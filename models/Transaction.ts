@@ -33,7 +33,7 @@ export interface ITransaction extends Document {
   referenceId: string;
   type: TransactionType;
   status: TransactionStatus;
-  fromUser: mongoose.Types.ObjectId;
+  fromUser?: mongoose.Types.ObjectId;
   toUser?: mongoose.Types.ObjectId;
   amount: number;
   currency: "USD" | "NGN";
@@ -52,6 +52,7 @@ export interface ITransaction extends Document {
   updatedAt: Date;
   completedAt?: Date;
   failureReason?: string;
+  markAsCompleted: (toronetTransactionId?: string) => void;
 }
 
 /**
@@ -88,7 +89,9 @@ const TransactionSchema: Schema = new Schema(
     fromUser: {
       type: Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      required: function () {
+        return this.type === TransactionType.TRANSFER;
+      },
     },
     toUser: {
       type: Schema.Types.ObjectId,
@@ -119,31 +122,12 @@ const TransactionSchema: Schema = new Schema(
       required: true,
     },
     bankDetails: {
-      accountNumber: {
-        type: String,
-        trim: true,
-        required: true,
-      },
-      accountName: {
-        type: String,
-        trim: true,
-        required: true,
-      },
-      bankName: {
-        type: String,
-        trim: true,
-        required: true,
-      },
-      routingNumber: {
-        type: String,
-        trim: true,
-        required: true,
-      },
+      type: Object,
+      default: {},
     },
     exchangeRate: {
       type: Number,
       min: 0,
-      required: true,
     },
     fees: {
       type: Number,

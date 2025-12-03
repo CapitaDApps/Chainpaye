@@ -7,6 +7,7 @@
 import { connectDatabase } from "./config/database";
 import { logger } from "./utils/logger";
 import dotenv from "dotenv";
+import { app } from "./webhooks";
 
 // Load environment variables
 dotenv.config();
@@ -14,18 +15,13 @@ dotenv.config();
 /**
  * Main bot initialization function
  */
+const { PORT = "3000" } = process.env;
+
 async function initializeBot() {
   try {
     // Connect to MongoDB
     await connectDatabase();
     logger.info("Database connected successfully");
-
-    // Initialize WhatsApp bot
-    logger.info("Initializing ChainPaye WhatsApp bot...");
-
-    // TODO: Initialize WhatsApp Business API connection
-    // TODO: Set up webhook listeners
-    // TODO: Initialize message handlers
 
     logger.info("ChainPaye WhatsApp bot initialized successfully");
 
@@ -60,4 +56,15 @@ process.on("unhandledRejection", (reason, promise) => {
 });
 
 // Start the bot
-initializeBot();
+initializeBot().then(() => {
+  // Initialize WhatsApp bot
+  logger.info("Initializing ChainPaye WhatsApp bot...");
+
+  // TODO: Set up webhook listeners
+  // TODO: Initialize message handlers
+
+  app.listen(PORT, (error) => {
+    if (error) return console.error("Error starting server", error);
+    console.log("Server online...");
+  });
+});

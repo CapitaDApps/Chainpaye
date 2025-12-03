@@ -7,3 +7,5 @@ export type KycDataType = {
     dob: string,
     address: string
 }
+
+export type CurrencyType = "USD" | "NGN"

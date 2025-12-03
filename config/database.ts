@@ -13,7 +13,7 @@ import { logger } from "../utils/logger";
 export const connectDatabase = async (): Promise<void> => {
   try {
     const mongoUri =
-      process.env.MONGODB_URI || "mongodb://localhost:27017/chainpaye";
+      process.env.MONGO_DB_URI || "mongodb://localhost:27017/chainpaye";
 
     await mongoose.connect(mongoUri);
 

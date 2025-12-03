@@ -1,0 +1,241 @@
+{
+  "version": "7.2",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "SIGN_IN": ["SIGN_UP", "FORGOT_PASSWORD"],
+    "SIGN_UP": ["TERMS_AND_CONDITIONS"],
+    "FORGOT_PASSWORD": [],
+    "TERMS_AND_CONDITIONS": []
+  },
+  "screens": [
+    {
+      "id": "SIGN_IN",
+      "title": "Sign in",
+      "terminal": true,
+      "success": true,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "sign_in_form",
+            "children": [
+              {
+                "type": "TextInput",
+                "required": true,
+                "label": "Email address",
+                "name": "email",
+                "input-type": "email"
+              },
+              {
+                "type": "TextInput",
+                "required": true,
+                "label": "Password",
+                "name": "password",
+                "input-type": "password"
+              },
+              {
+                "type": "EmbeddedLink",
+                "text": "Don't have an account? Sign up",
+                "on-click-action": {
+                  "name": "navigate",
+                  "next": {
+                    "type": "screen",
+                    "name": "SIGN_UP"
+                  },
+                  "payload": {}
+                }
+              },
+              {
+                "type": "EmbeddedLink",
+                "text": "Forgot password",
+                "on-click-action": {
+                  "name": "navigate",
+                  "next": {
+                    "type": "screen",
+                    "name": "FORGOT_PASSWORD"
+                  },
+                  "payload": {
+                    "body": "Example"
+                  }
+                }
+              },
+              {
+                "type": "Footer",
+                "label": "Sign in",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "email": "${form.email}",
+                    "password": "${form.password}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "SIGN_UP",
+      "title": "Sign up",
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "sign_up_form",
+            "children": [
+              {
+                "type": "TextInput",
+                "required": true,
+                "label": "First Name",
+                "name": "first_name",
+                "input-type": "text"
+              },
+              {
+                "type": "TextInput",
+                "required": true,
+                "label": "Last Name",
+                "name": "last_name",
+                "input-type": "text"
+              },
+              {
+                "type": "TextInput",
+                "required": true,
+                "label": "Email address",
+                "name": "email",
+                "input-type": "email"
+              },
+              {
+                "type": "TextInput",
+                "required": true,
+                "label": "Set password",
+                "name": "password",
+                "input-type": "password"
+              },
+              {
+                "type": "TextInput",
+                "required": true,
+                "label": "Confirm password",
+                "name": "confirm_password",
+                "input-type": "password"
+              },
+              {
+                "type": "OptIn",
+                "name": "terms_agreement",
+                "label": "I agree with the terms.",
+                "required": true,
+                "on-click-action": {
+                  "name": "navigate",
+                  "next": {
+                    "type": "screen",
+                    "name": "TERMS_AND_CONDITIONS"
+                  },
+                  "payload": {}
+                }
+              },
+              {
+                "type": "OptIn",
+                "name": "offers_acceptance",
+                "label": "I would like to receive news and offers."
+              },
+              {
+                "type": "Footer",
+                "label": "Continue",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "first_name": "${form.first_name}",
+                    "last_name": "${form.last_name}",
+                    "email": "${form.email}",
+                    "password": "${form.password}",
+                    "confirm_password": "${form.confirm_password}",
+                    "terms_agreement": "${form.terms_agreement}",
+                    "offers_acceptance": "${form.offers_acceptance}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "FORGOT_PASSWORD",
+      "title": "Forgot password",
+      "terminal": true,
+      "success": true,
+      "data": {
+        "body": {
+          "type": "string",
+          "__example__": "Enter your email address for your account and we'll send a reset link. The single-use link will expire after 24 hours."
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "forgot_password_form",
+            "children": [
+              {
+                "type": "TextBody",
+                "text": "${data.body}"
+              },
+              {
+                "type": "TextInput",
+                "required": true,
+                "label": "Email address",
+                "name": "email",
+                "input-type": "email"
+              },
+              {
+                "type": "Footer",
+                "label": "Sign in",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "email": "${form.email}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "TERMS_AND_CONDITIONS",
+      "title": "Terms and conditions",
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Our Terms"
+          },
+          {
+            "type": "TextSubheading",
+            "text": "Data usage"
+          },
+          {
+            "type": "TextBody",
+            "text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed vitae odio dui. Praesent ut nulla tincidunt, scelerisque augue malesuada, volutpat lorem. Aliquam iaculis ex at diam posuere mollis. Suspendisse eget purus ac tellus interdum pharetra. In quis dolor turpis. Fusce in porttitor enim, vitae efficitur nunc. Fusce dapibus finibus volutpat. Fusce velit mi, ullamcorper ac gravida vitae, blandit quis ex. Fusce ultrices diam et justo blandit, quis consequat nisl euismod. Vestibulum pretium est sem, vitae convallis justo sollicitudin non. Morbi bibendum purus mattis quam condimentum, a scelerisque erat bibendum. Nullam sit amet bibendum lectus."
+          },
+          {
+            "type": "TextSubheading",
+            "text": "Privacy policy"
+          },
+          {
+            "type": "TextBody",
+            "text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed vitae odio dui. Praesent ut nulla tincidunt, scelerisque augue malesuada, volutpat lorem. Aliquam iaculis ex at diam posuere mollis. Suspendisse eget purus ac tellus interdum pharetra. In quis dolor turpis. Fusce in porttitor enim, vitae efficitur nunc. Fusce dapibus finibus volutpat. Fusce velit mi, ullamcorper ac gravida vitae, blandit quis ex. Fusce ultrices diam et justo blandit, quis consequat nisl euismod. Vestibulum pretium est sem, vitae convallis justo sollicitudin non. Morbi bibendum purus mattis quam condimentum, a scelerisque erat bibendum. Nullam sit amet bibendum lectus."
+          }
+        ]
+      }
+    }
+  ]
+}

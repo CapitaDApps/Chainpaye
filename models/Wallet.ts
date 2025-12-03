@@ -18,7 +18,6 @@ export enum StablecoinType {
  */
 export interface IWallet extends Document {
   user: mongoose.Types.ObjectId;
-  toronetWalletId: string;
   publicKey: string;
   password: string; // Encrypted
   balances: {
@@ -46,12 +45,6 @@ const WalletSchema: Schema = new Schema(
       ref: "User",
       required: true,
       unique: true,
-    },
-    toronetWalletId: {
-      type: String,
-      required: true,
-      unique: true,
-      trim: true,
     },
     publicKey: {
       type: String,
