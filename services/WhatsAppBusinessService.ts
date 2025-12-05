@@ -7,7 +7,7 @@
 import axios from "axios";
 import { WalletService } from "./WalletService";
 
-type ButtonPayloadType = "Transfer to contacts";
+type ButtonPayloadType = "Receive Payment";
 type CommandTextType =
   | "transfer-usd"
   | "transfer-ngn"
@@ -30,7 +30,7 @@ export class WhatsAppBusinessService {
   async sendNormalMessage(message: string, to: string) {
     await axios({
       method: "POST",
-      url: `https://graph.facebook.com/v18.0/${this.business_phone_number_id}/messages`,
+      url: `https://graph.facebook.com/v24.0/${this.business_phone_number_id}/messages`,
       headers: {
         Authorization: `Bearer ${this.GRAPH_API_TOKEN}`,
       },
@@ -46,7 +46,7 @@ export class WhatsAppBusinessService {
     // https://moccasin-bright-skunk-108.mypinata.cloud/ipfs/bafkreic632v26b4htt7cfwkhsleivo6q3lljlnhadgb6u
     await axios({
       method: "POST",
-      url: `https://graph.facebook.com/v18.0/${this.business_phone_number_id}/messages`,
+      url: `https://graph.facebook.com/v24.0/${this.business_phone_number_id}/messages`,
       headers: {
         Authorization: `Bearer ${this.GRAPH_API_TOKEN}`,
       },
@@ -56,7 +56,7 @@ export class WhatsAppBusinessService {
         to,
         type: "template",
         template: {
-          name: "intro",
+          name: "seasonal_promotion_text_only",
           language: {
             code: "en",
           },
@@ -72,6 +72,108 @@ export class WhatsAppBusinessService {
                 },
               ],
             },
+
+            {
+              type: "body",
+              parameters: [],
+            },
+            {
+              type: "button",
+              sub_type: "flow",
+              index: "0",
+              parameters: [],
+            },
+            {
+              type: "button",
+              sub_type: "quick_reply",
+              index: "1",
+              parameters: [],
+            },
+          ],
+        },
+      },
+    });
+  }
+
+  async sendTemplateTextMessage(
+    templateName: string,
+    to: string,
+    templateLang: string
+  ) {
+    await axios({
+      method: "POST",
+      url: `https://graph.facebook.com/v24.0/${this.business_phone_number_id}/messages`,
+      headers: {
+        Authorization: `Bearer ${this.GRAPH_API_TOKEN}`,
+      },
+      data: {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: "template",
+        template: {
+          name: templateName,
+          language: {
+            code: templateLang,
+          },
+        },
+      },
+    });
+  }
+
+  async sendTemplateInteractiveMessage(
+    templateName: string,
+    to: string,
+    templateLang: string
+  ) {
+    await axios({
+      method: "POST",
+      url: `https://graph.facebook.com/v24.0/${this.business_phone_number_id}/messages`,
+      headers: {
+        Authorization: `Bearer ${this.GRAPH_API_TOKEN}`,
+      },
+      data: {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: "template",
+        template: {
+          name: templateName,
+          language: {
+            code: templateLang,
+          },
+          components: [
+            {
+              type: "header",
+              parameters: [],
+            },
+
+            {
+              type: "body",
+              parameters: [],
+            },
+            {
+              type: "footer",
+              parameters: [],
+            },
+            {
+              type: "button",
+              sub_type: "flow",
+              index: "0",
+              parameters: [],
+            },
+            {
+              type: "button",
+              sub_type: "quick_reply",
+              index: "1",
+              parameters: [],
+            },
+            {
+              type: "button",
+              sub_type: "quick_reply",
+              index: "2",
+              parameters: [],
+            },
           ],
         },
       },
@@ -80,18 +182,9 @@ export class WhatsAppBusinessService {
 
   async handleButtonPayload(payload: ButtonPayloadType, to: string) {
     switch (payload) {
-      case "Transfer to contacts":
+      case "Receive Payment":
         // set up transfet to contacts
-        await this.sendNormalMessage(
-          `THIS IS A TEST FEATURE
-
-Send your transfer message in this format:
-
-*transfer-usd: amount, to_phone_number*
-*transfer-ngn: amount, to_phone_number*
-          `,
-          to
-        );
+        await this.sendTemplateInteractiveMessage("receivepayments", to, "en");
         break;
       default:
         // invalid payload

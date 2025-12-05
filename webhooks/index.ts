@@ -1,15 +1,12 @@
 import dotenv from "dotenv";
 import express, { Express } from "express";
-import { IncomingMessage } from "http";
-import { getIpData } from "../services/ipdata";
 import { UserService } from "../services/UserService";
 import { WhatsAppBusinessService } from "../services/WhatsAppBusinessService";
+import flowRouter from "./route/route";
+import { CustomReq } from "./types/request.type";
+
 dotenv.config();
 export const app: Express = express();
-
-interface CustomReq extends IncomingMessage {
-  rawBody: string;
-}
 
 const userService = new UserService();
 const whatsappBusinessService = new WhatsAppBusinessService();
@@ -54,16 +51,16 @@ app.get("/", (req, res) => {
 });
 
 app.post("/webhook", async (req, res) => {
-  console.log("Incoming webhook message:", JSON.stringify(req.body, null, 2));
+  // console.log("Incoming webhook message:", JSON.stringify(req.body, null, 2));
 
   // const ipDetails = await getIpData(req.ip);
   // console.log({ ip: req.ip?.split(":") });
 
-  const ipDetails = await getIpData("8.8.8.8");
+  // const ipDetails = await getIpData("8.8.8.8");
 
-  if (!ipDetails) throw new Error("Couldn't detect user's location");
+  // if (!ipDetails) throw new Error("Couldn't detect user's location");
 
-  console.log({ ipDetails });
+  // console.log({ ipDetails });
   const message = req.body.entry?.[0]?.changes[0]?.value?.messages?.[0];
   const contact = req.body.entry[0].changes[0].value.contacts?.[0];
   if (contact) {
@@ -72,7 +69,7 @@ app.post("/webhook", async (req, res) => {
       await userService.createOrGetUser({
         whatsappNumber: `+${wa_id}`,
         fullName: `${profile.name}`,
-        countryCode: ipDetails.countryCode,
+        countryCode: "NG",
       });
     }
   }
@@ -90,7 +87,7 @@ app.post("/webhook", async (req, res) => {
     } else {
       whatsappBusinessService
         .sendTemplateIntroMessage(message.from)
-        .catch((err) => console.log(err.response.data));
+        .catch((err) => console.log(err));
     }
   }
 
@@ -108,3 +105,5 @@ app.post("/webhook", async (req, res) => {
 
   res.sendStatus(200);
 });
+
+app.use("/flow", flowRouter);
