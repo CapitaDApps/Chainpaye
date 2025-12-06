@@ -1,4 +1,4 @@
-export const getTopUpScreen = async (decryptedBody: {
+export const getInvoiceScreen = async (decryptedBody: {
   screen: string;
   data: any;
   version: string;
@@ -29,9 +29,9 @@ export const getTopUpScreen = async (decryptedBody: {
   // handle initial request when opening the flow
   if (action === "INIT") {
     return {
-      screen: "TOPUP_WALLET",
+      screen: "TRANSFER",
       data: {
-        currencies: [
+        currency: [
           { id: "1", title: "USD" },
           { id: "2", title: "NGN" },
         ],
@@ -41,8 +41,10 @@ export const getTopUpScreen = async (decryptedBody: {
 
   if (action === "data_exchange") {
     // handle the request based on the current screen
+    console.log({ data });
     switch (screen) {
-      case "TOPUP_WALLET":
+      case "INVOICE":
+        // TODO: process flow input data
         return {
           screen: "PIN",
           data: {},
@@ -51,9 +53,10 @@ export const getTopUpScreen = async (decryptedBody: {
         console.log({ data });
         return {
           screen: "COMPLETE",
-          data: {},
+          data: {
+            paymentUrl: "",
+          },
         };
-
       default:
         break;
     }

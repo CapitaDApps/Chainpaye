@@ -1,3 +1,7 @@
+import { redisClient } from "../../services/redis";
+import { WalletService } from "../../services/WalletService";
+import { User } from "../../models/User";
+
 export const getTransferScreen = async (decryptedBody: {
   screen: string;
   data: any;
@@ -6,6 +10,8 @@ export const getTransferScreen = async (decryptedBody: {
   flow_token: string;
 }) => {
   const { screen, data, version, action, flow_token } = decryptedBody;
+  const walletService = new WalletService();
+
   // handle health check request
   if (action === "ping") {
     return {
@@ -26,42 +32,126 @@ export const getTransferScreen = async (decryptedBody: {
     };
   }
 
-  // handle initial request when opening the flow
-  if (action === "INIT") {
-    return {
-      screen: "TRANSFER",
-      data: {
-        currency: [
-          { id: "1", title: "USD" },
-          { id: "2", title: "NGN" },
-        ],
-      },
-    };
-  }
+  try {
+    // Get user phone number from Redis using flow_token
+    const userPhone = await redisClient.get(flow_token);
 
-  if (action === "data_exchange") {
-    // handle the request based on the current screen
-    console.log({ data });
-    switch (screen) {
-      case "TRANSFER":
-        // TODO: process flow input data
-        return {
-          screen: "PIN",
-          data: {},
-        };
-      case "PIN":
-        console.log({ data });
-        return {
-          screen: "COMPLETE",
-          data: {},
-        };
-      default:
-        break;
+    // handle initial request when opening the flow
+    if (action === "INIT") {
+      return {
+        screen: "TRANSFER",
+        data: {
+          currency: [
+            { id: "1", title: "USD" },
+            { id: "2", title: "NGN" },
+          ],
+        },
+      };
     }
-  }
 
-  console.error("Unhandled request body:", decryptedBody);
-  throw new Error(
-    "Unhandled endpoint request. Make sure you handle the request action & screen logged above."
-  );
+    if (action === "data_exchange") {
+      // handle the request based on the current screen
+      switch (screen) {
+        case "TRANSFER":
+          if (!userPhone) {
+            return {
+              screen: "TRANSFER",
+              error_message: "User flow session not found",
+            };
+          }
+          return {
+            screen: "PIN",
+            data: {},
+          };
+        case "PIN":
+          const { accountNumber, amount, currency, pin } = data;
+          if (!pin) {
+            return {
+              screen: "PIN",
+              data: {
+                error_message: "Please enter your PIN",
+              },
+            };
+          }
+
+          // Verify user PIN
+          const phone = userPhone?.startsWith("+")
+            ? userPhone
+            : `+${userPhone}`;
+          console.log({ phone });
+          const user = await User.findOne({ whatsappNumber: phone }).select(
+            "+pin"
+          );
+          console.log({ user });
+          if (!user?.pin) {
+            return {
+              screen: "PIN",
+              data: {
+                error_message:
+                  "You have to set a pin to proceed. Use the /setup pin command in the chat.",
+              },
+            };
+          }
+          const pinValid = await user.comparePin(pin);
+          if (!user || !pinValid) {
+            return {
+              screen: "PIN",
+              data: {
+                error_message: "Invalid PIN. Please try again.",
+              },
+            };
+          }
+
+          const acctNo = accountNumber.startsWith("+")
+            ? accountNumber
+            : `+${accountNumber}`;
+
+          const transferResult = await walletService.transfer(
+            userPhone!,
+            acctNo,
+            amount,
+            currency
+          );
+
+          if (transferResult?.success) {
+            return {
+              screen: "SUCCESS",
+              data: {
+                message: transferResult.message,
+              },
+            };
+          } else {
+            return {
+              screen: "PIN",
+              data: {
+                error_message:
+                  transferResult?.message ||
+                  "Transfer failed. Please try again.",
+              },
+            };
+          }
+        // return {
+        //   screen: "SUCCESS",
+        //   data: {
+        //     extension_message_response: {
+        //       params: {
+        //         flow_token: flow_token,
+        //         optional_param1: amount,
+        //         optional_param2: accountNumber,
+        //       },
+        //     },
+        //   },
+        // };
+        default:
+          break;
+      }
+    }
+    console.error("Unhandled request body:", decryptedBody);
+    throw new Error(
+      "Unhandled endpoint request. Make sure you handle the request action & screen logged above."
+    );
+  } catch (error) {
+    console.error("An error occurred", error);
+    throw new Error((error as { message: string }).message);
+  }
 };

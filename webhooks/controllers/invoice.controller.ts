@@ -3,14 +3,14 @@ import {
   encryptResponse,
   FlowEndpointException,
 } from "../encryption";
-import { getTransferScreen } from "../services/transferFlow.service";
+import { getInvoiceScreen } from "../services/invoice.service";
 import { isRequestSignatureValid } from "../utils/validSignature";
 import { Request, Response } from "express";
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
 const PASSPHRASE = process.env.PASSPHRASE;
 
-export const transferFlowController = async (req: Request, res: Response) => {
+export const invoiceController = async (req: Request, res: Response) => {
   if (!PRIVATE_KEY) {
     throw new Error(
       'Private key is empty. Please check your env variable "PRIVATE_KEY".'
@@ -31,7 +31,6 @@ export const transferFlowController = async (req: Request, res: Response) => {
 
   let decryptedRequest = null;
   try {
-    console.log(req.body);
     decryptedRequest = decryptRequest(req.body, PRIVATE_KEY, PASSPHRASE);
   } catch (err) {
     console.error(err);
@@ -49,19 +48,19 @@ export const transferFlowController = async (req: Request, res: Response) => {
   // Refer to the docs for details https://developers.facebook.com/docs/whatsapp/flows/reference/error-codes#endpoint_error_codes
 
   /*
-  if (!isValidFlowToken(decryptedBody.flow_token)) {
-    const error_response = {
-      error_msg: `The message is no longer available`,
-    };
-    return res
-      .status(427)
-      .send(
-        encryptResponse(error_response, aesKeyBuffer, initialVectorBuffer)
-      );
-  }
-  */
+    if (!isValidFlowToken(decryptedBody.flow_token)) {
+      const error_response = {
+        error_msg: `The message is no longer available`,
+      };
+      return res
+        .status(427)
+        .send(
+          encryptResponse(error_response, aesKeyBuffer, initialVectorBuffer)
+        );
+    }
+    */
 
-  const screenResponse = await getTransferScreen(decryptedBody);
+  const screenResponse = await getInvoiceScreen(decryptedBody);
   console.log("👉 Response to Encrypt:", screenResponse);
 
   res.send(encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer));

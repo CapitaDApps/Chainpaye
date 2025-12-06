@@ -77,6 +77,8 @@ export class WalletService {
           fromWallet.publicKey
         );
 
+        console.log({ respUSD });
+
         if (!respUSD.result) throw new Error("Error fetching USD balance");
 
         if (respUSD.balance < amount)

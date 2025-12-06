@@ -51,7 +51,7 @@ app.get("/", (req, res) => {
 });
 
 app.post("/webhook", async (req, res) => {
-  // console.log("Incoming webhook message:", JSON.stringify(req.body, null, 2));
+  console.log("Incoming webhook message:", JSON.stringify(req.body, null, 2));
 
   // const ipDetails = await getIpData(req.ip);
   // console.log({ ip: req.ip?.split(":") });
@@ -77,7 +77,11 @@ app.post("/webhook", async (req, res) => {
   if (message && message.type == "text") {
     const messageBody = message.text.body;
     const messageList = messageBody.split(":");
-    if (!messageBody.includes("hello")) {
+    if (messageBody === "/setup pin") {
+      whatsappBusinessService
+        .sendPinFlowTempMessage(message.from)
+        .catch((err) => console.log(err));
+    } else if (!messageBody.includes("hello")) {
       const command = messageList[0].trim();
       const text = messageList[1]?.trim();
       console.log({ text });
@@ -87,7 +91,7 @@ app.post("/webhook", async (req, res) => {
     } else {
       whatsappBusinessService
         .sendTemplateIntroMessage(message.from)
-        .catch((err) => console.log(err));
+        .catch((err: Error) => console.log(err));
     }
   }
 

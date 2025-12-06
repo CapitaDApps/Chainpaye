@@ -5,6 +5,7 @@
 
 import mongoose, { Schema, Document } from "mongoose";
 import bcrypt from "bcryptjs";
+import { hashPin } from "../webhooks/utils/hashPin";
 
 /**
  * Interface for User document
@@ -112,9 +113,7 @@ UserSchema.pre<IUser>("save", async function (next) {
   if (!this.isModified("pin")) return next();
 
   try {
-    // Hash PIN with cost of 12
-    const salt = await bcrypt.genSalt(12);
-    this.pin = await bcrypt.hash(String(this.pin), salt);
+    this.pin = await hashPin(String(this.pin));
     next();
   } catch (error) {
     next(error as Error);

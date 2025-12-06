@@ -6,6 +6,8 @@
 
 import axios from "axios";
 import { WalletService } from "./WalletService";
+import { redisClient } from "./redis";
+import { v4 as uuidv4 } from "uuid";
 
 type ButtonPayloadType = "Receive Payment";
 type CommandTextType =
@@ -14,7 +16,8 @@ type CommandTextType =
   | "deposit"
   | "deposit-usd"
   | "deposit-ngn"
-  | "status";
+  | "status"
+  | "setup pin";
 
 export class WhatsAppBusinessService {
   private GRAPH_API_TOKEN: string;
@@ -43,7 +46,9 @@ export class WhatsAppBusinessService {
   }
 
   async sendTemplateIntroMessage(to: string) {
-    // https://moccasin-bright-skunk-108.mypinata.cloud/ipfs/bafkreic632v26b4htt7cfwkhsleivo6q3lljlnhadgb6u
+    const flowToken = uuidv4();
+    await redisClient.set(flowToken, to, "EX", 3600); // Store flow_token for 1 hour
+
     await axios({
       method: "POST",
       url: `https://graph.facebook.com/v24.0/${this.business_phone_number_id}/messages`,
@@ -56,9 +61,9 @@ export class WhatsAppBusinessService {
         to,
         type: "template",
         template: {
-          name: "seasonal_promotion_text_only",
+          name: "intromessage",
           language: {
-            code: "en",
+            code: "en_US",
           },
           components: [
             {
@@ -74,20 +79,56 @@ export class WhatsAppBusinessService {
             },
 
             {
-              type: "body",
-              parameters: [],
+              type: "button",
+              sub_type: "flow",
+              index: "0",
+              parameters: [
+                {
+                  type: "action",
+                  action: {
+                    flow_token: flowToken,
+                  },
+                },
+              ],
             },
+          ],
+        },
+      },
+    });
+  }
+
+  async sendPinFlowTempMessage(to: string) {
+    const flowToken = uuidv4();
+    await redisClient.set(flowToken, to, "EX", 3600); // Store flow_token for 1 hour
+    await axios({
+      method: "POST",
+      url: `https://graph.facebook.com/v24.0/${this.business_phone_number_id}/messages`,
+      headers: {
+        Authorization: `Bearer ${this.GRAPH_API_TOKEN}`,
+      },
+      data: {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: "template",
+        template: {
+          name: "appointment",
+          language: {
+            code: "en",
+          },
+          components: [
             {
               type: "button",
               sub_type: "flow",
               index: "0",
-              parameters: [],
-            },
-            {
-              type: "button",
-              sub_type: "quick_reply",
-              index: "1",
-              parameters: [],
+              parameters: [
+                {
+                  type: "action",
+                  action: {
+                    flow_token: flowToken,
+                  },
+                },
+              ],
             },
           ],
         },
