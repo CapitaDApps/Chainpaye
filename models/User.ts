@@ -5,14 +5,14 @@
 
 import mongoose, { Schema, Document } from "mongoose";
 import bcrypt from "bcryptjs";
+import { hashPin } from "../webhooks/utils/hashPin";
 
 /**
  * Interface for User document
  */
 export interface IUser extends Document {
   whatsappNumber: string;
-  firstName: string;
-  lastName: string;
+  fullName: string;
   email?: string;
   country: string;
   currency: "USD" | "NGN";
@@ -38,24 +38,20 @@ const UserSchema: Schema = new Schema(
       trim: true,
       match: /^\+\d{1,15}$/, // International phone number format
     },
-    firstName: {
+    fullName: {
       type: String,
       required: true,
       trim: true,
-      maxlength: 50,
+      maxlength: 150,
     },
-    lastName: {
-      type: String,
-      required: true,
-      trim: true,
-      maxlength: 50,
-    },
+
     email: {
       type: String,
       trim: true,
       lowercase: true,
       match: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
       sparse: true, // Allows multiple null values
+      unique: true,
     },
     country: {
       type: String,
@@ -84,16 +80,14 @@ const UserSchema: Schema = new Schema(
       type: Date,
       select: false,
     },
-    toronetWalletId: {
-      type: String,
+    toronetWallet: {
+      type: Schema.Types.ObjectId,
       unique: true,
-      sparse: true, // Allows multiple null values
+      ref: "Wallet",
     },
     pin: {
       type: String,
-      required: true,
-      minlength: 4,
-      maxlength: 6,
+      required: false,
       select: false, // Don't include in queries by default
     },
   },
@@ -106,7 +100,7 @@ const UserSchema: Schema = new Schema(
  * Index for efficient queries
  */
 UserSchema.index({ whatsappNumber: 1 });
-UserSchema.index({ toronetWalletId: 1 });
+UserSchema.index({ toronetWallet: 1 });
 UserSchema.index({ email: 1 });
 
 /**
@@ -117,9 +111,7 @@ UserSchema.pre<IUser>("save", async function (next) {
   if (!this.isModified("pin")) return next();
 
   try {
-    // Hash PIN with cost of 12
-    const salt = await bcrypt.genSalt(12);
-    this.pin = await bcrypt.hash(String(this.pin), salt);
+    this.pin = await hashPin(String(this.pin));
     next();
   } catch (error) {
     next(error as Error);
@@ -138,13 +130,6 @@ UserSchema.methods.comparePin = async function (
     return false;
   }
 };
-
-/**
- * Virtual for full name
- */
-UserSchema.virtual("fullName").get(function () {
-  return `${this.firstName} ${this.lastName}`;
-});
 
 /**
  * Method to generate verification code
