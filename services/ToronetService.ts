@@ -42,11 +42,11 @@ export class ToronetService {
 
   constructor() {
     const instance = axios.create({
-      baseURL: "https://toronet.org/api",
+      baseURL: "https://api.toronet.org",
       timeout: 10000,
     });
     this.axiosInstance = instance;
-    this.baseUrl = "https://toronet.org/api";
+    this.baseUrl = "https://api.toronet.org";
     this.encryptionKey =
       process.env.ENCRYPTION_KEY || "default-key-change-in-production";
     this.adminPassword = process.env.TORONET_ADMIN_PASSWORD || "";

@@ -5,11 +5,13 @@ import { WalletService } from "./WalletService";
 import { CurrencyType } from "../types/toronetService.types";
 import { Wallet } from "../models/Wallet";
 import { WhatsAppBusinessService } from "./WhatsAppBusinessService";
+import { hashPin } from "../webhooks/utils/hashPin";
 
 type CreateOrGetUserType = {
   whatsappNumber: string;
   fullName: string;
   countryCode: string;
+  pin: string;
 };
 
 export class UserService {
@@ -21,6 +23,11 @@ export class UserService {
     this.toronetService = new ToronetService();
     this.walletService = new WalletService();
     this.whatsappBusinessService = new WhatsAppBusinessService();
+  }
+
+  async getUser(phoneNumber: string) {
+    const user = await User.findOne({ whatsappNumber: phoneNumber });
+    return user;
   }
 
   async createOrGetUser(data: CreateOrGetUserType) {
@@ -35,6 +42,7 @@ export class UserService {
         whatsappNumber: data.whatsappNumber,
         fullName: data.fullName,
         country: data.countryCode,
+        pin: await hashPin(data.pin),
       });
       await this.walletService.addWallet(user);
       return user;

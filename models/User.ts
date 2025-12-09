@@ -88,8 +88,6 @@ const UserSchema: Schema = new Schema(
     pin: {
       type: String,
       required: false,
-      minlength: 4,
-      maxlength: 6,
       select: false, // Don't include in queries by default
     },
   },

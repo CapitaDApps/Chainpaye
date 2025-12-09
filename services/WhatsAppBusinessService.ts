@@ -167,6 +167,8 @@ export class WhatsAppBusinessService {
     to: string,
     templateLang: string
   ) {
+    const flowToken = uuidv4();
+    await redisClient.set(flowToken, to, "EX", 3600); // Store flow_token for 1 hour
     await axios({
       method: "POST",
       url: `https://graph.facebook.com/v24.0/${this.business_phone_number_id}/messages`,
@@ -201,7 +203,14 @@ export class WhatsAppBusinessService {
               type: "button",
               sub_type: "flow",
               index: "0",
-              parameters: [],
+              parameters: [
+                {
+                  type: "action",
+                  action: {
+                    flow_token: flowToken,
+                  },
+                },
+              ],
             },
             {
               type: "button",
@@ -348,7 +357,7 @@ routing number: *${data.routingNO}*
 transactionId: *${data.transactionId}*
 
 
-**You can check the status of the transaction by sending this message: status: transactionId**
+**You can check the status of the transaction by sending this message: /status <transactionId>**
           
           `,
           to

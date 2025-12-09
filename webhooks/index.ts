@@ -4,6 +4,8 @@ import { UserService } from "../services/UserService";
 import { WhatsAppBusinessService } from "../services/WhatsAppBusinessService";
 import flowRouter from "./route/route";
 import { CustomReq } from "./types/request.type";
+import axios from "axios";
+import { User } from "../models/User";
 
 dotenv.config();
 export const app: Express = express();
@@ -63,48 +65,71 @@ app.post("/webhook", async (req, res) => {
   // console.log({ ipDetails });
   const message = req.body.entry?.[0]?.changes[0]?.value?.messages?.[0];
   const contact = req.body.entry[0].changes[0].value.contacts?.[0];
-  if (contact) {
-    const { profile, wa_id } = contact;
-    if (profile.name && wa_id) {
-      await userService.createOrGetUser({
-        whatsappNumber: `+${wa_id}`,
-        fullName: `${profile.name}`,
-        countryCode: "NG",
+
+  if (message) {
+    try {
+      // mark incoming message as read
+      await axios({
+        method: "POST",
+        url: `https://graph.facebook.com/v24.0/${897300070126934}/messages`,
+        headers: {
+          Authorization: `Bearer ${GRAPH_API_TOKEN}`,
+        },
+        data: {
+          messaging_product: "whatsapp",
+          status: "read",
+          message_id: message.id,
+          typing_indicator: {
+            type: "text",
+          },
+        },
       });
+
+      if (contact) {
+        const { wa_id } = contact;
+
+        if (wa_id) {
+          const user = await userService.getUser(`+${wa_id}`);
+
+          if (!user) {
+            // send welcome mesage
+            await whatsappBusinessService.sendTemplateIntroMessage(
+              message.from
+            );
+          } else {
+            // send other messages
+            if (message.type == "text") {
+              await whatsappBusinessService.sendTemplateInteractiveMessage(
+                "appointment",
+                message.from,
+                "en"
+              );
+            }
+
+            if (message.type == "button") {
+              const { payload } = message.button;
+              await whatsappBusinessService.handleButtonPayload(
+                payload,
+                message.from
+              );
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.log(error);
     }
   }
 
   if (message && message.type == "text") {
-    const messageBody = message.text.body;
-    const messageList = messageBody.split(":");
-    if (messageBody === "/setup pin") {
-      whatsappBusinessService
-        .sendPinFlowTempMessage(message.from)
-        .catch((err) => console.log(err));
-    } else if (!messageBody.includes("hello")) {
-      const command = messageList[0].trim();
-      const text = messageList[1]?.trim();
-      console.log({ text });
-      whatsappBusinessService
-        .handleCommandText(command, text, message.from)
-        .catch((err) => console.log("handleCommandText", err));
-    } else {
-      whatsappBusinessService
-        .sendTemplateIntroMessage(message.from)
-        .catch((err: Error) => console.log(err));
-    }
-  }
-
-  if (message && message.type == "button") {
-    // "button": {
-    //               "payload": "Transfer to contacts",
-    //               "text": "Transfer to contacts"
-    //             }
-
-    const { payload } = message.button;
-    whatsappBusinessService
-      .handleButtonPayload(payload, message.from)
-      .catch((err) => console.log("Error from handleButtonPayload", err));
+    // else if (!messageBody.includes("hello")) {
+    //   const command = messageList[0].trim();
+    //   const text = messageList[1]?.trim();
+    //   console.log({ text });
+    //   whatsappBusinessService
+    //     .handleCommandText(command, text, message.from)
+    //     .catch((err) => console.log("handleCommandText", err));
+    // }
   }
 
   res.sendStatus(200);
