@@ -63,8 +63,9 @@ export const getTopUpScreen = async (decryptedBody: {
             },
           };
         }
-        const phone = userPhone?.startsWith("+") ? userPhone : `+${userPhone}`;
-        const user = await userService.getUser(phone);
+        const phone = userPhone.startsWith("+") ? userPhone : `+${userPhone}`;
+
+        const user = await userService.getUser(phone, true);
 
         if (isNaN(Number(data.amount)))
           return {
@@ -83,10 +84,8 @@ export const getTopUpScreen = async (decryptedBody: {
             },
           };
         }
-        console.log({ pin: data.pin });
-        const isValidPin = await user.comparePin(data.pin);
 
-        console.log({ isValidPin });
+        const isValidPin = await user.comparePin(data.pin);
 
         if (!isValidPin) {
           return {
@@ -97,19 +96,14 @@ export const getTopUpScreen = async (decryptedBody: {
           };
         }
 
-        const result = await walletService.deposit(
-          phone,
-          data.amount,
-          data.currency
-        );
+        walletService
+          .deposit(phone, data.amount, data.currency)
+          .then(async (result) => {
+            if (data.currency == "USD") {
+              await whatsappBusinessService.sendNormalMessage(
+                `*Make deposit to the specified account.*
 
-        if (data.currency == "USD") {
-          const depositAmount: string = data.amount;
-
-          await whatsappBusinessService.sendNormalMessage(
-            `*Make deposit to the specified account.*
-
-*Amount:* ${result.amount}
+*Amount:* ${data.amount}
 *Account Name:* ${result.accountName}
 *Bank Name:* ${result.bankName}
 *Account Number:* ${result.accountNumber}
@@ -118,19 +112,19 @@ export const getTopUpScreen = async (decryptedBody: {
 *Transaction Id:* ${result.transactionId}
 
 
-**You can check the status of the transaction by sending this message: /status <TransactionId>**
-          `,
-            phone
-          );
-          await whatsappBusinessService.sendNormalMessage(
-            data.transactionId,
-            phone
-          );
-        } else if (data.currency == "NGN") {
-          const depositAmountNGN = data.amount;
+*You can check the status of the transaction by sending this message:*
 
-          await whatsappBusinessService.sendNormalMessage(
-            `*Make deposit to the specified account details.*
+_/status <transactionId>_
+          `,
+                phone
+              );
+              await whatsappBusinessService.sendNormalMessage(
+                data.transactionId,
+                phone
+              );
+            } else {
+              await whatsappBusinessService.sendNormalMessage(
+                `*Make deposit to the specified account details.*
 
 amount: *${result.amount}*
 account name: *${result.accountName}*
@@ -140,21 +134,23 @@ account number: *${result.accountNumber}*
 transactionId: *${result.transactionId}*
 
 
-**You can check the status of the transaction by sending this message: status: transactionId**
+*You can check the status of the transaction by sending this message:*
+
+_/status <transactionId>_
         `,
-            phone
-          );
-          await whatsappBusinessService.sendNormalMessage(
-            result.transactionId,
-            phone
-          );
-        }
+                phone
+              );
+              await whatsappBusinessService.sendNormalMessage(
+                result.transactionId,
+                phone
+              );
+            }
+          })
+          .catch((error) => console.log("Error topping up", error));
 
         return {
-          screen: "COMPLETE",
-          data: {
-            transactionId: result.transactionId,
-          },
+          screen: "PROCESSING",
+          data: {},
         };
 
       default:

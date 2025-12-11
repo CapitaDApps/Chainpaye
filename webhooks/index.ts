@@ -6,13 +6,18 @@ import flowRouter from "./route/route";
 import { CustomReq } from "./types/request.type";
 import axios from "axios";
 import { User } from "../models/User";
+import { redisClient } from "../services/redis";
+import { ToronetService } from "../services/ToronetService";
+import { IWallet } from "../models/Wallet";
+import { WalletService } from "../services/WalletService";
 
 dotenv.config();
 export const app: Express = express();
 
 const userService = new UserService();
 const whatsappBusinessService = new WhatsAppBusinessService();
-
+const toronetService = new ToronetService();
+const walletService = new WalletService();
 app.use(
   express.json({
     // store the raw request body to use it for signature verification
@@ -86,7 +91,7 @@ app.post("/webhook", async (req, res) => {
       });
 
       if (contact) {
-        const { wa_id } = contact;
+        const { profile, wa_id } = contact;
 
         if (wa_id) {
           const user = await userService.getUser(`+${wa_id}`);
@@ -99,11 +104,46 @@ app.post("/webhook", async (req, res) => {
           } else {
             // send other messages
             if (message.type == "text") {
-              await whatsappBusinessService.sendTemplateInteractiveMessage(
-                "appointment",
-                message.from,
-                "en"
-              );
+              if (message.text.body.toLowerCase().includes("balance")) {
+                const userWallet = await userService.getUserToroWallet(
+                  message.from
+                );
+                const [NGNBal, USDBal] = await Promise.all([
+                  toronetService.getBalanceNGN(userWallet.publicKey),
+                  toronetService.getBalanceUSD(userWallet.publicKey),
+                ]);
+                await whatsappBusinessService.sendNormalMessage(
+                  `*Your balance:* 
+*USD:* ${USDBal.balance}
+*NGN:* ${NGNBal.balance}
+                  `,
+                  message.from
+                );
+              } else if (message.text.body.startsWith("/status")) {
+                const msgList = message.text.body.split(" ");
+                const txId = msgList[1];
+                console.log({ msgList, txId });
+                if (!txId)
+                  return await whatsappBusinessService.sendNormalMessage(
+                    "Please pass the transaction id in the required format. status: transactionid",
+                    message.from
+                  );
+                const txStatusData = await walletService.checkTransactionStatus(
+                  txId
+                );
+
+                await whatsappBusinessService.sendNormalMessage(
+                  `${txStatusData.message}
+          `,
+                  message.from
+                );
+              } else {
+                await whatsappBusinessService.sendTemplateInteractiveMessage(
+                  "appointment",
+                  message.from,
+                  "en"
+                );
+              }
             }
 
             if (message.type == "button") {
@@ -112,6 +152,38 @@ app.post("/webhook", async (req, res) => {
                 payload,
                 message.from
               );
+            }
+
+            if (message.type == "interactive") {
+              const interactive = message.interactive;
+              const interactiveType = interactive.type;
+              if (interactiveType == "nfm_reply") {
+                const responseJson = JSON.parse(
+                  interactive.nfm_reply.response_json
+                );
+                console.log({ responseJson });
+
+                if (responseJson.type == "new-account") {
+                  const userAccount = await redisClient.get(
+                    `${responseJson.flow_token}_accountCreation`
+                  );
+                  let account: any;
+                  if (userAccount) {
+                    account = JSON.parse(userAccount);
+                  }
+                  await whatsappBusinessService.sendNormalMessage(
+                    `Hello *${
+                      account.fullName || profile.name
+                    }*, welcome to Chainpaye.`,
+                    message.from
+                  );
+                  await whatsappBusinessService.sendTemplateInteractiveMessage(
+                    "appointment",
+                    message.from,
+                    "en"
+                  );
+                }
+              }
             }
           }
         }

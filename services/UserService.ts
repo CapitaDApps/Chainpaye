@@ -1,13 +1,13 @@
-import { User } from "../models/User";
+import { IUser, User } from "../models/User";
 import { ToronetService } from "./ToronetService";
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 import { WalletService } from "./WalletService";
 import { CurrencyType } from "../types/toronetService.types";
 import { Wallet } from "../models/Wallet";
 import { WhatsAppBusinessService } from "./WhatsAppBusinessService";
-import { hashPin } from "../webhooks/utils/hashPin";
+import { nanoid } from "nanoid";
 
-type CreateOrGetUserType = {
+type CreateUserType = {
   whatsappNumber: string;
   fullName: string;
   countryCode: string;
@@ -25,60 +25,66 @@ export class UserService {
     this.whatsappBusinessService = new WhatsAppBusinessService();
   }
 
-  async getUser(phoneNumber: string) {
-    const user = await User.findOne({ whatsappNumber: phoneNumber });
+  async getUser(phoneNumber: string, includePin = false) {
+    phoneNumber = phoneNumber.startsWith("+") ? phoneNumber : `+${phoneNumber}`;
+    const user = await User.findOne({ whatsappNumber: phoneNumber }).select(
+      `${includePin ? "+pin" : ""}`
+    );
     return user;
   }
 
-  async createOrGetUser(data: CreateOrGetUserType) {
+  async getUserToroWallet(phoneNumber: string) {
+    const user = await this.getUser(phoneNumber);
+    if (!user)
+      throw new Error(`User with phone number - ${phoneNumber} not found`);
+
+    const userId = user.userId;
+
+    const wallet = await Wallet.findOne({ userId });
+
+    if (!wallet)
+      throw new Error(`Wallet for user - ${phoneNumber} was not found`);
+
+    return wallet;
+  }
+
+  async createUser(data: CreateUserType) {
     const user = await User.findOne({ whatsappNumber: data.whatsappNumber });
-    if (!user) {
-      // send welcome message
-      this.whatsappBusinessService.sendNormalMessage(
-        `Hello *${data.fullName}*, welcome to Chainpaye.`,
-        data.whatsappNumber
-      );
-      const user = await User.create({
-        whatsappNumber: data.whatsappNumber,
-        fullName: data.fullName,
-        country: data.countryCode,
-        pin: await hashPin(data.pin),
-      });
-      await this.walletService.addWallet(user);
-      return user;
-    }
 
-    return user;
+    if (!user) {
+      const userId = this.generateUserId();
+      const session = await mongoose.startSession();
+      try {
+        await session.withTransaction(async () => {
+          await User.create(
+            [
+              {
+                whatsappNumber: data.whatsappNumber,
+                fullName: data.fullName,
+                country: data.countryCode,
+                pin: data.pin,
+                userId,
+              },
+            ],
+            { session }
+          );
+
+          await this.walletService.addWallet(
+            { userId, fullName: data.fullName },
+            session
+          );
+        });
+      } catch (error) {
+        console.log("Error creating user", error);
+        throw error;
+      } finally {
+        await session.endSession();
+      }
+    }
   }
 
-  // TODO: Convert all incoming funds to TORO for easy transfer
-
-  async transferWithinWhatsapp({
-    fromId,
-    toPhoneNumber,
-    amount,
-    currency,
-  }: {
-    fromId: Types.ObjectId;
-    toPhoneNumber: string;
-    amount: number;
-    currency: CurrencyType;
-  }) {
-    const from = await User.findById(fromId);
-    const to = await User.findOne({ phoneNumber: toPhoneNumber });
-
-    if (!from)
-      throw new Error(`User with id-[${fromId.toString()}] not found.`);
-    if (!to)
-      throw new Error(`User with phone number - [${toPhoneNumber}] not found.`);
-
-    const toWallet = await Wallet.findOne({ user: to._id });
-    if (!toWallet)
-      throw new Error(
-        `User with phone number - [${toPhoneNumber}] has no wallet.`
-      );
-    const toAddress = toWallet.publicKey;
-    // this.toronetService
+  private generateUserId(): string {
+    return nanoid();
   }
 
   // TODO: Email verification for pin

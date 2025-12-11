@@ -1,6 +1,7 @@
 import { redisClient } from "../../services/redis";
 import { WalletService } from "../../services/WalletService";
 import { User } from "../../models/User";
+import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService";
 
 export const getTransferScreen = async (decryptedBody: {
   screen: string;
@@ -11,6 +12,7 @@ export const getTransferScreen = async (decryptedBody: {
 }) => {
   const { screen, data, version, action, flow_token } = decryptedBody;
   const walletService = new WalletService();
+  const whatsappBusinessService = new WhatsAppBusinessService();
 
   // handle health check request
   if (action === "ping") {
@@ -82,7 +84,7 @@ export const getTransferScreen = async (decryptedBody: {
           const user = await User.findOne({ whatsappNumber: phone }).select(
             "+pin"
           );
-          console.log({ user });
+
           if (!user?.pin) {
             return {
               screen: "PIN",
@@ -106,30 +108,45 @@ export const getTransferScreen = async (decryptedBody: {
             ? accountNumber
             : `+${accountNumber}`;
 
-          const transferResult = await walletService.transfer(
-            userPhone!,
-            acctNo,
-            amount,
-            currency
-          );
+          walletService
+            .transfer(userPhone!, acctNo, amount, currency)
+            .then(async (transferResult) => {
+              if (transferResult) {
+                await whatsappBusinessService.sendNormalMessage(
+                  transferResult?.message,
+                  userPhone!
+                );
+              } else {
+                await whatsappBusinessService.sendNormalMessage(
+                  `An error occurred processing transfer`,
+                  userPhone!
+                );
+              }
+            })
+            .catch((error) => console.log("Error transferring", error));
 
-          if (transferResult?.success) {
-            return {
-              screen: "SUCCESS",
-              data: {
-                message: transferResult.message,
-              },
-            };
-          } else {
-            return {
-              screen: "PIN",
-              data: {
-                error_message:
-                  transferResult?.message ||
-                  "Transfer failed. Please try again.",
-              },
-            };
-          }
+          return {
+            screen: "PROCESSING",
+            data: {},
+          };
+
+        // if (transferResult?.success) {
+        //   return {
+        //     screen: "SUCCESS",
+        //     data: {
+        //       message: transferResult.message,
+        //     },
+        //   };
+        // } else {
+        //   return {
+        //     screen: "PIN",
+        //     data: {
+        //       error_message:
+        //         transferResult?.message ||
+        //         "Transfer failed. Please try again.",
+        //     },
+        //   };
+        // }
         // return {
         //   screen: "SUCCESS",
         //   data: {
