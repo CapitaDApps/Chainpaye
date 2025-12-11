@@ -3,15 +3,16 @@
  * This schema defines the structure for user accounts in the system
  */
 
-import mongoose, { Schema, Document } from "mongoose";
-import bcrypt from "bcryptjs";
-import { hashPin } from "../webhooks/utils/hashPin";
+import argon2 from "argon2";
+import mongoose, { Document, Schema, Types } from "mongoose";
+import { IWallet } from "./Wallet";
 
 /**
  * Interface for User document
  */
 export interface IUser extends Document {
   whatsappNumber: string;
+  userId: string;
   fullName: string;
   email?: string;
   country: string;
@@ -19,8 +20,7 @@ export interface IUser extends Document {
   isVerified: boolean;
   verificationCode?: string;
   verificationCodeExpires?: Date;
-  toronetWalletId?: string;
-  pin?: string;
+  pin: string;
   createdAt: Date;
   updatedAt: Date;
   comparePin(candidatePin: string): Promise<boolean>;
@@ -37,6 +37,11 @@ const UserSchema: Schema = new Schema(
       unique: true,
       trim: true,
       match: /^\+\d{1,15}$/, // International phone number format
+    },
+    userId: {
+      type: String,
+      required: true,
+      unique: true,
     },
     fullName: {
       type: String,
@@ -80,14 +85,10 @@ const UserSchema: Schema = new Schema(
       type: Date,
       select: false,
     },
-    toronetWallet: {
-      type: Schema.Types.ObjectId,
-      unique: true,
-      ref: "Wallet",
-    },
+
     pin: {
       type: String,
-      required: false,
+      required: true,
       select: false, // Don't include in queries by default
     },
   },
@@ -100,7 +101,6 @@ const UserSchema: Schema = new Schema(
  * Index for efficient queries
  */
 UserSchema.index({ whatsappNumber: 1 });
-UserSchema.index({ toronetWallet: 1 });
 UserSchema.index({ email: 1 });
 
 /**
@@ -111,7 +111,7 @@ UserSchema.pre<IUser>("save", async function (next) {
   if (!this.isModified("pin")) return next();
 
   try {
-    this.pin = await hashPin(String(this.pin));
+    this.pin = await argon2.hash(this.pin);
     next();
   } catch (error) {
     next(error as Error);
@@ -125,7 +125,7 @@ UserSchema.methods.comparePin = async function (
   candidatePin: string
 ): Promise<boolean> {
   try {
-    return await bcrypt.compare(candidatePin, this.pin);
+    return await argon2.verify(this.pin, candidatePin);
   } catch (error) {
     return false;
   }

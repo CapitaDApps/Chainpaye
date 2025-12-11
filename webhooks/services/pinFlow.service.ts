@@ -1,7 +1,5 @@
 import { redisClient } from "../../services/redis";
 import { User } from "../../models/User";
-import bycrypt from "bcryptjs";
-import { hashPin } from "../utils/hashPin";
 
 export const getPinScreen = async (decryptedBody: {
   screen: string;
@@ -91,8 +89,7 @@ export const getPinScreen = async (decryptedBody: {
 
         // Update user's PIN in the database
         try {
-          const hashedPin = await hashPin(pin);
-          await User.updateOne({ whatsappNumber: phone }, { pin: hashedPin });
+          await User.updateOne({ whatsappNumber: phone }, { pin });
 
           // return {
           //   screen: "SUCCESS",

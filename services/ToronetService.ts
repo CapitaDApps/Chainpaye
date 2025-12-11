@@ -5,8 +5,8 @@
  */
 import axios, { AxiosInstance, AxiosResponse } from "axios";
 import cryptojs from "crypto-js";
-import { CurrencyType, KycDataType } from "../types/toronetService.types";
 import { nanoid } from "nanoid";
+import { CurrencyType, KycDataType } from "../types/toronetService.types";
 
 type BalanceResult = { result: boolean; balance: number; message: string };
 type InitializeDepositReturn =
@@ -43,7 +43,7 @@ export class ToronetService {
   constructor() {
     const instance = axios.create({
       baseURL: "https://api.toronet.org",
-      timeout: 10000,
+      timeout: 300000,
     });
     this.axiosInstance = instance;
     this.baseUrl = "https://api.toronet.org";
@@ -56,6 +56,7 @@ export class ToronetService {
   async createWallet(): Promise<{ walletAddress: string; password: string }> {
     const generatedPassword = this.generateRandomPassword();
     const encryptedPassword = this.encrypt(generatedPassword);
+    console.log({ generatedPassword, encryptedPassword });
     const resp = await this.axiosInstance.post("/keystore", {
       op: "createkey",
       params: [{ name: "pwd", value: generatedPassword }],
@@ -206,11 +207,8 @@ export class ToronetService {
     };
   }
 
-  async checkStatusOfTransaction(
-    transactionId: string,
-    currency: CurrencyType
-  ) {
-    const url = `${this.baseUrl}/payment/toro/`;
+  async recordTransaction(transactionId: string, currency: CurrencyType) {
+    const url = `/payment/toro/`;
 
     const body = {
       op: "recordfiattransaction",
@@ -238,10 +236,61 @@ export class ToronetService {
       },
     });
     const data = resp.data;
-    console.log({ data });
+    console.log({ recordTransactionData: data });
     return {
       result: data.result,
       transactionHash: data.transactionHash,
+    };
+  }
+
+  async updateVirtualWallet(virtualAccountNO: string) {
+    const body = {
+      op: "updatevirtualwallettransactions",
+      params: [
+        {
+          name: "walletaddress",
+          value: virtualAccountNO, //blockchain address
+        },
+      ],
+    };
+
+    const resp = await this.axiosInstance.post("/payment", body, {
+      headers: {
+        adminpwd: this.adminPassword,
+        admin: this.adminAddress,
+      },
+    });
+    const data = resp.data;
+    console.log({ updateVirtualWalletData: data });
+    return {
+      result: data.result,
+      transactionHash: data.transactionHash,
+    };
+  }
+
+  async getTransactionStatus(txId: string) {
+    const body = {
+      op: "getfiattransactions_txid",
+      params: [
+        {
+          name: "txid",
+          value: txId,
+        },
+      ],
+    };
+
+    const resp = await this.axiosInstance.post("/payment/toro/", body, {
+      headers: {
+        adminpwd: this.adminPassword,
+        admin: this.adminAddress,
+      },
+    });
+    const data = resp.data;
+    console.log({ getTransactionStatusData: data });
+
+    return {
+      result: data.result,
+      status: data.status,
     };
   }
 
@@ -448,6 +497,7 @@ export class ToronetService {
     password: string
   ) {
     const decryptedPassword = this.decrypt(password);
+    console.log({ decryptedPassword });
     return {
       op: "transfer",
       params: [
@@ -460,7 +510,7 @@ export class ToronetService {
   }
 
   private generateRandomPassword(): string {
-    return nanoid(15);
+    return nanoid(10);
   }
 
   private generateRandomReferenceId(): string {
@@ -472,6 +522,11 @@ export class ToronetService {
   }
 
   private decrypt(data: string): string {
-    return cryptojs.AES.decrypt(data, this.encryptionKey).toString();
+    const bytes = cryptojs.AES.decrypt(data, this.encryptionKey);
+    return bytes.toString(cryptojs.enc.Utf8);
+  }
+
+  decryptPassword(password: string): string {
+    return this.decrypt(password);
   }
 }
