@@ -65,5 +65,5 @@ jobs:
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
             cd app
             pnpm install
-            pm2 restart ecosystem.config.js --only chainfundme-stage --update-env
+            pm2 restart ecosystem.config.js --only chainpaye-stage --update-env
             pm2 save
