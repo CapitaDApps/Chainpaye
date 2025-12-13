@@ -12,6 +12,7 @@ type CreateUserType = {
   fullName: string;
   countryCode: string;
   pin: string;
+  dob: string;
 };
 
 export class UserService {
@@ -64,6 +65,7 @@ export class UserService {
                 country: data.countryCode,
                 pin: data.pin,
                 userId,
+                dob: data.dob,
               },
             ],
             { session }

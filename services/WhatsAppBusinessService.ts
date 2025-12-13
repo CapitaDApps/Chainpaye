@@ -8,8 +8,12 @@ import axios from "axios";
 import { WalletService } from "./WalletService";
 import { redisClient } from "./redis";
 import { v4 as uuidv4 } from "uuid";
+import { User } from "../models/User";
 
-type ButtonPayloadType = "Receive Payment";
+type ButtonPayloadType =
+  | "Receive Payment"
+  | "Withdraw to Bank"
+  | "From a Friend";
 type CommandTextType =
   | "transfer-usd"
   | "transfer-ngn"
@@ -230,12 +234,99 @@ export class WhatsAppBusinessService {
     });
   }
 
+  async sendFlowById(to: string, flowId: string, screenId: string, data?: any) {
+    const flowToken = uuidv4();
+    await redisClient.set(flowToken, to, "EX", 3600); // Store flow_token for 1 hour
+    const body = {
+      messaging_product: "whatsapp",
+      to,
+      recipient_type: "individual",
+      type: "interactive",
+      interactive: {
+        type: "flow",
+        header: {
+          type: "text",
+          text: "Withdraw",
+        },
+        body: {
+          text: "Open flow to complete withdrawal",
+        },
+
+        action: {
+          name: "flow",
+          parameters: {
+            flow_message_version: "3",
+            flow_action: "navigate",
+            flow_token: flowToken,
+            flow_id: flowId,
+            flow_cta: "Withdraw",
+            flow_action_payload: {
+              screen: "WITHDRAWAL_CURRENCY",
+            },
+          },
+        },
+      },
+    };
+    try {
+      await axios({
+        method: "POST",
+        url: `https://graph.facebook.com/v24.0/${this.business_phone_number_id}/messages`,
+        headers: {
+          Authorization: `Bearer ${this.GRAPH_API_TOKEN}`,
+        },
+        data: body,
+      });
+    } catch (error) {
+      console.log("error sending withdraw flow", error);
+      throw error;
+    }
+  }
+
   async handleButtonPayload(payload: ButtonPayloadType, to: string) {
     switch (payload) {
       case "Receive Payment":
         // set up transfet to contacts
         await this.sendTemplateInteractiveMessage("receivepayments", to, "en");
         break;
+      case "Withdraw to Bank": {
+        const phone = to.startsWith("+") ? to : `+${to}`;
+        const user = await User.findOne({ whatsappNumber: phone });
+        if (!user) {
+          await this.sendTemplateIntroMessage(to);
+          return;
+        }
+        if (!user.isVerified) {
+          await this.sendTemplateInteractiveMessage("completekyce", to, "en");
+          return;
+        }
+        // send withdraw flow
+        const withdrawFlowId = "775551478878542";
+        const initScreen = "WITHDRAWAL_CURRENCY";
+        this.sendFlowById(to, withdrawFlowId, initScreen);
+        break;
+      }
+
+      case "From a Friend": {
+        const phone = to.startsWith("+") ? to : `+${to}`;
+        const user = await User.findOne({ whatsappNumber: phone });
+        if (!user) {
+          await this.sendTemplateIntroMessage(to);
+          return;
+        }
+        if (user.country === "NG") {
+          await this.sendNormalMessage(
+            `*Account details*
+
+*Bank Name*: FCMB
+*Account Number*: ${to}
+*Account Name*: CAPITADAPPS BRIDGE LIMITED ACCT ${user.fullName}
+          `,
+            to
+          );
+        }
+        break;
+      }
+
       default:
         // invalid payload
         break;
@@ -251,70 +342,6 @@ export class WhatsAppBusinessService {
     const [amount, to_phone_number] = text.split(",");
 
     switch (command) {
-      case "transfer-usd":
-        if (!amount || !to_phone_number)
-          return await this.sendNormalMessage(
-            "Parameters not correctly passed",
-            to
-          );
-        if (isNaN(Number(amount)))
-          return await this.sendNormalMessage(
-            "Invalid transfer amount passed",
-            to
-          );
-        const resp = await this.walletService.transfer(
-          to,
-          to_phone_number.trim(),
-          Number(amount),
-          "USD"
-        );
-        if (resp?.success) {
-          return this.sendNormalMessage(resp.message, to);
-        }
-        this.sendNormalMessage(
-          resp?.message || "transfer failed. Pls try again",
-          to
-        );
-        if (resp?.type == "no user data") {
-          this.sendNormalMessage(
-            `${to} is trying to send you ${amount}USD on chainpaye, create an account to receive this funds`,
-            resp.data!
-          );
-        }
-        break;
-
-      case "transfer-ngn":
-        if (!amount || !to_phone_number)
-          return await this.sendNormalMessage(
-            "Parameters not correctly passed",
-            to
-          );
-        if (isNaN(Number(amount)))
-          return await this.sendNormalMessage(
-            "Invalid transfer amount passed",
-            to
-          );
-        const respNgn = await this.walletService.transfer(
-          to,
-          to_phone_number.trim(),
-          Number(amount),
-          "NGN"
-        );
-        if (respNgn?.success) {
-          return this.sendNormalMessage(respNgn.message, to);
-        }
-        this.sendNormalMessage(
-          respNgn?.message || "transfer failed. Pls try again",
-          to
-        );
-        if (respNgn?.type == "no user data") {
-          this.sendNormalMessage(
-            `${to} is trying to send you ${amount}USD on chainpaye, create an account to receive this funds`,
-            respNgn.data!
-          );
-        }
-        break;
-
       case "status":
         const txId = text.trim();
         if (!txId)

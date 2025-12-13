@@ -18,6 +18,7 @@ const userService = new UserService();
 const whatsappBusinessService = new WhatsAppBusinessService();
 const toronetService = new ToronetService();
 const walletService = new WalletService();
+
 app.use(
   express.json({
     // store the raw request body to use it for signature verification
@@ -181,6 +182,13 @@ app.post("/webhook", async (req, res) => {
                     "appointment",
                     message.from,
                     "en"
+                  );
+                }
+
+                if (responseJson.type == "processing_started") {
+                  await whatsappBusinessService.sendNormalMessage(
+                    `Payment link generation feature in development...`,
+                    message.from
                   );
                 }
               }

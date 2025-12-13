@@ -58,7 +58,9 @@ export const getTransferScreen = async (decryptedBody: {
           if (!userPhone) {
             return {
               screen: "TRANSFER",
-              error_message: "User flow session not found",
+              data: {
+                error_message: "User flow session not found",
+              },
             };
           }
           return {

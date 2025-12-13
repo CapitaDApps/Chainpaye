@@ -24,7 +24,8 @@ export class WalletService {
 
     if (!wallet) {
       const toronetWallet = await this.toronetService.createWallet();
-      const wallet = await Wallet.create(
+      console.log({ toronetWallet });
+      await Wallet.create(
         [
           {
             userId,
@@ -34,8 +35,6 @@ export class WalletService {
         ],
         { session }
       );
-
-      await User.updateOne({ userId }, { toronetWallet: wallet }, { session });
 
       await this.toronetService.createVirtualWalletNGN({
         address: toronetWallet.walletAddress,

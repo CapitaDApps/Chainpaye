@@ -1,0 +1,69 @@
+name: deploy-staging
+
+on:
+  push:
+    branches: ["stage"]
+
+jobs:
+  typecheck:
+    name: Run Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js and PNPM
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10 # Specify a version of pnpm
+          run_install: false # We run install in the next step
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run Type Check (pnpm typecheck)
+        run: pnpm typecheck
+
+  deploy-stage:
+    needs: typecheck
+    name: Deploy chainpaye to staging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Copy files via scp
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.STAGEHOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.STAGEKEY }}
+          source: .
+          target: app/
+
+      - name: Create .env file
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.STAGEHOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.STAGEKEY }}
+          script: |
+            echo "${{ secrets.DOT_ENV }}" > app/.env
+
+      - name: Start up application with pm2
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.STAGEHOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.STAGEKEY }}
+          script: |
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            cd app
+            pnpm install
+            pm2 restart ecosystem.config.js --only chainfundme-stage --update-env
+            pm2 save

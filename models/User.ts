@@ -21,9 +21,11 @@ export interface IUser extends Document {
   verificationCode?: string;
   verificationCodeExpires?: Date;
   pin: string;
+  dob: string;
   createdAt: Date;
   updatedAt: Date;
   comparePin(candidatePin: string): Promise<boolean>;
+  markVerified(): Promise<void>;
 }
 
 /**
@@ -91,6 +93,10 @@ const UserSchema: Schema = new Schema(
       required: true,
       select: false, // Don't include in queries by default
     },
+    dob: {
+      type: String,
+      required: true,
+    },
   },
   {
     timestamps: true, // Automatically add createdAt and updatedAt
@@ -102,7 +108,6 @@ const UserSchema: Schema = new Schema(
  */
 UserSchema.index({ whatsappNumber: 1 });
 UserSchema.index({ email: 1 });
-
 /**
  * Pre-save middleware to hash PIN
  */
@@ -129,6 +134,10 @@ UserSchema.methods.comparePin = async function (
   } catch (error) {
     return false;
   }
+};
+
+UserSchema.methods.markVerified = async function () {
+  this.isVerified = true;
 };
 
 /**

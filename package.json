@@ -5,9 +5,10 @@
   "scripts": {
     "dev": "tsx  --watch index.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
-    "lint": "eslint src --ext .ts",
-    "lint:fix": "eslint src --ext .ts --fix"
+    "start": "tsx index.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint --ext .ts",
+    "lint:fix": "eslint --ext .ts --fix"
   },
   "keywords": [
     "whatsapp",

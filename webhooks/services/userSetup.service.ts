@@ -68,10 +68,13 @@ export const userSetupScreen = async (decryptedBody: {
 
           //   Get user phone number from Redis using flow_token
           const userPhone = await redisClient.get(flow_token);
+          // const userPhone = "+2348110236998";
           if (!userPhone) {
             return {
               screen: "SECURITY_INFO",
-              error_message: "Session expired",
+              data: {
+                error_message: "Session expired",
+              },
             };
           }
           const phone = userPhone.startsWith("+") ? userPhone : `+${userPhone}`;
@@ -108,11 +111,22 @@ export const userSetupScreen = async (decryptedBody: {
             };
           }
 
+          const currentYear = new Date().getFullYear();
+          const yr = Number(data.dob.split("-")[0]);
+          if (currentYear - yr < 18) {
+            return {
+              screen: "SECURITY_INFO",
+              data: {
+                error_message: "You must be 18 and above to use chainpaye",
+              },
+            };
+          }
           await userService.createUser({
             countryCode: data.country,
             fullName: `${data.first_name} ${data.last_name}`,
             whatsappNumber: phone,
             pin,
+            dob: data.dob,
           });
 
           await redisClient.set(

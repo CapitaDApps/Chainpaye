@@ -99,7 +99,6 @@ const WalletSchema: Schema = new Schema(
  * Indexes for efficient queries
  */
 WalletSchema.index({ user: 1 });
-WalletSchema.index({ toronetWalletId: 1 });
 WalletSchema.index({ publicKey: 1 });
 
 /**

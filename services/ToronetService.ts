@@ -7,6 +7,13 @@ import axios, { AxiosInstance, AxiosResponse } from "axios";
 import cryptojs from "crypto-js";
 import { nanoid } from "nanoid";
 import { CurrencyType, KycDataType } from "../types/toronetService.types";
+import { User } from "../models/User";
+import { redisClient } from "./redis";
+
+export interface Bank {
+  id: string; // Mapped from bankCode
+  title: string; // Mapped from bankName
+}
 
 type BalanceResult = { result: boolean; balance: number; message: string };
 type InitializeDepositReturn =
@@ -427,13 +434,215 @@ export class ToronetService {
   }
 
   // TODO: Implement Withdrawal NGN
-  async withdrawNGN() {}
+  async withdrawNGN(data: {
+    userAddress: string;
+    password: string;
+    amount: string;
+    bankName: string;
+    routingNo: string;
+    accoountNo: string;
+    accountName: string;
+    phoneNumber: string;
+  }) {
+    const decryptedPassword = this.decrypt(data.password);
+    const body = {
+      op: "recordfiatwithdrawal",
+      params: [
+        {
+          name: "addr",
+          value: data.userAddress,
+        },
+        {
+          name: "pwd",
+          value: decryptedPassword,
+        },
+        {
+          name: "currency",
+          value: "NGN",
+        },
+        {
+          name: "token",
+          value: "NGN",
+        },
+        {
+          name: "payername",
+          value: "Zab Alabs",
+        },
+        {
+          name: "payeremail",
+          value: "email@gmail.com",
+        },
+        {
+          name: "payeraddress",
+          value: "10 Peachtree Rd",
+        },
+        {
+          name: "payercity",
+          value: "Pear St",
+        },
+        {
+          name: "payerstate",
+          value: "DE",
+        },
+        {
+          name: "payercountry",
+          value: "US",
+        },
+        {
+          name: "payerzipcode",
+          value: "19801",
+        },
+        {
+          name: "payerphone",
+          value: "6313003000",
+        },
+        {
+          name: "description",
+          value: "ToroNGN Exchange",
+        },
+        {
+          name: "amount",
+          value: data.amount,
+        },
+        {
+          name: "accounttype",
+          value: "bank",
+        },
+        {
+          name: "bankname",
+          value: data.bankName,
+        },
+        {
+          name: "routingno",
+          value: data.routingNo,
+        },
+        {
+          name: "accountno",
+          value: data.accoountNo,
+        },
+        {
+          name: "expirydate",
+          value: "optional",
+        },
+        {
+          name: "accountname",
+          value: data.accountName,
+        },
+        {
+          name: "recipientstate",
+          value: "Lagos",
+        },
+        {
+          name: "recipientzip",
+          value: "11776",
+        },
+        {
+          name: "recipientphone",
+          value: data.phoneNumber,
+        },
+      ],
+    };
+
+    const result = await this.axiosInstance.post("/payment/toro/", body, {
+      headers: {
+        adminpwd: this.adminPassword,
+        admin: this.adminAddress,
+      },
+    });
+
+    const withdrawResp = result.data;
+
+    if (withdrawResp.result) {
+      return {
+        success: true,
+        message: "Withdrawal successful",
+      };
+    }
+
+    return {
+      success: false,
+      message:
+        withdrawResp.message ||
+        "Withdrawal was not successful. Please try again.",
+    };
+  }
+
+  private processBanks(rawList: any[]): Bank[] {
+    const uniqueBanks = new Map<string, Bank>();
+
+    rawList.forEach((item) => {
+      const id = item.bankCode;
+      const title = item.bankName;
+
+      if (id.split("\r\n").length == 1 || title.split("\r\n").length == 1) {
+        if (!uniqueBanks.has(id)) {
+          // Add to map if it doesn't exist
+          uniqueBanks.set(id, {
+            id: id,
+            title: title,
+          });
+        }
+      } else {
+        console.log({ id, title });
+      }
+    });
+
+    // 2. Convert Map values back to an array and sort
+    return Array.from(uniqueBanks.values()).sort((a, b) => {
+      return a.title.localeCompare(b.title, "en", { sensitivity: "base" });
+    });
+  }
+
+  async getBankListNGN(): Promise<Bank[]> {
+    const body = {
+      op: "getbanklist_ngn",
+      params: [],
+    };
+
+    const bankList = await redisClient.getOrSetCache(
+      "bankList_ngn",
+      async () => {
+        const result = await this.axiosInstance.post("/payment/toro/", body);
+        const data = result.data;
+
+        const bankList = data.data;
+        const cleanBankList = this.processBanks(bankList);
+        return cleanBankList;
+      }
+    );
+
+    return bankList;
+  }
+
+  async getBankListUSD(): Promise<Bank[]> {
+    const body = {
+      op: "getbanklist_usd",
+      params: [],
+    };
+
+    const bankList = await redisClient.getOrSetCache(
+      "bankList_usd",
+      async () => {
+        const result = await this.axiosInstance.post("/payment/toro/", body);
+        const data = result.data;
+
+        const bankList = data.data;
+        const cleanBankList = this.processBanks(bankList);
+        return cleanBankList;
+      }
+    );
+
+    return bankList;
+  }
 
   // TODO: Implement withdrawal USD
   async withdrawUSD() {}
 
   // TODO: KYC
   async performKYC(data: KycDataType) {
+    const phone = data.phoneNumber.startsWith("+")
+      ? data.phoneNumber.replace("+", "")
+      : data.phoneNumber;
     const body = {
       op: "check_kyc",
       params: [
@@ -459,7 +668,7 @@ export class ToronetService {
         },
         {
           name: "phoneNumber",
-          value: data.phoneNumber,
+          value: phone,
         },
         {
           name: "dob",
@@ -472,7 +681,48 @@ export class ToronetService {
       ],
     };
 
-    const resp = await this.axiosInstance.post("/payment/toro/", body);
+    const user = await User.findOne({ whatsappNumber: `+${phone}` });
+
+    if (!user)
+      throw new Error(`user with phone number - [+${phone}] not found`);
+
+    if (user.isVerified) {
+      return {
+        success: true,
+        message: "You've been verified",
+      };
+    }
+
+    const resp = await this.axiosInstance.post("/payment/toro/", body, {
+      headers: {
+        admin: this.adminAddress,
+        adminpwd: this.adminPassword,
+      },
+    });
+    const result = resp.data;
+    console.log({ result });
+    if (typeof result.data == "string") {
+      const kycResult = JSON.parse(result.data);
+      if (kycResult.data == null) {
+        return {
+          success: false,
+          message: kycResult.message,
+        };
+      }
+    }
+    const passed = result.data.passed;
+    if (!passed) {
+      return {
+        success: false,
+        message: "KYC process failed. Please try again.",
+      };
+    }
+    await user.markVerified();
+    await user.save();
+    return {
+      success: true,
+      message: "You've been successfully verified",
+    };
   }
 
   private formBuyToroBody(address: string, password: string, amount: string) {
