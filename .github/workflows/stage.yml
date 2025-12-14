@@ -52,7 +52,10 @@ jobs:
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.STAGEKEY }}
           script: |
-            echo "${{ secrets.DOT_ENV }}" > app/.env
+            mkdir -p app
+            cat << 'EOF' > app/.env
+            ${{ secrets.DOT_ENV }}
+            EOF
 
       - name: Start up application with pm2
         uses: appleboy/ssh-action@v1.0.0

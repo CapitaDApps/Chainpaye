@@ -182,7 +182,7 @@ export class WalletService {
       toronetTxId: data.transactionId,
       currency,
       status: TransactionStatus.PENDING,
-      amount: currency == "NGN" ? +data.amount! : +amount,
+      amount: +amount,
       type: TransactionType.DEPOSIT,
       fromUser: user._id as Types.ObjectId,
     });
@@ -230,7 +230,7 @@ export class WalletService {
       transaction.markAsCompleted();
       return {
         success: true,
-        message: `Amount of ${transaction.amount}${transaction.currency} has been processed successfully`,
+        message: `Deposit amount of ${transaction.amount} ${transaction.currency} has been processed successfully`,
       };
     } else {
       return {
