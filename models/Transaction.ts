@@ -4,6 +4,7 @@
  */
 
 import mongoose, { Schema, Document } from "mongoose";
+import { IUser } from "./User";
 
 /**
  * Transaction types
@@ -33,7 +34,7 @@ export interface ITransaction extends Document {
   referenceId: string;
   type: TransactionType;
   status: TransactionStatus;
-  fromUser?: mongoose.Types.ObjectId;
+  fromUser?: mongoose.Types.ObjectId | IUser;
   toUser?: mongoose.Types.ObjectId;
   amount: number;
   currency: "USD" | "NGN";
@@ -89,9 +90,7 @@ const TransactionSchema: Schema = new Schema(
     fromUser: {
       type: Schema.Types.ObjectId,
       ref: "User",
-      required: function () {
-        return this.type === TransactionType.TRANSFER;
-      },
+      required: true,
     },
     toUser: {
       type: Schema.Types.ObjectId,

@@ -189,6 +189,10 @@ export class ToronetService {
     const data = resp.data;
     console.log({ data });
 
+    if (!data.result) {
+      throw new Error(data.error);
+    }
+
     if (currency == "NGN") {
       return {
         result: data.result,

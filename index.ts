@@ -50,10 +50,10 @@ process.on("uncaughtException", (error) => {
   process.exit(1);
 });
 
-process.on("unhandledRejection", (reason, promise) => {
-  logger.error("Unhandled Rejection at:", promise, "reason:", reason);
-  process.exit(1);
-});
+// process.on("unhandledRejection", (reason, promise) => {
+//   logger.error("Unhandled Rejection at:", promise, "reason:", reason);
+//   process.exit(1);
+// });
 
 // Start the bot
 initializeBot().then(() => {

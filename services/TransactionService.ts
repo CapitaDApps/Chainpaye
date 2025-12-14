@@ -1,3 +1,4 @@
+import { Types } from "mongoose";
 import {
   Transaction,
   TransactionStatus,
@@ -13,6 +14,8 @@ export class TransactionService {
     currency,
     status,
     amount,
+    fromUser,
+    toUser,
   }: {
     refId: string;
     toronetTxId: string;
@@ -20,6 +23,8 @@ export class TransactionService {
     currency: CurrencyType;
     status: TransactionStatus;
     amount: number;
+    fromUser: Types.ObjectId;
+    toUser?: Types.ObjectId;
   }) {
     const transaction = await Transaction.create({
       referenceId: refId,
@@ -30,6 +35,8 @@ export class TransactionService {
       fees: 1.5, // 1.5%
       amount,
       totalAmount: amount,
+      fromUser,
+      ...(toUser && { toUser }),
     });
 
     return transaction;

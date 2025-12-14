@@ -1,3 +1,5 @@
+import { scheduleProcessDeposit } from "../../jobs/jobs";
+import { Transaction } from "../../models/Transaction";
 import { redisClient } from "../../services/redis";
 import { UserService } from "../../services/UserService";
 import { WalletService } from "../../services/WalletService";
@@ -51,13 +53,12 @@ export const getTopUpScreen = async (decryptedBody: {
   if (action === "data_exchange") {
     // handle the request based on the current screen
     switch (screen) {
-      case "PIN":
-        // { pin: '23456', amount: '12345678', currency: 'USD' }
-        // Get user phone number from Redis using flow_token
-        const userPhone = await redisClient.get(flow_token);
+      case "TOPUP_WALLET": {
+        //  const userPhone = await redisClient.get(flow_token);
+        const userPhone = "+2348110236998";
         if (!userPhone) {
           return {
-            screen: "PIN",
+            screen: "TOPUP_WALLET",
             data: {
               error_message: "Session expired",
             },
@@ -69,11 +70,89 @@ export const getTopUpScreen = async (decryptedBody: {
 
         if (isNaN(Number(data.amount)))
           return {
-            screen: "PIN",
+            screen: "TOPUP_WALLET",
             data: {
               error_message: "Please enter a valid amount",
             },
           };
+
+        if (!user) {
+          return {
+            screen: "TOPUP_WALLET",
+            data: {
+              error_message:
+                "Could not find you in the database. Please try again",
+            },
+          };
+        }
+
+        const result = await walletService.deposit(
+          phone,
+          data.amount,
+          data.currency
+        );
+
+        const is_usd = data.currency == "USD";
+
+        // "amount": { "type": "string", "__example__": "100.00" },
+        // "currency": { "type": "string", "__example__": "USD" },
+        // "accountName": { "type": "string", "__example__": "John Doe" },
+        // "bankName": { "type": "string", "__example__": "Chase Bank" },
+        // "accountNumber": { "type": "string", "__example__": "1234567890" },
+        // "routingNO": { "type": "string", "__example__": "021000021" },
+        // "transactionId": { "type": "string", "__example__": "TXN_123456789" },
+
+        switch (data.currency) {
+          case "USD":
+            return {
+              screen: "BANK_DETAILS",
+              data: {
+                amount: Number(data.amount).toLocaleString(),
+                currency: data.currency,
+                accountName: result.accountName,
+                bankName: result.bankName,
+                accountNumber: `${result.accountNumber}`,
+                routingNO: `${result.routingNO}`,
+                is_usd,
+                transactionId: result.transactionId,
+              },
+            };
+          case "NGN":
+            return {
+              screen: "BANK_DETAILS",
+              data: {
+                amount: Number(result.amount).toLocaleString(),
+                currency: data.currency,
+                accountName: result.accountName,
+                bankName: result.bankName,
+                accountNumber: `${result.accountNumber}`,
+                transactionId: result.transactionId,
+                is_usd,
+                routingNO: "",
+              },
+            };
+
+          default:
+            break;
+        }
+      }
+
+      case "PIN":
+        // { pin: '23456', amount: '12345678', currency: 'USD' }
+        // Get user phone number from Redis using flow_token
+        // const userPhone = await redisClient.get(flow_token);
+        const userPhone = "+2348110236998";
+        if (!userPhone) {
+          return {
+            screen: "PIN",
+            data: {
+              error_message: "Session expired",
+            },
+          };
+        }
+        const phone = userPhone.startsWith("+") ? userPhone : `+${userPhone}`;
+
+        const user = await userService.getUser(phone, true);
 
         if (!user) {
           return {
@@ -96,58 +175,7 @@ export const getTopUpScreen = async (decryptedBody: {
           };
         }
 
-        walletService
-          .deposit(phone, data.amount, data.currency)
-          .then(async (result) => {
-            if (data.currency == "USD") {
-              await whatsappBusinessService.sendNormalMessage(
-                `*Make deposit to the specified account.*
-
-*Amount:* ${data.amount}
-*Account Name:* ${result.accountName}
-*Bank Name:* ${result.bankName}
-*Account Number:* ${result.accountNumber}
-*Routing Number:* ${result.routingNO}
-
-*Transaction Id:* ${result.transactionId}
-
-
-*You can check the status of the transaction by sending this message:*
-
-_/status <transactionId>_
-          `,
-                phone
-              );
-              await whatsappBusinessService.sendNormalMessage(
-                data.transactionId,
-                phone
-              );
-            } else {
-              await whatsappBusinessService.sendNormalMessage(
-                `*Make deposit to the specified account details.*
-
-amount: *${result.amount}*
-account name: *${result.accountName}*
-bank name: *${result.bankName}*
-account number: *${result.accountNumber}* 
-
-transactionId: *${result.transactionId}*
-
-
-*You can check the status of the transaction by sending this message:*
-
-_/status <transactionId>_
-        `,
-                phone
-              );
-              await whatsappBusinessService.sendNormalMessage(
-                result.transactionId,
-                phone
-              );
-            }
-          })
-          .catch((error) => console.log("Error topping up", error));
-
+        scheduleProcessDeposit(data.transactionId);
         return {
           screen: "PROCESSING",
           data: {},

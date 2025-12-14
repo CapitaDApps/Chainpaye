@@ -177,14 +177,15 @@ export class WalletService {
 
     console.log(data);
 
-    TransactionService.recordTransaction({
+    await TransactionService.recordTransaction({
       refId: data.refId,
       toronetTxId: data.transactionId,
       currency,
       status: TransactionStatus.PENDING,
-      amount: +amount,
+      amount: currency == "NGN" ? +data.amount! : +amount,
       type: TransactionType.DEPOSIT,
-    }).catch((err) => console.log("transaction", err));
+      fromUser: user._id as Types.ObjectId,
+    });
     return data;
   }
 
@@ -229,7 +230,7 @@ export class WalletService {
       transaction.markAsCompleted();
       return {
         success: true,
-        message: `Transaction with id - [${transactionId}] has been processed successfully`,
+        message: `Amount of ${transaction.amount}${transaction.currency} has been processed successfully`,
       };
     } else {
       return {
