@@ -46,6 +46,7 @@ async function processDepositHandler(job: Job<ProcessDeposit>) {
           `,
         (transaction.fromUser as IUser).whatsappNumber
       );
+      await agenda.cancel({ name: JobNames.PROCESS_DEPOSIT });
     }
   }
 }
