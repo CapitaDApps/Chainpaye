@@ -49,15 +49,15 @@ export class WalletService {
     amount: number,
     currency: CurrencyType
   ) {
-    const user = await User.findOne({ whatsappNumber: `+${from}` });
-    if (!user) throw new Error(`User with phone number - [+${from}] not found`);
+    const user = await User.findOne({ whatsappNumber: from });
+    if (!user) throw new Error(`User with phone number - [${from}] not found`);
     const fromWallet = await Wallet.findOne({ userId: user.userId }).select(
       "+password"
     );
 
     if (!fromWallet)
       throw new Error(
-        `User with phone number - [+${from}] does not have a wallet`
+        `User with phone number - [${from}] does not have a wallet`
       );
 
     const toUser = await User.findOne({ whatsappNumber: to });
@@ -104,13 +104,14 @@ export class WalletService {
           return {
             success: true,
             type: "transfer success",
-            message: `Transfer of ${amount}USD to ${to} was successful`,
+            message: `Transfer of ${amount} USD to ${toUser.fullName} was successful`,
+            messageTo: `You've received ${amount} USD from ${user.fullName}`,
           };
         } else {
           return {
             success: false,
             type: "transfer failed",
-            message: `Transfer of ${amount}USD to ${to} was unsuccessful`,
+            message: `Transfer of ${amount}USD to ${toUser.fullName} was unsuccessful`,
           };
         }
 
@@ -139,13 +140,14 @@ export class WalletService {
           return {
             success: true,
             type: "transfer success",
-            message: `Transfer of ${amount}NGN to ${to} was successful`,
+            message: `Transfer of ${amount} NGN to ${toUser.fullName} was successful`,
+            messageTo: `You've received ${amount} NGN from ${user.fullName}`,
           };
         } else {
           return {
             success: false,
             type: "transfer failed",
-            message: `Transfer of ${amount}NGN to ${to} was unsuccessful`,
+            message: `Transfer of ${amount}NGN to ${toUser.fullName} was unsuccessful`,
           };
         }
 
@@ -238,6 +240,16 @@ export class WalletService {
         message: `Transaction with id - [${transactionId}] still pending`,
       };
     }
+  }
+
+  async ngnBalance(address: string) {
+    const bal = await this.toronetService.getBalanceNGN(address);
+    return bal;
+  }
+
+  async usdBalance(address: string) {
+    const bal = await this.toronetService.getBalanceUSD(address);
+    return bal;
   }
 
   // TODO update wallet PIN

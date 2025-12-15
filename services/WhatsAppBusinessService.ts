@@ -9,11 +9,12 @@ import { WalletService } from "./WalletService";
 import { redisClient } from "./redis";
 import { v4 as uuidv4 } from "uuid";
 import { User } from "../models/User";
+import { Wallet } from "../models/Wallet";
 
 type ButtonPayloadType =
-  | "Receive Payment"
+  | "My Account"
   | "Withdraw to Bank"
-  | "From a Friend";
+  | "Copy Account Number";
 type CommandTextType =
   | "transfer-usd"
   | "transfer-ngn"
@@ -169,7 +170,8 @@ export class WhatsAppBusinessService {
   async sendTemplateInteractiveMessage(
     templateName: string,
     to: string,
-    templateLang: string
+    templateLang: string,
+    bodyParameters?: any[]
   ) {
     const flowToken = uuidv4();
     await redisClient.set(flowToken, to, "EX", 3600); // Store flow_token for 1 hour
@@ -197,7 +199,7 @@ export class WhatsAppBusinessService {
 
             {
               type: "body",
-              parameters: [],
+              parameters: bodyParameters || [],
             },
             {
               type: "footer",
@@ -284,10 +286,51 @@ export class WhatsAppBusinessService {
 
   async handleButtonPayload(payload: ButtonPayloadType, to: string) {
     switch (payload) {
-      case "Receive Payment":
-        // set up transfet to contacts
-        await this.sendTemplateInteractiveMessage("receivepayments", to, "en");
+      case "My Account": {
+        const phone = to.startsWith("+") ? to : `+${to}`;
+        const user = await User.findOne({ whatsappNumber: phone });
+        if (!user) {
+          await this.sendTemplateIntroMessage(to);
+          return;
+        }
+        const wallet = await Wallet.findOne({ userId: user.userId });
+        if (!wallet) {
+          throw new Error(`Wallet for user - [${to}] not found`);
+        }
+
+        const [ngnBalance, usdBalance] = await Promise.all([
+          await this.walletService.ngnBalance(wallet.publicKey),
+          await this.walletService.usdBalance(wallet.publicKey),
+        ]);
+
+        const params = [
+          {
+            type: "text",
+            text: `${user.fullName}`,
+          },
+          {
+            type: "text",
+            text: `${user.whatsappNumber.replace("+", "")}`,
+          },
+          {
+            type: "text",
+            text: `${ngnBalance.balance.toLocaleString()}`,
+          },
+          {
+            type: "text",
+            text: `${usdBalance.balance.toLocaleString()}`,
+          },
+        ];
+
+        await this.sendTemplateInteractiveMessage(
+          "receivepayments",
+          to,
+          "en",
+          params
+        );
         break;
+      }
+
       case "Withdraw to Bank": {
         const phone = to.startsWith("+") ? to : `+${to}`;
         const user = await User.findOne({ whatsappNumber: phone });
@@ -306,24 +349,14 @@ export class WhatsAppBusinessService {
         break;
       }
 
-      case "From a Friend": {
+      case "Copy Account Number": {
         const phone = to.startsWith("+") ? to : `+${to}`;
         const user = await User.findOne({ whatsappNumber: phone });
         if (!user) {
           await this.sendTemplateIntroMessage(to);
           return;
         }
-        if (user.country === "NG") {
-          await this.sendNormalMessage(
-            `*Account details*
-
-*Bank Name*: FCMB
-*Account Number*: ${to}
-*Account Name*: CAPITADAPPS BRIDGE LIMITED ACCT ${user.fullName}
-          `,
-            to
-          );
-        }
+        await this.sendNormalMessage(`${to}`, to);
         break;
       }
 

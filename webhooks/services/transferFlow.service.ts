@@ -37,6 +37,7 @@ export const getTransferScreen = async (decryptedBody: {
   try {
     // Get user phone number from Redis using flow_token
     const userPhone = await redisClient.get(flow_token);
+    // const userPhone = `+2348110236998`;
 
     // handle initial request when opening the flow
     if (action === "INIT") {
@@ -54,21 +55,44 @@ export const getTransferScreen = async (decryptedBody: {
     if (action === "data_exchange") {
       // handle the request based on the current screen
       switch (screen) {
-        case "TRANSFER":
+        case "TRANSFER": {
+          const { accountNumber, amount, currency } = data;
           if (!userPhone) {
             return {
               screen: "TRANSFER",
               data: {
-                error_message: "User flow session not found",
+                error_message:
+                  "User flow session not found. Please restart flow",
               },
             };
           }
+
+          const user = await User.findOne({
+            whatsappNumber: `+${accountNumber}`,
+          });
+
+          if (!user) {
+            return {
+              screen: "TRANSFER",
+              data: {
+                error_message: `Could not find user with account number - ${accountNumber}. Please check the account number.`,
+              },
+            };
+          }
+
           return {
-            screen: "PIN",
-            data: {},
+            screen: "TRANSFER_CONFIRMATION",
+            data: {
+              accountNumber,
+              currency,
+              amount,
+              recipientName: `${user.fullName}`,
+            },
           };
-        case "PIN":
-          const { accountNumber, amount, currency, pin } = data;
+        }
+
+        case "PIN": {
+          const { accountNumber, amount, currency, recipientName, pin } = data;
           if (!pin) {
             return {
               screen: "PIN",
@@ -82,7 +106,7 @@ export const getTransferScreen = async (decryptedBody: {
           const phone = userPhone?.startsWith("+")
             ? userPhone
             : `+${userPhone}`;
-          console.log({ phone });
+
           const user = await User.findOne({ whatsappNumber: phone }).select(
             "+pin"
           );
@@ -91,8 +115,7 @@ export const getTransferScreen = async (decryptedBody: {
             return {
               screen: "PIN",
               data: {
-                error_message:
-                  "You have to set a pin to proceed. Use the /setup pin command in the chat.",
+                error_message: "You have to set a pin to proceed",
               },
             };
           }
@@ -111,13 +134,20 @@ export const getTransferScreen = async (decryptedBody: {
             : `+${accountNumber}`;
 
           walletService
-            .transfer(userPhone!, acctNo, amount, currency)
+            .transfer(phone, acctNo, amount, currency)
             .then(async (transferResult) => {
               if (transferResult) {
-                await whatsappBusinessService.sendNormalMessage(
+                whatsappBusinessService.sendNormalMessage(
                   transferResult?.message,
                   userPhone!
                 );
+
+                if (transferResult.success) {
+                  whatsappBusinessService.sendNormalMessage(
+                    transferResult.messageTo!,
+                    accountNumber
+                  );
+                }
               } else {
                 await whatsappBusinessService.sendNormalMessage(
                   `An error occurred processing transfer`,
@@ -132,35 +162,37 @@ export const getTransferScreen = async (decryptedBody: {
             data: {},
           };
 
-        // if (transferResult?.success) {
-        //   return {
-        //     screen: "SUCCESS",
-        //     data: {
-        //       message: transferResult.message,
-        //     },
-        //   };
-        // } else {
-        //   return {
-        //     screen: "PIN",
-        //     data: {
-        //       error_message:
-        //         transferResult?.message ||
-        //         "Transfer failed. Please try again.",
-        //     },
-        //   };
-        // }
-        // return {
-        //   screen: "SUCCESS",
-        //   data: {
-        //     extension_message_response: {
-        //       params: {
-        //         flow_token: flow_token,
-        //         optional_param1: amount,
-        //         optional_param2: accountNumber,
-        //       },
-        //     },
-        //   },
-        // };
+          // if (transferResult?.success) {
+          //   return {
+          //     screen: "SUCCESS",
+          //     data: {
+          //       message: transferResult.message,
+          //     },
+          //   };
+          // } else {
+          //   return {
+          //     screen: "PIN",
+          //     data: {
+          //       error_message:
+          //         transferResult?.message ||
+          //         "Transfer failed. Please try again.",
+          //     },
+          //   };
+          // }
+          // return {
+          //   screen: "SUCCESS",
+          //   data: {
+          //     extension_message_response: {
+          //       params: {
+          //         flow_token: flow_token,
+          //         optional_param1: amount,
+          //         optional_param2: accountNumber,
+          //       },
+          //     },
+          //   },
+          // };
+        }
+
         default:
           break;
       }
