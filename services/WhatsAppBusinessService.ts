@@ -14,7 +14,8 @@ import { Wallet } from "../models/Wallet";
 type ButtonPayloadType =
   | "My Account"
   | "Withdraw to Bank"
-  | "Copy Account Number";
+  | "Copy Account Number"
+  | "Invoice a Client";
 type CommandTextType =
   | "transfer-usd"
   | "transfer-ngn"
@@ -359,6 +360,9 @@ export class WhatsAppBusinessService {
         await this.sendNormalMessage(`${to}`, to);
         break;
       }
+
+      case "Invoice a Client":
+        await this.sendNormalMessage(`Feature in development...`, to);
 
       default:
         // invalid payload

@@ -58,6 +58,39 @@ app.get("/", (req, res) => {
   res.status(200).json({ server: "active" });
 });
 
+async function readMessage(messageId: string) {
+  await axios({
+    method: "POST",
+    url: `https://graph.facebook.com/v24.0/${897300070126934}/messages`,
+    headers: {
+      Authorization: `Bearer ${GRAPH_API_TOKEN}`,
+    },
+    data: {
+      messaging_product: "whatsapp",
+      status: "read",
+      message_id: messageId,
+    },
+  });
+}
+
+async function replyingMessage(messageId: string) {
+  await axios({
+    method: "POST",
+    url: `https://graph.facebook.com/v24.0/${897300070126934}/messages`,
+    headers: {
+      Authorization: `Bearer ${GRAPH_API_TOKEN}`,
+    },
+    data: {
+      messaging_product: "whatsapp",
+      status: "read",
+      message_id: messageId,
+      typing_indicator: {
+        type: "text",
+      },
+    },
+  });
+}
+
 app.post("/webhook", async (req, res) => {
   console.log("Incoming webhook message:", JSON.stringify(req.body, null, 2));
 
@@ -73,23 +106,9 @@ app.post("/webhook", async (req, res) => {
   const contact = req.body.entry[0].changes[0].value.contacts?.[0];
 
   if (message) {
+    await readMessage(message.id);
     try {
       // mark incoming message as read
-      await axios({
-        method: "POST",
-        url: `https://graph.facebook.com/v24.0/${897300070126934}/messages`,
-        headers: {
-          Authorization: `Bearer ${GRAPH_API_TOKEN}`,
-        },
-        data: {
-          messaging_product: "whatsapp",
-          status: "read",
-          message_id: message.id,
-          typing_indicator: {
-            type: "text",
-          },
-        },
-      });
 
       if (contact) {
         const { profile, wa_id } = contact;
@@ -98,6 +117,7 @@ app.post("/webhook", async (req, res) => {
           const user = await userService.getUser(`+${wa_id}`);
 
           if (!user) {
+            await replyingMessage(message.id);
             // send welcome mesage
             await whatsappBusinessService.sendTemplateIntroMessage(
               message.from
@@ -105,6 +125,7 @@ app.post("/webhook", async (req, res) => {
           } else {
             // send other messages
             if (message.type == "text") {
+              await replyingMessage(message.id);
               if (message.text.body.toLowerCase().includes("balance")) {
                 const userWallet = await userService.getUserToroWallet(
                   message.from
@@ -148,6 +169,7 @@ app.post("/webhook", async (req, res) => {
             }
 
             if (message.type == "button") {
+              await replyingMessage(message.id);
               const { payload } = message.button;
               await whatsappBusinessService.handleButtonPayload(
                 payload,
@@ -165,6 +187,7 @@ app.post("/webhook", async (req, res) => {
                 console.log({ responseJson });
 
                 if (responseJson.type == "new-account") {
+                  await replyingMessage(message.id);
                   const userAccount = await redisClient.get(
                     `${responseJson.flow_token}_accountCreation`
                   );
@@ -186,6 +209,7 @@ app.post("/webhook", async (req, res) => {
                 }
 
                 if (responseJson.type == "processing_started") {
+                  await replyingMessage(message.id);
                   await whatsappBusinessService.sendNormalMessage(
                     `Payment link generation feature in development...`,
                     message.from
