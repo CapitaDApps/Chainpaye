@@ -54,8 +54,8 @@ export const getTopUpScreen = async (decryptedBody: {
     // handle the request based on the current screen
     switch (screen) {
       case "TOPUP_WALLET": {
-        //  const userPhone = await redisClient.get(flow_token);
-        const userPhone = "+2348110236998";
+        const userPhone = await redisClient.get(flow_token);
+        // const userPhone = "+2348110236998";
         if (!userPhone) {
           return {
             screen: "TOPUP_WALLET",
@@ -140,8 +140,8 @@ export const getTopUpScreen = async (decryptedBody: {
       case "PIN":
         // { pin: '23456', amount: '12345678', currency: 'USD' }
         // Get user phone number from Redis using flow_token
-        // const userPhone = await redisClient.get(flow_token);
-        const userPhone = "+2348110236998";
+        const userPhone = await redisClient.get(flow_token);
+        // const userPhone = "+2348110236998";
         if (!userPhone) {
           return {
             screen: "PIN",
