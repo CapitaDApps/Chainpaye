@@ -4,6 +4,7 @@ import { Transaction } from "../models/Transaction";
 import { WalletService } from "../services/WalletService";
 import { WhatsAppBusinessService } from "../services/WhatsAppBusinessService";
 import { IUser } from "../models/User";
+import { CONSTANTS } from "../utils/config";
 
 enum JobNames {
   PROCESS_DEPOSIT = "PROCESS_DEPOSIT",
@@ -20,20 +21,22 @@ async function processDepositHandler(job: Job<ProcessDeposit>) {
   const transactionId = job.attrs.data.transactionId;
   const endDate = job.attrs.endDate;
   const now = Date.now();
-  console.log({ transactionId });
+
   const transaction = await Transaction.findOne({
     toronetTransactionId: transactionId,
   }).populate("fromUser");
+
   if (!transaction) {
     await agenda.cancel({ name: JobNames.PROCESS_DEPOSIT });
     return;
   }
+
   const result = await walletService.checkTransactionStatus(transactionId);
   if (result.success) {
-    await whatsappBusinessService.sendNormalMessage(
-      `${result.message}
-          `,
-      (transaction.fromUser as IUser).whatsappNumber
+    await whatsappBusinessService.sendVideoContent(
+      (transaction.fromUser as IUser).whatsappNumber,
+      CONSTANTS.MONEY_IN_MEDIA,
+      result.message
     );
     await agenda.cancel({ name: JobNames.PROCESS_DEPOSIT });
     return;

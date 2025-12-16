@@ -51,6 +51,26 @@ export class WhatsAppBusinessService {
     });
   }
 
+  async sendVideoContent(to: string, videoUrl: string, caption?: string) {
+    await axios({
+      method: "POST",
+      url: `https://graph.facebook.com/v24.0/${this.business_phone_number_id}/messages`,
+      headers: {
+        Authorization: `Bearer ${this.GRAPH_API_TOKEN}`,
+      },
+      data: {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: "video",
+        video: {
+          link: videoUrl,
+          ...(caption && { caption }),
+        },
+      },
+    });
+  }
+
   async sendTemplateIntroMessage(to: string) {
     const flowToken = uuidv4();
     await redisClient.set(flowToken, to, "EX", 3600); // Store flow_token for 1 hour

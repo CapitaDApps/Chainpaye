@@ -4,6 +4,7 @@ import { redisClient } from "../../services/redis";
 import { ToronetService } from "../../services/ToronetService";
 import { UserService } from "../../services/UserService";
 import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService";
+import { CONSTANTS } from "../../utils/config";
 
 export async function getWithdrawalFlowScreen(decryptedBody: {
   screen: string;
@@ -164,9 +165,10 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
             amount,
           })
           .then(async (withdrawalResp) => {
-            await whatsappBusinessService.sendNormalMessage(
-              withdrawalResp.message,
-              phone
+            await whatsappBusinessService.sendVideoContent(
+              phone,
+              CONSTANTS.MONEY_OUT_MEDIA,
+              withdrawalResp.message
             );
           })
           .catch((error) => console.log("Error processig withdrawal", error));

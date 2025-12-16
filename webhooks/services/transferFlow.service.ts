@@ -2,6 +2,7 @@ import { redisClient } from "../../services/redis";
 import { WalletService } from "../../services/WalletService";
 import { User } from "../../models/User";
 import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService";
+import { CONSTANTS } from "../../utils/config";
 
 export const getTransferScreen = async (decryptedBody: {
   screen: string;
@@ -137,15 +138,24 @@ export const getTransferScreen = async (decryptedBody: {
             .transfer(phone, acctNo, amount, currency)
             .then(async (transferResult) => {
               if (transferResult) {
-                whatsappBusinessService.sendNormalMessage(
-                  transferResult?.message,
-                  userPhone!
-                );
-
                 if (transferResult.success) {
+                  // money out for sender
+                  whatsappBusinessService.sendVideoContent(
+                    userPhone!,
+                    CONSTANTS.MONEY_OUT_MEDIA,
+                    transferResult.message
+                  );
+
+                  // money in for receiver
+                  whatsappBusinessService.sendVideoContent(
+                    accountNumber,
+                    CONSTANTS.MONEY_IN_MEDIA,
+                    transferResult.messageTo!
+                  );
+                } else {
                   whatsappBusinessService.sendNormalMessage(
-                    transferResult.messageTo!,
-                    accountNumber
+                    transferResult?.message,
+                    userPhone!
                   );
                 }
               } else {
