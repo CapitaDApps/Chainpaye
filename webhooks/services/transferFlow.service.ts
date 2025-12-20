@@ -140,18 +140,22 @@ export const getTransferScreen = async (decryptedBody: {
               if (transferResult) {
                 if (transferResult.success) {
                   // money out for sender
-                  whatsappBusinessService.sendVideoContent(
-                    userPhone!,
-                    CONSTANTS.MONEY_OUT_MEDIA,
-                    transferResult.message
-                  );
+                  whatsappBusinessService
+                    .sendVideoContent(
+                      userPhone!,
+                      CONSTANTS.MONEY_OUT_MEDIA,
+                      transferResult.message
+                    )
+                    .catch((err) => console.log("Money out error", err));
 
                   // money in for receiver
-                  whatsappBusinessService.sendVideoContent(
-                    accountNumber,
-                    CONSTANTS.MONEY_IN_MEDIA,
-                    transferResult.messageTo!
-                  );
+                  whatsappBusinessService
+                    .sendVideoContent(
+                      accountNumber,
+                      CONSTANTS.MONEY_IN_MEDIA,
+                      transferResult.messageTo!
+                    )
+                    .catch((err) => console.log("Money in error", err));
                 } else {
                   whatsappBusinessService.sendNormalMessage(
                     transferResult?.message,
