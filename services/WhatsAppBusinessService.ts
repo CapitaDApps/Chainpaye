@@ -14,7 +14,7 @@ import { Wallet } from "../models/Wallet";
 type ButtonPayloadType =
   | "My Account"
   | "Withdraw to Bank"
-  | "Copy Account Number"
+  | "Copy Account NO"
   | "Invoice a Client";
 type CommandTextType =
   | "transfer-usd"
@@ -358,7 +358,7 @@ export class WhatsAppBusinessService {
         break;
       }
 
-      case "Copy Account Number": {
+      case "Copy Account NO": {
         const phone = to.startsWith("+") ? to : `+${to}`;
         const user = await User.findOne({ whatsappNumber: phone });
         if (!user) {
