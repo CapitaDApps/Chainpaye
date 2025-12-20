@@ -352,7 +352,7 @@ export class WhatsAppBusinessService {
           return;
         }
         // send withdraw flow
-        const withdrawFlowId = "775551478878542";
+        const withdrawFlowId = "1654062222645036";
         const initScreen = "WITHDRAWAL_CURRENCY";
         this.sendFlowById(to, withdrawFlowId, initScreen);
         break;
