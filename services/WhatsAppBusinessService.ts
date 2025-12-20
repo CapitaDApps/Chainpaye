@@ -239,18 +239,6 @@ export class WhatsAppBusinessService {
                 },
               ],
             },
-            {
-              type: "button",
-              sub_type: "quick_reply",
-              index: "1",
-              parameters: [],
-            },
-            {
-              type: "button",
-              sub_type: "quick_reply",
-              index: "2",
-              parameters: [],
-            },
           ],
         },
       },
