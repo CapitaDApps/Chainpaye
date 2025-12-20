@@ -36,6 +36,7 @@ const {
   APP_SECRET,
   PRIVATE_KEY,
   PASSPHRASE = "",
+  BUSINESS_PHONE_NUMBER_ID,
 } = process.env;
 
 // Route for GET requests
@@ -61,7 +62,7 @@ app.get("/", (req, res) => {
 async function readMessage(messageId: string) {
   await axios({
     method: "POST",
-    url: `https://graph.facebook.com/v24.0/${897300070126934}/messages`,
+    url: `https://graph.facebook.com/v24.0/${BUSINESS_PHONE_NUMBER_ID}/messages`,
     headers: {
       Authorization: `Bearer ${GRAPH_API_TOKEN}`,
     },
@@ -76,7 +77,7 @@ async function readMessage(messageId: string) {
 async function replyingMessage(messageId: string) {
   await axios({
     method: "POST",
-    url: `https://graph.facebook.com/v24.0/${897300070126934}/messages`,
+    url: `https://graph.facebook.com/v24.0/${BUSINESS_PHONE_NUMBER_ID}/messages`,
     headers: {
       Authorization: `Bearer ${GRAPH_API_TOKEN}`,
     },
