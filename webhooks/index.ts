@@ -203,7 +203,7 @@ app.post("/webhook", async (req, res) => {
                     message.from
                   );
                   await whatsappBusinessService.sendTemplateInteractiveMessage(
-                    "appointment",
+                    "menumessage",
                     message.from,
                     "en"
                   );
