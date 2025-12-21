@@ -102,7 +102,7 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
         const chosenBank = ngnBanks.find((bk) => bk.id == bankCode);
         if (!chosenBank) {
           return {
-            screen: "PIN",
+            screen: "WITHDRAWAL_DETAILS",
             data: {
               error_message: "Selected bank not found",
             },
@@ -112,6 +112,14 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
           accountNumber,
           bankCode
         );
+        if (!accountName)
+          return {
+            screen: "WITHDRAWAL_DETAILS",
+            data: {
+              error_message:
+                "Could not verify account name, check acct NO and try again.",
+            },
+          };
         return {
           screen: "SUMMARY",
           data: {
