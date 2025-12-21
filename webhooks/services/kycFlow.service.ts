@@ -72,9 +72,8 @@ export async function getKycFlowScreen(decryptedBody: {
 
         new Promise(async () => {
           try {
-            console.log(user.fullName);
-            const firstName = user.fullName.split(" ")[0]?.trim()!;
-            const lastName = user.fullName.split(" ")[1]?.trim()!;
+            const firstName = user.firstName;
+            const lastName = user.lastName;
             const result = await toronetService.performKYC({
               firstName,
               lastName,

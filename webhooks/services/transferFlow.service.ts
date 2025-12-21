@@ -85,7 +85,7 @@ export const getTransferScreen = async (decryptedBody: {
               accountNumber,
               currency,
               amount,
-              recipientName: `${user.fullName}`,
+              recipientName: `${user.firstName} ${user.lastName}`,
             },
           };
         }

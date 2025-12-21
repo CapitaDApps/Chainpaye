@@ -76,6 +76,8 @@ export class WalletService {
         `Could not find wallet for user with phone number - [${to}]`
       );
 
+    const fullName = `${toUser.firstName} ${toUser.lastName}`;
+
     switch (currency) {
       case "USD":
         const respUSD = await this.toronetService.getBalanceUSD(
@@ -104,14 +106,14 @@ export class WalletService {
           return {
             success: true,
             type: "transfer success",
-            message: `Transfer of ${amount} USD to ${toUser.fullName} was successful`,
-            messageTo: `You've received ${amount} USD from ${user.fullName}`,
+            message: `Transfer of ${amount} USD to ${fullName} was successful`,
+            messageTo: `You've received ${amount} USD from ${fullName}`,
           };
         } else {
           return {
             success: false,
             type: "transfer failed",
-            message: `Transfer of ${amount}USD to ${toUser.fullName} was unsuccessful`,
+            message: `Transfer of ${amount}USD to ${fullName} was unsuccessful`,
           };
         }
 
@@ -140,14 +142,14 @@ export class WalletService {
           return {
             success: true,
             type: "transfer success",
-            message: `Transfer of ${amount} NGN to ${toUser.fullName} was successful`,
-            messageTo: `You've received ${amount} NGN from ${user.fullName}`,
+            message: `Transfer of ${amount} NGN to ${fullName} was successful`,
+            messageTo: `You've received ${amount} NGN from ${fullName}`,
           };
         } else {
           return {
             success: false,
             type: "transfer failed",
-            message: `Transfer of ${amount}NGN to ${toUser.fullName} was unsuccessful`,
+            message: `Transfer of ${amount}NGN to ${fullName} was unsuccessful`,
           };
         }
 

@@ -13,7 +13,8 @@ import { IWallet } from "./Wallet";
 export interface IUser extends Document {
   whatsappNumber: string;
   userId: string;
-  fullName: string;
+  firstName: string;
+  lastName: string;
   email?: string;
   country: string;
   currency: "USD" | "NGN";
@@ -45,7 +46,15 @@ const UserSchema: Schema = new Schema(
       required: true,
       unique: true,
     },
-    fullName: {
+
+    firstName: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 150,
+    },
+
+    lastName: {
       type: String,
       required: true,
       trim: true,

@@ -315,7 +315,7 @@ export class WhatsAppBusinessService {
         const params = [
           {
             type: "text",
-            text: `${user.fullName}`,
+            text: `${user.firstName} ${user.lastName}`,
           },
           {
             type: "text",
