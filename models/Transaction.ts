@@ -14,6 +14,7 @@ export enum TransactionType {
   TRANSFER = "transfer",
   DEPOSIT = "deposit",
   WITHDRAWAL = "withdrawal",
+  DIRECT_TRANSFER = "direct_transfer",
 }
 
 /**
@@ -53,6 +54,7 @@ export interface ITransaction extends Document {
   updatedAt: Date;
   completedAt?: Date;
   failureReason?: string;
+  hash?: string;
   markAsCompleted: (toronetTransactionId?: string) => void;
 }
 
@@ -90,13 +92,25 @@ const TransactionSchema: Schema = new Schema(
     fromUser: {
       type: Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      required: function () {
+        return this.type !== TransactionType.DIRECT_TRANSFER;
+      },
     },
     toUser: {
       type: Schema.Types.ObjectId,
       ref: "User",
       required: function () {
         return this.type === TransactionType.TRANSFER;
+      },
+    },
+    hash: {
+      type: String,
+      trim: true,
+      required: function () {
+        return (
+          (this.type as unknown as TransactionType) ===
+          TransactionType.DIRECT_TRANSFER
+        );
       },
     },
     amount: {

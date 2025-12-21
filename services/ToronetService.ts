@@ -254,13 +254,52 @@ export class ToronetService {
     };
   }
 
-  async updateVirtualWallet(virtualAccountNO: string) {
+  async getVirtualWalletByAddress(publicKey: string): Promise<{
+    result: boolean;
+    bankname: string;
+    network: string;
+    accountnumber: string;
+    address: string;
+    accountname: string;
+    newwallet: boolean;
+    lastcheck: string;
+  }> {
+    const body = {
+      op: "getvirtualwalletbyaddress",
+      params: [
+        {
+          name: "address",
+          value: publicKey, //blockchain address
+        },
+      ],
+    };
+
+    const resp = await this.axiosInstance.post("/payment", body, {
+      headers: {
+        adminpwd: this.adminPassword,
+        admin: this.adminAddress,
+      },
+    });
+
+    const data = resp.data;
+    return data;
+  }
+
+  async updateVirtualWallet(publicKey: string) {
+    const virtualWalletData = await redisClient.getOrSetCache(
+      publicKey,
+      async () => {
+        const data = await this.getVirtualWalletByAddress(publicKey);
+        return data;
+      }
+    );
+
     const body = {
       op: "updatevirtualwallettransactions",
       params: [
         {
           name: "walletaddress",
-          value: virtualAccountNO, //blockchain address
+          value: virtualWalletData.accountnumber, //blockchain address
         },
       ],
     };
@@ -273,6 +312,7 @@ export class ToronetService {
     });
     const data = resp.data;
     console.log({ updateVirtualWalletData: data });
+
     return {
       result: data.result,
       transactionHash: data.transactionHash,
@@ -748,7 +788,7 @@ export class ToronetService {
       if (kycResult.data == null) {
         return {
           success: false,
-          message: kycResult.message,
+          message: kycResult.description,
         };
       }
     }
@@ -759,8 +799,8 @@ export class ToronetService {
         message: "KYC process failed. Please try again.",
       };
     }
-    await user.markVerified();
-    await user.save();
+    user.markVerified().then(() => user.save());
+
     return {
       success: true,
       message: "You've been successfully verified",

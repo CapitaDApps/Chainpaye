@@ -48,8 +48,8 @@ export async function getKycFlowScreen(decryptedBody: {
   if (action === "data_exchange") {
     switch (screen) {
       case "KYC_INPUT":
-        const userPhone = await redisClient.get(flow_token);
-        // const userPhone = "+2348110236998";
+        //const userPhone = await redisClient.get(flow_token);
+        const userPhone = "+2348110236998";
         if (!userPhone) {
           return {
             screen: "KYC_INPUT",
@@ -73,8 +73,8 @@ export async function getKycFlowScreen(decryptedBody: {
         new Promise(async () => {
           try {
             console.log(user.fullName);
-            const firstName = user.fullName.split(" ")[0]!;
-            const lastName = user.fullName.split(" ")[1]!;
+            const firstName = user.fullName.split(" ")[0]?.trim()!;
+            const lastName = user.fullName.split(" ")[1]?.trim()!;
             const result = await toronetService.performKYC({
               firstName,
               lastName,

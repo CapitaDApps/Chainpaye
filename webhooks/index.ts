@@ -131,6 +131,7 @@ app.post("/webhook", async (req, res) => {
                 const userWallet = await userService.getUserToroWallet(
                   message.from
                 );
+                await toronetService.updateVirtualWallet(userWallet.publicKey);
                 const [NGNBal, USDBal] = await Promise.all([
                   toronetService.getBalanceNGN(userWallet.publicKey),
                   toronetService.getBalanceUSD(userWallet.publicKey),

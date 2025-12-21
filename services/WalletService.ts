@@ -222,6 +222,7 @@ export class WalletService {
       );
     } else {
       transaction.markAsCompleted();
+      transaction.save();
       return {
         success: true,
         message: `Transaction with id - [${transactionId}] has been processed successfully`,
@@ -230,6 +231,8 @@ export class WalletService {
 
     if (result.result) {
       transaction.markAsCompleted();
+      transaction.save();
+
       return {
         success: true,
         message: `Deposit amount of ${transaction.amount} ${transaction.currency} has been processed successfully`,
