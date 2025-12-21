@@ -9,7 +9,8 @@ import { nanoid } from "nanoid";
 
 type CreateUserType = {
   whatsappNumber: string;
-  fullName: string;
+  firstName: string;
+  lastName: string;
   countryCode: string;
   pin: string;
   dob: string;
@@ -61,7 +62,8 @@ export class UserService {
             [
               {
                 whatsappNumber: data.whatsappNumber,
-                fullName: data.fullName,
+                firstName: data.firstName,
+                lastName: data.lastName,
                 country: data.countryCode,
                 pin: data.pin,
                 userId,
@@ -72,7 +74,7 @@ export class UserService {
           );
 
           await this.walletService.addWallet(
-            { userId, fullName: data.fullName },
+            { userId, fullName: `${data.firstName} ${data.lastName}` },
             session
           );
         });
