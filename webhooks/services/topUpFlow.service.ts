@@ -141,7 +141,7 @@ export const getTopUpScreen = async (decryptedBody: {
         // { pin: '23456', amount: '12345678', currency: 'USD' }
         // Get user phone number from Redis using flow_token
         const userPhone = await redisClient.get(flow_token);
-        // const userPhone = "+2348110236998";
+
         if (!userPhone) {
           return {
             screen: "PIN",
