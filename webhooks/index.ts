@@ -156,8 +156,7 @@ app.post("/webhook", async (req, res) => {
                 );
 
                 await whatsappBusinessService.sendNormalMessage(
-                  `${txStatusData.message}
-          `,
+                  `${txStatusData.message}`,
                   message.from
                 );
               }
@@ -196,14 +195,11 @@ app.post("/webhook", async (req, res) => {
                     }*, welcome to Chainpaye.`,
                     message.from
                   );
-                  if (!user.isVerified) {
-                    await whatsappBusinessService.sendTemplateInteractiveMessage(
-                      "completekyce",
-                      message.from,
-                      "en"
-                    );
-                    return res.sendStatus(200);
-                  }
+                  await whatsappBusinessService.sendTemplateInteractiveMessage(
+                    "menumessage",
+                    message.from,
+                    "en"
+                  );
                 }
 
                 if (responseJson.type == "processing_started") {
@@ -216,20 +212,16 @@ app.post("/webhook", async (req, res) => {
               }
             }
 
-            if (!user.isVerified) {
+            if (
+              message.type !== "button" ||
+              message.text.body ||
+              message.type == "interactive"
+            ) {
               await whatsappBusinessService.sendTemplateInteractiveMessage(
-                "completekyce",
+                "menumessage",
                 message.from,
                 "en"
               );
-            } else {
-              if (message.type !== "button") {
-                await whatsappBusinessService.sendTemplateInteractiveMessage(
-                  "menumessage",
-                  message.from,
-                  "en"
-                );
-              }
             }
           }
         }
