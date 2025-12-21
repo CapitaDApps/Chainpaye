@@ -96,9 +96,9 @@ export class WhatsAppBusinessService {
               type: "header",
               parameters: [
                 {
-                  type: "image",
-                  image: {
-                    link: "https://moccasin-bright-skunk-108.mypinata.cloud/ipfs/bafkreic632v26b4htt7cfwkhsleivo6q3lljlnhadgb6uikrkw6yabppyu",
+                  type: "video",
+                  video: {
+                    link: "https://chainpaye-public.s3.us-east-1.amazonaws.com/chainpaye-intro-video.mp4",
                   },
                 },
               ],
