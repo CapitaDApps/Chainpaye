@@ -123,7 +123,8 @@ export const userSetupScreen = async (decryptedBody: {
           }
           await userService.createUser({
             countryCode: data.country,
-            fullName: `${data.first_name.trim()} ${data.last_name.trim()}`,
+            firstName: data.first_name.trim(),
+            lastName: data.last_name.trim(),
             whatsappNumber: phone,
             pin,
             dob: data.dob,
