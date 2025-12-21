@@ -1,6 +1,6 @@
 import { Job, JobAttributesData } from "agenda";
 import { agenda } from ".";
-import { Transaction } from "../models/Transaction";
+import { Transaction, TransactionStatus } from "../models/Transaction";
 import { WalletService } from "../services/WalletService";
 import { WhatsAppBusinessService } from "../services/WhatsAppBusinessService";
 import { IUser } from "../models/User";
@@ -37,6 +37,10 @@ async function processDepositHandler(job: Job<ProcessDeposit>) {
       (transaction.fromUser as IUser).whatsappNumber,
       CONSTANTS.MONEY_IN_MEDIA,
       result.message
+    );
+    await Transaction.updateOne(
+      { toronetTransactionId: transactionId },
+      { status: TransactionStatus.COMPLETED }
     );
     await agenda.cancel({ name: JobNames.PROCESS_DEPOSIT });
     return;

@@ -9,7 +9,7 @@ const APP_SECRET = process.env.APP_SECRET;
 
 export function isRequestSignatureValid(req: Request) {
   if (!APP_SECRET) {
-    console.warn(
+    console.log(
       "App Secret is not set up. Please Add your app secret in /.env file to check for request validation"
     );
     return true;
