@@ -55,12 +55,12 @@ export const getTopUpScreen = async (decryptedBody: {
     switch (screen) {
       case "TOPUP_WALLET": {
         const userPhone = await redisClient.get(flow_token);
-        // const userPhone = "+2348110236998";
+
         if (!userPhone) {
           return {
             screen: "TOPUP_WALLET",
             data: {
-              error_message: "Session expired",
+              error_message: "Session expired. Restart flow a new message",
             },
           };
         }
@@ -146,7 +146,7 @@ export const getTopUpScreen = async (decryptedBody: {
           return {
             screen: "PIN",
             data: {
-              error_message: "Session expired",
+              error_message: "Session expired. Restart flow a new message",
             },
           };
         }

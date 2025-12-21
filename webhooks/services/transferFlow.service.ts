@@ -38,7 +38,6 @@ export const getTransferScreen = async (decryptedBody: {
   try {
     // Get user phone number from Redis using flow_token
     const userPhone = await redisClient.get(flow_token);
-    // const userPhone = `+2348110236998`;
 
     // handle initial request when opening the flow
     if (action === "INIT") {
@@ -62,8 +61,7 @@ export const getTransferScreen = async (decryptedBody: {
             return {
               screen: "TRANSFER",
               data: {
-                error_message:
-                  "User flow session not found. Please restart flow",
+                error_message: "Session expired. Restart flow a new message",
               },
             };
           }

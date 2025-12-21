@@ -65,12 +65,12 @@ export async function getGenerateLinkScreen(decryptedBody: {
   }
 
   if (action === "data_exchange") {
-    //const userPhone = await redisClient.get(flow_token);
-    const userPhone = "+2348110236998";
+    const userPhone = await redisClient.get(flow_token);
+
     if (!userPhone) {
       return {
         screen: "CREATE_LINK_DETAILS",
-        error_message: "Session expired",
+        error_message: "Session expired. Restart flow a new message",
       };
     }
     const phone = userPhone.startsWith("+") ? userPhone : `+${userPhone}`;

@@ -68,12 +68,12 @@ export const userSetupScreen = async (decryptedBody: {
 
           //   Get user phone number from Redis using flow_token
           const userPhone = await redisClient.get(flow_token);
-          // const userPhone = "+2348110236998";
+
           if (!userPhone) {
             return {
               screen: "SECURITY_INFO",
               data: {
-                error_message: "Session expired",
+                error_message: "Session expired. Restart flow a new message",
               },
             };
           }
