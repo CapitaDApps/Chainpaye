@@ -223,11 +223,13 @@ app.post("/webhook", async (req, res) => {
                 "en"
               );
             } else {
-              await whatsappBusinessService.sendTemplateInteractiveMessage(
-                "menumessage",
-                message.from,
-                "en"
-              );
+              if (message.type !== "button") {
+                await whatsappBusinessService.sendTemplateInteractiveMessage(
+                  "menumessage",
+                  message.from,
+                  "en"
+                );
+              }
             }
           }
         }
