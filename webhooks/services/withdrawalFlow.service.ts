@@ -69,6 +69,7 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
             return {
               screen: "WITHDRAWAL_DETAILS",
               data: {
+                currency,
                 banks: usdBanks,
               },
             };
@@ -78,6 +79,7 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
             return {
               screen: "WITHDRAWAL_DETAILS",
               data: {
+                currency,
                 banks: ngnBanks,
               },
             };
@@ -91,9 +93,40 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
         }
       }
 
+      case "WITHDRAWAL_DETAILS": {
+        const { currency, bankCode, accountNumber, amount } = data;
+        console.log({ data });
+
+        console.log({ bankCode });
+        const ngnBanks = await toronetService.getBankListNGN();
+        const chosenBank = ngnBanks.find((bk) => bk.id == bankCode);
+        if (!chosenBank) {
+          return {
+            screen: "PIN",
+            data: {
+              error_message: "Selected bank not found",
+            },
+          };
+        }
+        const accountName = await toronetService.resolveBankAccountName(
+          accountNumber,
+          bankCode
+        );
+        return {
+          screen: "SUMMARY",
+          data: {
+            currency,
+            amount,
+            accountNumber,
+            resolvedAccountName: accountName,
+            resolvedBankName: chosenBank.title,
+            bankCode,
+          },
+        };
+      }
+
       case "PIN": {
-        const { currency, bank, accountName, accountNumber, amount, pin } =
-          data;
+        const { bankCode, accountName, accountNumber, amount, pin } = data;
         console.log({ pinData: data });
 
         const user = await User.findOne({ whatsappNumber: phone }).select(
@@ -120,9 +153,9 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
           };
         }
 
-        console.log({ bank });
+        console.log({ bankCode });
         const ngnBanks = await toronetService.getBankListNGN();
-        const chosenBank = ngnBanks.find((bk) => bk.id == bank);
+        const chosenBank = ngnBanks.find((bk) => bk.id == bankCode);
 
         if (!chosenBank) {
           return {
@@ -146,7 +179,7 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
 
         if (+balanceNGN.balance < +amount) {
           return {
-            success: "PIN",
+            screen: "PIN",
             data: {
               error_message: "Insufficient balance for withdrawal",
             },
@@ -165,7 +198,7 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
             amount,
           })
           .then(async (withdrawalResp) => {
-            await whatsappBusinessService.sendVideoContent(
+            whatsappBusinessService.sendVideoContent(
               phone,
               CONSTANTS.MONEY_OUT_MEDIA,
               withdrawalResp.message

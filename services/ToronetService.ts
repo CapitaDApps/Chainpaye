@@ -556,6 +556,8 @@ export class ToronetService {
 
     const withdrawResp = result.data;
 
+    console.log({ withdrawResp });
+
     if (withdrawResp.result) {
       return {
         success: true,
@@ -566,6 +568,7 @@ export class ToronetService {
     return {
       success: false,
       message:
+        withdrawResp.error ||
         withdrawResp.message ||
         "Withdrawal was not successful. Please try again.",
     };
@@ -637,6 +640,41 @@ export class ToronetService {
     );
 
     return bankList;
+  }
+
+  async resolveBankAccountName(
+    accountNumber: string,
+    bankCode: string
+  ): Promise<string> {
+    const accountName = await redisClient.getOrSetCache(
+      accountNumber,
+      async () => {
+        const body = {
+          op: "verifybankaccountname_ngn",
+          params: [
+            {
+              name: "destinationInstitutionCode",
+              value: bankCode, //destinationInstitutionCode
+            },
+            {
+              name: "accountNumber",
+              value: accountNumber,
+            },
+          ],
+        };
+
+        const result = await this.axiosInstance.post("/payment/toro/", body, {
+          headers: {
+            adminpwd: this.adminPassword,
+            admin: this.adminAddress,
+          },
+        });
+
+        const data = result.data;
+        return data.data.accountName;
+      }
+    );
+    return accountName;
   }
 
   // TODO: Implement withdrawal USD

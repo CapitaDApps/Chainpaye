@@ -399,9 +399,7 @@ export class WhatsAppBusinessService {
         );
 
         await this.sendNormalMessage(
-          `*THIS IS A TEST FEATURE*
-          
-${txStatusData.message}
+          `${txStatusData.message}
           `,
           to
         );
