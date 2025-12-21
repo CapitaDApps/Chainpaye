@@ -159,6 +159,12 @@ app.post("/webhook", async (req, res) => {
                   `${txStatusData.message}`,
                   message.from
                 );
+              } else {
+                await whatsappBusinessService.sendTemplateInteractiveMessage(
+                  "menumessage",
+                  message.from,
+                  "en"
+                );
               }
             }
 
@@ -211,35 +217,12 @@ app.post("/webhook", async (req, res) => {
                 }
               }
             }
-
-            if (
-              message.type !== "button" ||
-              message.text.body ||
-              message.type == "interactive"
-            ) {
-              await whatsappBusinessService.sendTemplateInteractiveMessage(
-                "menumessage",
-                message.from,
-                "en"
-              );
-            }
           }
         }
       }
     } catch (error) {
       console.log(error);
     }
-  }
-
-  if (message && message.type == "text") {
-    // else if (!messageBody.includes("hello")) {
-    //   const command = messageList[0].trim();
-    //   const text = messageList[1]?.trim();
-    //   console.log({ text });
-    //   whatsappBusinessService
-    //     .handleCommandText(command, text, message.from)
-    //     .catch((err) => console.log("handleCommandText", err));
-    // }
   }
 
   res.sendStatus(200);
