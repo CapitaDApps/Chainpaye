@@ -96,9 +96,9 @@ export class WhatsAppBusinessService {
               type: "header",
               parameters: [
                 {
-                  type: "video",
-                  video: {
-                    link: "https://chainpaye-public.s3.us-east-1.amazonaws.com/chainpaye-intro-video.mp4",
+                  type: "image",
+                  image: {
+                    link: "https://chainpaye-public.s3.us-east-1.amazonaws.com/chainpaye-img.jpg",
                   },
                 },
               ],
