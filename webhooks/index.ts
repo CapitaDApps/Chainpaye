@@ -161,11 +161,13 @@ app.post("/webhook", async (req, res) => {
                   message.from
                 );
               } else {
-                await whatsappBusinessService.sendTemplateInteractiveMessage(
-                  "menumessage",
-                  message.from,
-                  "en"
-                );
+                if (message.text.body) {
+                  await whatsappBusinessService.sendTemplateInteractiveMessage(
+                    "menumessage",
+                    message.from,
+                    "en"
+                  );
+                }
               }
             }
 
