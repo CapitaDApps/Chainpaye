@@ -49,6 +49,7 @@ export async function getKycFlowScreen(decryptedBody: {
     switch (screen) {
       case "KYC_INPUT":
         const userPhone = await redisClient.get(flow_token);
+        // const userPhone = "+2348110236998";
 
         if (!userPhone) {
           return {

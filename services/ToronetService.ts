@@ -783,8 +783,9 @@ export class ToronetService {
     });
     const result = resp.data;
     console.log({ result });
-    if (typeof result.data == "string") {
-      const kycResult = JSON.parse(result.data);
+    const resultData = result.data;
+    if (typeof resultData == "string") {
+      const kycResult = JSON.parse(resultData);
       if (kycResult.data == null) {
         return {
           success: false,
@@ -792,8 +793,49 @@ export class ToronetService {
         };
       }
     }
-    const passed = result.data.passed;
+    const passed = resultData.passed;
     if (!passed) {
+      //       {
+      //   result: {
+      //     result: true,
+      //     data: {
+      //       bvn: 'Y',
+      //       firstName: 'N',
+      //       lastName: 'Y',
+      //       middleName: 'N/A',
+      //       phoneNumber: 'N',
+      //       dob: 'Y',
+      //       passed: false
+      //     }
+      //   }
+      // }
+
+      if (resultData.firstName == "N" && !resultData.passed) {
+        return {
+          success: false,
+          message:
+            "Registered first name does not match BVN information. Please reach out to support",
+        };
+      }
+      if (resultData.lastName == "N" && !resultData.passed) {
+        return {
+          success: false,
+          message:
+            "Registered last name does not match BVN information. Please reach out to support",
+        };
+      }
+      if (resultData.dob == "N" && !resultData.passed) {
+        return {
+          success: false,
+          message: "Registered date of birth does not match BVN information",
+        };
+      }
+      if (resultData.bvn == "N" && !resultData.passed) {
+        return {
+          success: false,
+          message: "could not verify bvn",
+        };
+      }
       return {
         success: false,
         message: "KYC process failed. Please try again.",
