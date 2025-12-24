@@ -270,4 +270,20 @@ export class WalletService {
   }
 
   // TODO Get Wallet INFO
+
+  async getUserRecentTransactions(userId: string, limit: number = 5) {
+    const user = await User.findOne({ userId });
+    if (!user) {
+      throw new Error(`User with userId - [${userId}] not found`);
+    }
+
+    const transactions = await Transaction.find({
+      $or: [{ fromUser: user._id }, { toUser: user._id }],
+    })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .populate("fromUser toUser", "firstName lastName whatsappNumber");
+
+    return transactions;
+  }
 }
