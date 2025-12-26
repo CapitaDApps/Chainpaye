@@ -1,6 +1,9 @@
 import { redisClient } from "../../services/redis";
+import { ToronetService } from "../../services/ToronetService";
 import { UserService } from "../../services/UserService";
 import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService";
+import { getCountryCodeFromPhoneNumber } from "../../utils/countryCodeMapping";
+import { formatDate } from "../utils/formatDate";
 
 const countries = [
   { id: "NG", title: "Nigeria" },
@@ -22,6 +25,7 @@ export const userSetupScreen = async (decryptedBody: {
   const { screen, data, version, action, flow_token } = decryptedBody;
   const userService = new UserService();
   const whatsappBusinessService = new WhatsAppBusinessService();
+  const toronetService = new ToronetService();
   // handle health check request
   if (action === "ping") {
     return {
@@ -42,11 +46,16 @@ export const userSetupScreen = async (decryptedBody: {
     };
   }
 
+  //   Get user phone number from Redis using flow_token
+  const userPhone = await redisClient.get(flow_token);
+  const phone = userPhone?.startsWith("+") ? userPhone : `+${userPhone}`;
   // handle initial request when opening the flow
   if (action === "INIT") {
     return {
       screen: "PERSONAL_INFO",
-      data: {},
+      data: {
+        is_ng: getCountryCodeFromPhoneNumber(phone) === "NG",
+      },
     };
   }
 
@@ -55,20 +64,6 @@ export const userSetupScreen = async (decryptedBody: {
     switch (screen) {
       case "SECURITY_INFO":
         try {
-          console.log({ data });
-
-          //       data: {
-          //   first_name: 'Knowledge',
-          //   last_name: 'Okhakumhe',
-          //   dob: '2025-12-09',
-          //   country: 'NG',
-          //   pin: '12314',
-          //   confirm_pin: '124124'
-          // }
-
-          //   Get user phone number from Redis using flow_token
-          const userPhone = await redisClient.get(flow_token);
-
           if (!userPhone) {
             return {
               screen: "SECURITY_INFO",
@@ -77,8 +72,6 @@ export const userSetupScreen = async (decryptedBody: {
               },
             };
           }
-          const phone = userPhone.startsWith("+") ? userPhone : `+${userPhone}`;
-
           // validate pin
           const pin = data.pin.trim();
           const confirm_pin = data.confirm_pin.trim();
@@ -121,8 +114,8 @@ export const userSetupScreen = async (decryptedBody: {
               },
             };
           }
+
           await userService.createUser({
-            countryCode: data.country,
             firstName: data.first_name.trim(),
             lastName: data.last_name.trim(),
             whatsappNumber: phone,
@@ -130,7 +123,28 @@ export const userSetupScreen = async (decryptedBody: {
             dob: data.dob,
           });
 
-          await redisClient.set(
+          if (data.bvn) {
+            toronetService
+              .performKYC({
+                firstName: data.first_name.trim(),
+                lastName: data.last_name.trim(),
+                bvn: data.bvn,
+                dob: formatDate(data.dob),
+                address: "",
+                phoneNumber: phone,
+              })
+              .then((result) => {
+                whatsappBusinessService.sendNormalMessage(
+                  result.message,
+                  phone
+                );
+              })
+              .catch((err) =>
+                console.log(`Error performing kyc for user - [${phone}]`)
+              );
+          }
+
+          redisClient.set(
             `${flow_token}_accountCreation`,
             JSON.stringify({
               fullName: `${data.first_name} ${data.last_name}`,

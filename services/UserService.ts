@@ -6,14 +6,15 @@ import { CurrencyType } from "../types/toronetService.types";
 import { Wallet } from "../models/Wallet";
 import { WhatsAppBusinessService } from "./WhatsAppBusinessService";
 import { nanoid } from "nanoid";
+import { getCountryCodeFromPhoneNumber } from "../utils/countryCodeMapping";
 
 type CreateUserType = {
   whatsappNumber: string;
   firstName: string;
   lastName: string;
-  countryCode: string;
   pin: string;
   dob: string;
+  countryCode?: string; // Optional - will be extracted from phone number if not provided
 };
 
 export class UserService {
@@ -55,6 +56,17 @@ export class UserService {
 
     if (!user) {
       const userId = this.generateUserId();
+
+      // Extract country from phone number if not provided
+      const extractedCountry =
+        data.countryCode || getCountryCodeFromPhoneNumber(data.whatsappNumber);
+
+      if (!extractedCountry) {
+        throw new Error(
+          `Could not determine country for phone number: ${data.whatsappNumber}`
+        );
+      }
+
       const session = await mongoose.startSession();
       try {
         await session.withTransaction(async () => {
@@ -64,7 +76,7 @@ export class UserService {
                 whatsappNumber: data.whatsappNumber,
                 firstName: data.firstName,
                 lastName: data.lastName,
-                country: data.countryCode,
+                country: extractedCountry,
                 pin: data.pin,
                 userId,
                 dob: data.dob,
@@ -74,7 +86,11 @@ export class UserService {
           );
 
           await this.walletService.addWallet(
-            { userId, fullName: `${data.firstName} ${data.lastName}` },
+            {
+              userId,
+              fullName: `${data.firstName} ${data.lastName}`,
+              country: extractedCountry,
+            },
             session
           );
         });

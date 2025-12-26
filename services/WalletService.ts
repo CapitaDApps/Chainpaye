@@ -17,7 +17,11 @@ export class WalletService {
   }
 
   async addWallet(
-    { fullName, userId }: { userId: string; fullName: string },
+    {
+      fullName,
+      userId,
+      country,
+    }: { userId: string; fullName: string; country: string },
     session: mongo.ClientSession
   ): Promise<void> {
     const wallet = await Wallet.findOne({ userId });
@@ -36,10 +40,13 @@ export class WalletService {
         { session }
       );
 
-      await this.toronetService.createVirtualWalletNGN({
-        address: toronetWallet.walletAddress,
-        fullName,
-      });
+      // Only create NGN virtual wallet for Nigerian users
+      if (country === "NG") {
+        await this.toronetService.createVirtualWalletNGN({
+          address: toronetWallet.walletAddress,
+          fullName,
+        });
+      }
     }
   }
 

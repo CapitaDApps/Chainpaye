@@ -1,0 +1,6 @@
+In the userSetup.service, in the INIT action let the data object take an is_ng property, this is alsp based on the user's phone number country code.
+
+If they they are nigerians the data from the decrypted body must include their bvn, if it doesn't send and error message with the error_message property.
+
+Create the user then perform kyc. Creating user is a neccessary step so the user has a wallet address on which kyc is to be done.
+Let all these run in the background, and a message sent to the user on whatsapp whether their kyc failed or not. if is fails. let the user remain in the db but they won't be able to access any thing unless verified, to effect this, do it in the index.ts in the webhook, when the user exists, check if they've done kyc, if not prompt them to do kyc and return the response so as not to do anything else

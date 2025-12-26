@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 import express, { Express } from "express";
+import helmet from "helmet";
 import { UserService } from "../services/UserService";
 import { WhatsAppBusinessService } from "../services/WhatsAppBusinessService";
 import flowRouter from "./route/route";
@@ -11,9 +12,29 @@ import { ToronetService } from "../services/ToronetService";
 import { IWallet } from "../models/Wallet";
 import { WalletService } from "../services/WalletService";
 import { TransactionType } from "../models/Transaction";
+import {
+  userRateLimiter,
+  strictRateLimiter,
+  verifyWebhookSignature,
+} from "./middleware";
 
 dotenv.config();
 export const app: Express = express();
+
+// Apply helmet security middleware
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'"],
+        imgSrc: ["'self'", "data:", "https:"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+  })
+);
 
 const userService = new UserService();
 const whatsappBusinessService = new WhatsAppBusinessService();
@@ -40,7 +61,7 @@ const {
   BUSINESS_PHONE_NUMBER_ID,
 } = process.env;
 
-// Route for GET requests
+// Route for GET requests (webhook verification - no rate limiting needed)
 app.get("/webhook", (req, res) => {
   const {
     "hub.mode": mode,
@@ -56,7 +77,8 @@ app.get("/webhook", (req, res) => {
   }
 });
 
-app.get("/", (req, res) => {
+// Health check endpoint with rate limiting
+app.get("/", userRateLimiter, (req, res) => {
   res.status(200).json({ server: "active" });
 });
 
@@ -93,7 +115,7 @@ async function replyingMessage(messageId: string) {
   });
 }
 
-app.post("/webhook", async (req, res) => {
+app.post("/webhook", verifyWebhookSignature, async (req, res) => {
   console.log("Incoming webhook message:", JSON.stringify(req.body, null, 2));
 
   // const ipDetails = await getIpData(req.ip);
@@ -125,6 +147,15 @@ app.post("/webhook", async (req, res) => {
               message.from
             );
           } else {
+            if (user.country == "NG" && !user.isVerified) {
+              await whatsappBusinessService.sendTemplateInteractiveMessage(
+                "completekyce",
+                message.from,
+                "en"
+              );
+              res.sendStatus(200);
+              return;
+            }
             // send other messages
             if (message.type == "text") {
               await replyingMessage(message.id);
@@ -132,7 +163,12 @@ app.post("/webhook", async (req, res) => {
                 const userWallet = await userService.getUserToroWallet(
                   message.from
                 );
-                await toronetService.updateVirtualWallet(userWallet.publicKey);
+                // Only update virtual wallet for Nigerian users
+                if (user.country === "NG") {
+                  await toronetService.updateVirtualWallet(
+                    userWallet.publicKey
+                  );
+                }
                 const [NGNBal, USDBal] = await Promise.all([
                   toronetService.getBalanceNGN(userWallet.publicKey),
                   toronetService.getBalanceUSD(userWallet.publicKey),
@@ -279,4 +315,5 @@ app.post("/webhook", async (req, res) => {
   res.sendStatus(200);
 });
 
-app.use("/flow", flowRouter);
+// Apply rate limiting to flow routes (user-facing endpoints)
+app.use("/flow", userRateLimiter, flowRouter);
