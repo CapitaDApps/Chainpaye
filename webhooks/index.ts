@@ -147,18 +147,18 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
               message.from
             );
           } else {
-            if (user.country == "NG" && !user.isVerified) {
-              await whatsappBusinessService.sendTemplateInteractiveMessage(
-                "completekyce",
-                message.from,
-                "en"
-              );
-              res.sendStatus(200);
-              return;
-            }
             // send other messages
-            if (message.type == "text") {
+            if (message.type == "text" && message.text.body) {
               await replyingMessage(message.id);
+              if (user.country == "NG" && !user.isVerified) {
+                await whatsappBusinessService.sendTemplateInteractiveMessage(
+                  "completekyce",
+                  message.from,
+                  "en"
+                );
+                res.sendStatus(200);
+                return;
+              }
               if (message.text.body.toLowerCase().includes("balance")) {
                 const userWallet = await userService.getUserToroWallet(
                   message.from
