@@ -813,15 +813,13 @@ export class ToronetService {
       if (resultData.firstName == "N" && !resultData.passed) {
         return {
           success: false,
-          message:
-            "Registered first name does not match BVN information. Please reach out to support",
+          message: "Registered first name does not match BVN information",
         };
       }
       if (resultData.lastName == "N" && !resultData.passed) {
         return {
           success: false,
-          message:
-            "Registered last name does not match BVN information. Please reach out to support",
+          message: "Registered last name does not match BVN information",
         };
       }
       if (resultData.dob == "N" && !resultData.passed) {

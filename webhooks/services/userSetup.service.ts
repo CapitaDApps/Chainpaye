@@ -1,3 +1,4 @@
+import { Wallet } from "../../models/Wallet";
 import { redisClient } from "../../services/redis";
 import { ToronetService } from "../../services/ToronetService";
 import { UserService } from "../../services/UserService";
@@ -115,33 +116,76 @@ export const userSetupScreen = async (decryptedBody: {
             };
           }
 
-          await userService.createUser({
-            firstName: data.first_name.trim(),
-            lastName: data.last_name.trim(),
-            whatsappNumber: phone,
-            pin,
-            dob: data.dob,
-          });
+          const userCountry = getCountryCodeFromPhoneNumber(phone);
+
+          if (userCountry == "NG") {
+            if (!data.bvn) {
+              return {
+                screen: "SECURITY_INFO",
+                data: {
+                  error_message: "Please enter your bvn",
+                },
+              };
+            }
+          }
+
+          const user = await userService.getUser(phone);
+
+          if (!user) {
+            await userService.createUser({
+              whatsappNumber: phone,
+            });
+          }
+
+          const userToroWallet = await userService.getUserToroWallet(phone);
 
           if (data.bvn) {
-            toronetService
-              .performKYC({
-                firstName: data.first_name.trim(),
-                lastName: data.last_name.trim(),
-                bvn: data.bvn,
-                dob: formatDate(data.dob),
-                address: "",
-                phoneNumber: phone,
-              })
-              .then((result) => {
-                whatsappBusinessService.sendNormalMessage(
-                  result.message,
-                  phone
-                );
-              })
-              .catch((err) =>
-                console.log(`Error performing kyc for user - [${phone}]`)
-              );
+            const kycResult = await toronetService.performKYC({
+              firstName: data.first_name.trim(),
+              lastName: data.last_name.trim(),
+              bvn: data.bvn,
+              dob: formatDate(data.dob),
+              address: userToroWallet.publicKey,
+              phoneNumber: phone,
+            });
+
+            if (!kycResult.success) {
+              return {
+                screen: "SECURITY_INFO",
+                data: {
+                  error_message: kycResult.message,
+                },
+              };
+            }
+
+            if (kycResult.success) {
+              // update user
+              userService
+                .updateUserAferBvnVerified(phone, {
+                  firstName: data.first_name,
+                  lastName: data.last_name,
+                  pin: data.pin,
+                  dob: formatDate(data.dob),
+                })
+                .then(async (user) => {
+                  if (!user) {
+                    throw new Error(
+                      `user with phone number - [${phone}] does not exist`
+                    );
+                  }
+                  // create virtual wallet
+                  const userId = user.userId;
+                  const wallet = await Wallet.findOne({ userId });
+                  if (!wallet)
+                    throw new Error(
+                      `User with phone number - [${phone}] does not have a wallet`
+                    );
+                  await toronetService.createVirtualWalletNGN({
+                    address: wallet.publicKey,
+                    fullName: `${data.first_name} ${data.last_name}`,
+                  });
+                });
+            }
           }
 
           redisClient.set(

@@ -10,11 +10,13 @@ import { getCountryCodeFromPhoneNumber } from "../utils/countryCodeMapping";
 
 type CreateUserType = {
   whatsappNumber: string;
+};
+
+type UpdateUserAfterBvnVerified = {
+  pin: string;
   firstName: string;
   lastName: string;
-  pin: string;
   dob: string;
-  countryCode?: string; // Optional - will be extracted from phone number if not provided
 };
 
 export class UserService {
@@ -58,8 +60,9 @@ export class UserService {
       const userId = this.generateUserId();
 
       // Extract country from phone number if not provided
-      const extractedCountry =
-        data.countryCode || getCountryCodeFromPhoneNumber(data.whatsappNumber);
+      const extractedCountry = getCountryCodeFromPhoneNumber(
+        data.whatsappNumber
+      );
 
       if (!extractedCountry) {
         throw new Error(
@@ -74,12 +77,10 @@ export class UserService {
             [
               {
                 whatsappNumber: data.whatsappNumber,
-                firstName: data.firstName,
-                lastName: data.lastName,
+
                 country: extractedCountry,
-                pin: data.pin,
+
                 userId,
-                dob: data.dob,
               },
             ],
             { session }
@@ -88,7 +89,6 @@ export class UserService {
           await this.walletService.addWallet(
             {
               userId,
-              fullName: `${data.firstName} ${data.lastName}`,
               country: extractedCountry,
             },
             session
@@ -101,6 +101,17 @@ export class UserService {
         await session.endSession();
       }
     }
+  }
+
+  async updateUserAferBvnVerified(
+    phoneNumber: string,
+    data: UpdateUserAfterBvnVerified
+  ) {
+    const u = await User.findOneAndUpdate(
+      { whatsappNumber: phoneNumber },
+      { ...data }
+    );
+    return u;
   }
 
   private generateUserId(): string {

@@ -13,16 +13,16 @@ import { IWallet } from "./Wallet";
 export interface IUser extends Document {
   whatsappNumber: string;
   userId: string;
-  firstName: string;
-  lastName: string;
+  firstName?: string;
+  lastName?: string;
   email?: string;
   country: string;
   currency: "USD" | "NGN";
   isVerified: boolean;
   verificationCode?: string;
   verificationCodeExpires?: Date;
-  pin: string;
-  dob: string;
+  pin?: string;
+  dob?: string;
   createdAt: Date;
   updatedAt: Date;
   comparePin(candidatePin: string): Promise<boolean>;
@@ -49,14 +49,12 @@ const UserSchema: Schema = new Schema(
 
     firstName: {
       type: String,
-      required: true,
       trim: true,
       maxlength: 150,
     },
 
     lastName: {
       type: String,
-      required: true,
       trim: true,
       maxlength: 150,
     },
@@ -104,7 +102,6 @@ const UserSchema: Schema = new Schema(
     },
     dob: {
       type: String,
-      required: true,
     },
   },
   {
@@ -125,7 +122,9 @@ UserSchema.pre<IUser>("save", async function (next) {
   if (!this.isModified("pin")) return next();
 
   try {
-    this.pin = await argon2.hash(this.pin);
+    if (this.pin) {
+      this.pin = await argon2.hash(this.pin);
+    }
     next();
   } catch (error) {
     next(error as Error);

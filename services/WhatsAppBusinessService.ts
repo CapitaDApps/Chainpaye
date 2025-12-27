@@ -343,14 +343,14 @@ export class WhatsAppBusinessService {
       case "Withdraw to Bank": {
         const phone = to.startsWith("+") ? to : `+${to}`;
         const user = await User.findOne({ whatsappNumber: phone });
-        if (!user) {
+        if (!user || !user.firstName || !user.lastName) {
           await this.sendTemplateIntroMessage(to);
           return;
         }
-        if (!user.isVerified) {
-          await this.sendTemplateInteractiveMessage("completekyce", to, "en");
-          return;
-        }
+        // if (!user.isVerified) {
+        //   await this.sendTemplateInteractiveMessage("completekyce", to, "en");
+        //   return;
+        // }
         // send withdraw flow
         const withdrawFlowId = "1654062222645036";
         const initScreen = "WITHDRAWAL_CURRENCY";

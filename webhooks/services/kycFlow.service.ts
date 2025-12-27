@@ -75,18 +75,18 @@ export async function getKycFlowScreen(decryptedBody: {
           try {
             const firstName = user.firstName;
             const lastName = user.lastName;
-            const result = await toronetService.performKYC({
-              firstName,
-              lastName,
-              bvn: data.bvn,
-              dob: formatDate(user.dob),
-              phoneNumber: phone,
-              address: wallet.publicKey,
-            });
-            await whatsappBusinessService.sendNormalMessage(
-              result.message,
-              phone
-            );
+            // const result = await toronetService.performKYC({
+            //   firstName,
+            //   lastName,
+            //   bvn: data.bvn,
+            //   dob: formatDate(user.dob),
+            //   phoneNumber: phone,
+            //   address: wallet.publicKey,
+            // });
+            // await whatsappBusinessService.sendNormalMessage(
+            //   result.message,
+            //   phone
+            // );
           } catch (error) {
             console.log("Error in KYC process", error);
           }

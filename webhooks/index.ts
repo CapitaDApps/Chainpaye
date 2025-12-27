@@ -140,7 +140,7 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
         if (wa_id) {
           const user = await userService.getUser(`+${wa_id}`);
 
-          if (!user) {
+          if (!user || !user.firstName || !user.lastName || !user.isVerified) {
             await replyingMessage(message.id);
             // send welcome mesage
             await whatsappBusinessService.sendTemplateIntroMessage(
