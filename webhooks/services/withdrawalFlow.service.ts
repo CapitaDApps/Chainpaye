@@ -198,6 +198,8 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
           };
         }
 
+        const withdrawalNanoId = nanoid();
+
         toronetService
           .withdrawNGN({
             userAddress: wallet.publicKey,
@@ -216,7 +218,7 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
                 amount,
                 status: TransactionStatus.COMPLETED,
                 type: TransactionType.WITHDRAWAL,
-                refId: nanoid(),
+                refId: withdrawalNanoId,
                 toronetTxId: "",
                 currency: "NGN",
               });
@@ -226,6 +228,16 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
                 withdrawalResp.message
               );
             } else {
+              TransactionService.recordTransaction({
+                fromUser: user._id as Types.ObjectId,
+                amount,
+                status: TransactionStatus.FAILED,
+                type: TransactionType.WITHDRAWAL,
+                refId: withdrawalNanoId,
+                toronetTxId: "",
+                currency: "NGN",
+                failureReason: withdrawalResp.message,
+              });
               whatsappBusinessService.sendNormalMessage(
                 withdrawalResp.message,
                 phone
