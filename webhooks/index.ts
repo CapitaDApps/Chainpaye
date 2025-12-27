@@ -151,10 +151,8 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
             if (message.type == "text" && message.text.body) {
               await replyingMessage(message.id);
               if (user.country == "NG" && !user.isVerified) {
-                await whatsappBusinessService.sendTemplateInteractiveMessage(
-                  "completekyce",
-                  message.from,
-                  "en"
+                await whatsappBusinessService.sendTemplateIntroMessage(
+                  message.from
                 );
                 res.sendStatus(200);
                 return;
