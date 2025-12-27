@@ -7,6 +7,7 @@ import { Wallet } from "../models/Wallet";
 import { WhatsAppBusinessService } from "./WhatsAppBusinessService";
 import { nanoid } from "nanoid";
 import { getCountryCodeFromPhoneNumber } from "../utils/countryCodeMapping";
+import argon2 from "argon2";
 
 type CreateUserType = {
   whatsappNumber: string;
@@ -107,9 +108,10 @@ export class UserService {
     phoneNumber: string,
     data: UpdateUserAfterBvnVerified
   ) {
+    const pin = await argon2.hash(data.pin);
     const u = await User.findOneAndUpdate(
       { whatsappNumber: phoneNumber },
-      { ...data }
+      { ...data, pin }
     );
     return u;
   }

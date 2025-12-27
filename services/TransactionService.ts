@@ -16,6 +16,7 @@ export class TransactionService {
     amount,
     fromUser,
     toUser,
+    failureReason,
   }: {
     refId: string;
     toronetTxId: string;
@@ -25,6 +26,7 @@ export class TransactionService {
     amount: number;
     fromUser: Types.ObjectId;
     toUser?: Types.ObjectId;
+    failureReason?: string;
   }) {
     const transaction = await Transaction.create({
       referenceId: refId,
@@ -37,6 +39,7 @@ export class TransactionService {
       totalAmount: amount,
       fromUser,
       ...(toUser && { toUser }),
+      ...(failureReason && { failureReason }),
     });
 
     return transaction;

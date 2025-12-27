@@ -117,19 +117,19 @@ UserSchema.index({ email: 1 });
 /**
  * Pre-save middleware to hash PIN
  */
-UserSchema.pre<IUser>("save", async function (next) {
-  // Only hash the PIN if it has been modified (or is new)
-  if (!this.isModified("pin")) return next();
+// UserSchema.pre<IUser>("save", async function (next) {
+//   // Only hash the PIN if it has been modified (or is new)
+//   if (!this.isModified("pin")) return next();
 
-  try {
-    if (this.pin) {
-      this.pin = await argon2.hash(this.pin);
-    }
-    next();
-  } catch (error) {
-    next(error as Error);
-  }
-});
+//   try {
+//   if(this.pin){
+//       this.pin = await argon2.hash(this.pin);
+//   }
+//     next();
+//   } catch (error) {
+//     next(error as Error);
+//   }
+// });
 
 /**
  * Method to compare PIN for authentication

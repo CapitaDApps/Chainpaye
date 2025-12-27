@@ -48,6 +48,7 @@ export const userSetupScreen = async (decryptedBody: {
   }
 
   //   Get user phone number from Redis using flow_token
+  // const userPhone = "+2348110236998";
   const userPhone = await redisClient.get(flow_token);
   const phone = userPhone?.startsWith("+") ? userPhone : `+${userPhone}`;
   // handle initial request when opening the flow
