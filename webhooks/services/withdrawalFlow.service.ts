@@ -1,10 +1,14 @@
+import { Types } from "mongoose";
 import { User } from "../../models/User";
 import { Wallet } from "../../models/Wallet";
 import { redisClient } from "../../services/redis";
 import { ToronetService } from "../../services/ToronetService";
+import { TransactionService } from "../../services/TransactionService";
 import { UserService } from "../../services/UserService";
 import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService";
 import { CONSTANTS } from "../../utils/config";
+import { TransactionStatus, TransactionType } from "../../models/Transaction";
+import { nanoid } from "nanoid";
 
 export async function getWithdrawalFlowScreen(decryptedBody: {
   screen: string;
@@ -206,11 +210,27 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
             amount,
           })
           .then(async (withdrawalResp) => {
-            whatsappBusinessService.sendVideoContent(
-              phone,
-              CONSTANTS.MONEY_OUT_MEDIA,
-              withdrawalResp.message
-            );
+            if (withdrawalResp.success) {
+              TransactionService.recordTransaction({
+                fromUser: user._id as Types.ObjectId,
+                amount,
+                status: TransactionStatus.COMPLETED,
+                type: TransactionType.WITHDRAWAL,
+                refId: nanoid(),
+                toronetTxId: "",
+                currency: "NGN",
+              });
+              whatsappBusinessService.sendVideoContent(
+                phone,
+                CONSTANTS.MONEY_OUT_MEDIA,
+                withdrawalResp.message
+              );
+            } else {
+              whatsappBusinessService.sendNormalMessage(
+                withdrawalResp.message,
+                phone
+              );
+            }
           })
           .catch((error) => console.log("Error processig withdrawal", error));
 
