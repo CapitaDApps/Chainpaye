@@ -37,8 +37,8 @@ export async function getConversionFlowScreen(decryptedBody: {
     };
   }
 
-  // const userPhone = await redisClient.get(flow_token);
-  const userPhone = "+2348110236998";
+  const userPhone = await redisClient.get(flow_token);
+  // const userPhone = "+2348110236998";
 
   const phone = userPhone?.startsWith("+") ? userPhone : `+${userPhone}`;
 
