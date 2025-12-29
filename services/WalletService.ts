@@ -324,7 +324,7 @@ export class WalletService {
 
   // TODO Get Wallet INFO
 
-  async getUserRecentTransactions(userId: string, limit: number = 5) {
+  async getUserRecentTransactions(userId: string, limit: number = 10) {
     const user = await User.findOne({ userId });
     if (!user) {
       throw new Error(`User with userId - [${userId}] not found`);

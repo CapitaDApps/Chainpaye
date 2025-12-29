@@ -157,7 +157,10 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
                 res.sendStatus(200);
                 return;
               }
-              if (message.text.body.toLowerCase().includes("balance")) {
+              if (
+                message.text.body.toLowerCase().includes("balance") ||
+                message.text.body == "/balance"
+              ) {
                 const userWallet = await userService.getUserToroWallet(
                   message.from
                 );
@@ -178,7 +181,7 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
                   `,
                   message.from
                 );
-              } else if (message.text.body.startsWith("/status")) {
+              } else if (message.text.body.startsWith("/transactionHistory")) {
                 try {
                   const transactions =
                     await walletService.getUserRecentTransactions(user.userId);
