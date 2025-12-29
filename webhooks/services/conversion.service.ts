@@ -51,20 +51,17 @@ export async function getConversionFlowScreen(decryptedBody: {
         },
       };
     }
-    const [userToroWallet] = await Promise.all([
-      userService.getUserToroWallet(phone, true),
+    const userToroWallet = await userService.getUserToroWallet(phone, true);
+
+    const [usdBalanceResult, ngnBalanceResult] = await Promise.all([
+      toronetService.getBalanceUSD(userToroWallet.publicKey),
+      toronetService.getBalanceNGN(userToroWallet.publicKey),
     ]);
-
-    const usdBalanceResult = await toronetService.getBalanceUSD(
-      userToroWallet.publicKey
-    );
-
-    const ngnBalanceResult = await toronetService.getBalanceNGN(
-      userToroWallet.publicKey
-    );
 
     const usdBalance = usdBalanceResult.balance;
     const ngnBalance = ngnBalanceResult.balance;
+
+    console.log({ usdBalance, ngnBalance });
 
     await redisClient.set(
       quoteId,
@@ -75,8 +72,8 @@ export async function getConversionFlowScreen(decryptedBody: {
     return {
       screen: "CONVERT_ENTRY",
       data: {
-        balance_USD: usdBalance.toFixed(2),
-        balance_NGN: ngnBalance.toFixed(2),
+        balance_USD: parseFloat(String(usdBalance)).toFixed(2),
+        balance_NGN: parseFloat(String(ngnBalance)).toFixed(2),
       },
     };
   }
