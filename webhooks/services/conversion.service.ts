@@ -3,8 +3,7 @@ import { redisClient } from "../../services/redis";
 import { ToronetService } from "../../services/ToronetService";
 import { UserService } from "../../services/UserService";
 import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService";
-let usdBalance: number = 0;
-let ngnBalance: number = 0;
+
 export async function getConversionFlowScreen(decryptedBody: {
   screen: string;
   data: any;
@@ -41,7 +40,7 @@ export async function getConversionFlowScreen(decryptedBody: {
   // const userPhone = "+2348110236998";
 
   const phone = userPhone?.startsWith("+") ? userPhone : `+${userPhone}`;
-
+  const quoteId = `QUOTE_${phone}`;
   // handle initial request when opening the flow
   if (action === "INIT") {
     if (!userPhone) {
@@ -64,8 +63,14 @@ export async function getConversionFlowScreen(decryptedBody: {
       userToroWallet.publicKey
     );
 
-    usdBalance = usdBalanceResult.balance;
-    ngnBalance = ngnBalanceResult.balance;
+    const usdBalance = usdBalanceResult.balance;
+    const ngnBalance = ngnBalanceResult.balance;
+
+    await redisClient.set(
+      quoteId,
+      JSON.stringify({ usdBalance, ngnBalance }),
+      "EX"
+    );
 
     return {
       screen: "CONVERT_ENTRY",
@@ -88,7 +93,18 @@ export async function getConversionFlowScreen(decryptedBody: {
 
     switch (screen) {
       case "CONVERT_ENTRY": {
+        const balances = await redisClient.get(quoteId);
+        if (!balances)
+          return {
+            screen: "CONVERT_ENTRY",
+            data: {
+              error_message: "Could not fetch wallet balance",
+            },
+          };
+        const { usdBalance, ngnBalance } = JSON.parse(balances);
+
         const { fromCurrency, toCurrency, amount } = data;
+
         console.log({ data, usdBalance, ngnBalance });
 
         if (fromCurrency == "USD" && amount > usdBalance) {
@@ -128,7 +144,10 @@ export async function getConversionFlowScreen(decryptedBody: {
             amount,
             address: toronetWallet.publicKey,
           }),
-        ]);
+        ]).catch((err) => {
+          redisClient.del(quoteId);
+          throw err;
+        });
 
         return {
           screen: "CONVERT_QUOTE",
@@ -179,13 +198,18 @@ export async function getConversionFlowScreen(decryptedBody: {
           })
           .then((result) => {
             if (result.success) {
+              redisClient.del(quoteId);
               whatsappBusinessService.sendNormalMessage(
                 `Conversion of ${amountToPay} ${fromCurrency} to ${toCurrency} was successful. You have received ${toCurrency} ${result.toAmount}`,
                 phone
               );
             }
           })
-          .catch((error) => console.log("Error during conversion", error));
+          .catch((error) => {
+            redisClient.del(quoteId);
+            console.log("Error during conversion", error);
+            throw error;
+          });
 
         return {
           screen: "PROCESSING",
