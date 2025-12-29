@@ -245,12 +245,7 @@ export class WhatsAppBusinessService {
     });
   }
 
-  async sendFlowById(
-    to: string,
-    flowId: string,
-    screenId: string,
-    data: { header: string; body: string; cta: string }
-  ) {
+  async sendFlowById(to: string, flowId: string, screenId: string, data?: any) {
     const flowToken = uuidv4();
     await redisClient.set(flowToken, to, "EX", 3600); // Store flow_token for 1 hour
     const body = {
@@ -262,10 +257,10 @@ export class WhatsAppBusinessService {
         type: "flow",
         header: {
           type: "text",
-          text: data.header,
+          text: "Withdraw",
         },
         body: {
-          text: data.body,
+          text: "Open flow to complete withdrawal",
         },
 
         action: {
@@ -275,9 +270,9 @@ export class WhatsAppBusinessService {
             flow_action: "navigate",
             flow_token: flowToken,
             flow_id: flowId,
-            flow_cta: data.cta,
+            flow_cta: "Withdraw",
             flow_action_payload: {
-              screen: screenId,
+              screen: "WITHDRAWAL_CURRENCY",
             },
           },
         },
@@ -294,6 +289,59 @@ export class WhatsAppBusinessService {
       });
     } catch (error) {
       console.log("error sending withdraw flow", error);
+      throw error;
+    }
+  }
+
+  async sendConvertFlowById(
+    to: string,
+    flowId: string,
+    screenId: string,
+    data?: any
+  ) {
+    const flowToken = uuidv4();
+    await redisClient.set(flowToken, to, "EX", 3600); // Store flow_token for 1 hour
+    const body = {
+      messaging_product: "whatsapp",
+      to,
+      recipient_type: "individual",
+      type: "interactive",
+      interactive: {
+        type: "flow",
+        header: {
+          type: "text",
+          text: "Convert",
+        },
+        body: {
+          text: "Convert naira to dollar and vice versa",
+        },
+
+        action: {
+          name: "flow",
+          parameters: {
+            flow_message_version: "3",
+            flow_action: "navigate",
+            flow_token: flowToken,
+            flow_id: flowId,
+            flow_cta: "Convert",
+            flow_action_payload: {
+              screen: "CONVERT_ENTRY",
+            },
+          },
+        },
+      },
+    };
+    try {
+      await axios({
+        method: "POST",
+        url: `https://graph.facebook.com/v24.0/${this.business_phone_number_id}/messages`,
+        headers: {
+          Authorization: `Bearer ${this.GRAPH_API_TOKEN}`,
+        },
+        data: body,
+      });
+    } catch (error) {
+      console.log("error sending convert flow", error);
       throw error;
     }
   }
@@ -359,11 +407,7 @@ export class WhatsAppBusinessService {
         // send withdraw flow
         const withdrawFlowId = "1654062222645036";
         const initScreen = "WITHDRAWAL_CURRENCY";
-        this.sendFlowById(to, withdrawFlowId, initScreen, {
-          header: "Withdraw",
-          body: "Press continue to conitnue withdrawal process",
-          cta: "Continue",
-        });
+        this.sendFlowById(to, withdrawFlowId, initScreen);
         break;
       }
 

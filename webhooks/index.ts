@@ -249,7 +249,7 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
                 const convertFlowId = "773377672429898";
                 const convertFlowScreen = "CONVERT_ENTRY";
 
-                await whatsappBusinessService.sendFlowById(
+                await whatsappBusinessService.sendConvertFlowById(
                   message.from,
                   convertFlowId,
                   convertFlowScreen,
