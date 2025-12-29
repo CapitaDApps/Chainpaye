@@ -57,8 +57,7 @@ export class ToronetService {
     });
     this.axiosInstance = instance;
     this.baseUrl = "https://api.toronet.org";
-    this.encryptionKey =
-      process.env.ENCRYPTION_KEY || "default-key-change-in-production";
+    this.encryptionKey = process.env.ENCRYPTION_KEY || "";
     this.adminPassword = process.env.TORONET_ADMIN_PASSWORD || "";
     this.adminAddress = process.env.TORONET_ADMIN_ADDRESS || "";
   }
