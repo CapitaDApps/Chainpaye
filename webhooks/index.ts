@@ -245,6 +245,20 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
                     message.from
                   );
                 }
+              } else if (message.text.body === "/convert") {
+                const convertFlowId = "773377672429898";
+                const convertFlowScreen = "CONVERT_ENTRY";
+
+                await whatsappBusinessService.sendFlowById(
+                  message.from,
+                  convertFlowId,
+                  convertFlowScreen,
+                  {
+                    header: "Convert",
+                    body: "Convert naira to dollar and vice versa",
+                    cta: "Convert",
+                  }
+                );
               } else {
                 if (message.text.body) {
                   await whatsappBusinessService.sendTemplateInteractiveMessage(

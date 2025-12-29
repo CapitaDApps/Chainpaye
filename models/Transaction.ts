@@ -15,6 +15,7 @@ export enum TransactionType {
   DEPOSIT = "deposit",
   WITHDRAWAL = "withdrawal",
   DIRECT_TRANSFER = "direct_transfer",
+  CONVERSION = "conversion",
 }
 
 /**
@@ -48,13 +49,18 @@ export interface ITransaction extends Document {
     routingNumber?: string;
   };
   exchangeRate?: number;
-  fees: number;
+  fees?: number;
   totalAmount: number;
   createdAt: Date;
   updatedAt: Date;
   completedAt?: Date;
   failureReason?: string;
   hash?: string;
+  // Fields for conversion transactions
+  fromCurrency?: "USD" | "NGN";
+  toCurrency?: "USD" | "NGN";
+  fromAmount?: number;
+  toAmount?: number;
   markAsCompleted: (toronetTransactionId?: string) => void;
 }
 
@@ -142,9 +148,30 @@ const TransactionSchema: Schema = new Schema(
       type: Number,
       min: 0,
     },
+    // Fields for conversion transactions
+    fromCurrency: {
+      type: String,
+      enum: ["USD", "NGN"],
+      required: false,
+    },
+    toCurrency: {
+      type: String,
+      enum: ["USD", "NGN"],
+      required: false,
+    },
+    fromAmount: {
+      type: Number,
+      min: 0,
+      required: false,
+    },
+    toAmount: {
+      type: Number,
+      min: 0,
+      required: false,
+    },
     fees: {
       type: Number,
-      required: true,
+      required: false,
       default: 0,
       min: 0,
     },
@@ -182,7 +209,7 @@ TransactionSchema.index({ toronetTransactionId: 1 });
  */
 TransactionSchema.pre<ITransaction>("save", function (next) {
   if (this.isModified("amount") || this.isModified("fees")) {
-    this.totalAmount = this.amount + this.fees;
+    this.totalAmount = this.amount + (this.fees || 0);
   }
   next();
 });

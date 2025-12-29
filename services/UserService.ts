@@ -39,14 +39,16 @@ export class UserService {
     return user;
   }
 
-  async getUserToroWallet(phoneNumber: string) {
+  async getUserToroWallet(phoneNumber: string, includePassword = false) {
     const user = await this.getUser(phoneNumber);
     if (!user)
       throw new Error(`User with phone number - ${phoneNumber} not found`);
 
     const userId = user.userId;
 
-    const wallet = await Wallet.findOne({ userId });
+    const wallet = await Wallet.findOne({ userId }).select(
+      `${includePassword ? "+password" : ""}`
+    );
 
     if (!wallet)
       throw new Error(`Wallet for user - ${phoneNumber} was not found`);

@@ -245,7 +245,12 @@ export class WhatsAppBusinessService {
     });
   }
 
-  async sendFlowById(to: string, flowId: string, screenId: string, data?: any) {
+  async sendFlowById(
+    to: string,
+    flowId: string,
+    screenId: string,
+    data: { header: string; body: string; cta: string }
+  ) {
     const flowToken = uuidv4();
     await redisClient.set(flowToken, to, "EX", 3600); // Store flow_token for 1 hour
     const body = {
@@ -257,10 +262,10 @@ export class WhatsAppBusinessService {
         type: "flow",
         header: {
           type: "text",
-          text: "Withdraw",
+          text: data.header,
         },
         body: {
-          text: "Open flow to complete withdrawal",
+          text: data.body,
         },
 
         action: {
@@ -270,9 +275,9 @@ export class WhatsAppBusinessService {
             flow_action: "navigate",
             flow_token: flowToken,
             flow_id: flowId,
-            flow_cta: "Withdraw",
+            flow_cta: data.cta,
             flow_action_payload: {
-              screen: "WITHDRAWAL_CURRENCY",
+              screen: screenId,
             },
           },
         },
@@ -354,7 +359,11 @@ export class WhatsAppBusinessService {
         // send withdraw flow
         const withdrawFlowId = "1654062222645036";
         const initScreen = "WITHDRAWAL_CURRENCY";
-        this.sendFlowById(to, withdrawFlowId, initScreen);
+        this.sendFlowById(to, withdrawFlowId, initScreen, {
+          header: "Withdraw",
+          body: "Press continue to conitnue withdrawal process",
+          cta: "Continue",
+        });
         break;
       }
 

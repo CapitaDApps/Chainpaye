@@ -106,7 +106,7 @@ export class WalletService {
         );
 
         if (transferRespUSD.result) {
-          TransactionService.recordTransaction({
+          TransactionService.recordTransfer({
             refId: transferRespUSD.transactionHash,
             toronetTxId: transferRespUSD.transactionHash,
             amount: amount,
@@ -114,7 +114,6 @@ export class WalletService {
             toUser: toUser._id as Types.ObjectId,
             currency: "USD",
             status: TransactionStatus.COMPLETED,
-            type: TransactionType.TRANSFER,
           }).catch((err) =>
             console.log("Error recording successful transaction", err)
           );
@@ -125,7 +124,7 @@ export class WalletService {
             messageTo: `You've received ${amount} USD from ${fullName}`,
           };
         } else {
-          TransactionService.recordTransaction({
+          TransactionService.recordTransfer({
             refId: transferRespUSD.transactionHash,
             toronetTxId: transferRespUSD.transactionHash,
             amount: amount,
@@ -133,7 +132,6 @@ export class WalletService {
             toUser: toUser._id as Types.ObjectId,
             currency: "USD",
             status: TransactionStatus.FAILED,
-            type: TransactionType.TRANSFER,
             failureReason: transferRespUSD.message,
           }).catch((err) =>
             console.log("Error recording successful transaction", err)
@@ -167,7 +165,7 @@ export class WalletService {
         );
 
         if (transferRespNGN.result) {
-          TransactionService.recordTransaction({
+          TransactionService.recordTransfer({
             refId: transferRespNGN.transactionHash,
             toronetTxId: transferRespNGN.transactionHash,
             amount: amount,
@@ -175,7 +173,6 @@ export class WalletService {
             toUser: toUser._id as Types.ObjectId,
             currency: "NGN",
             status: TransactionStatus.COMPLETED,
-            type: TransactionType.TRANSFER,
           }).catch((err) =>
             console.log("Error recording successful transaction", err)
           );
@@ -186,7 +183,7 @@ export class WalletService {
             messageTo: `You've received ${amount} NGN from ${fullName}`,
           };
         } else {
-          TransactionService.recordTransaction({
+          TransactionService.recordTransfer({
             refId: transferRespNGN.transactionHash,
             toronetTxId: transferRespNGN.transactionHash,
             amount: amount,
@@ -194,7 +191,6 @@ export class WalletService {
             toUser: toUser._id as Types.ObjectId,
             currency: "NGN",
             status: TransactionStatus.FAILED,
-            type: TransactionType.TRANSFER,
             failureReason: transferRespNGN.message,
           }).catch((err) =>
             console.log("Error recording successful transaction", err)
@@ -234,13 +230,12 @@ export class WalletService {
 
     console.log(data);
 
-    await TransactionService.recordTransaction({
+    await TransactionService.recordDeposit({
       refId: data.refId,
       toronetTxId: data.transactionId,
       currency,
       status: TransactionStatus.PENDING,
       amount: +amount,
-      type: TransactionType.DEPOSIT,
       fromUser: user._id as Types.ObjectId,
     });
     return data;

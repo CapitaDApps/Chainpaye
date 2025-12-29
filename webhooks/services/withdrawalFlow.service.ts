@@ -7,7 +7,7 @@ import { TransactionService } from "../../services/TransactionService";
 import { UserService } from "../../services/UserService";
 import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService";
 import { CONSTANTS } from "../../utils/config";
-import { TransactionStatus, TransactionType } from "../../models/Transaction";
+import { TransactionStatus } from "../../models/Transaction";
 import { nanoid } from "nanoid";
 
 export async function getWithdrawalFlowScreen(decryptedBody: {
@@ -213,11 +213,10 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
           })
           .then(async (withdrawalResp) => {
             if (withdrawalResp.success) {
-              TransactionService.recordTransaction({
+              TransactionService.recordWithdrawal({
                 fromUser: user._id as Types.ObjectId,
                 amount,
                 status: TransactionStatus.COMPLETED,
-                type: TransactionType.WITHDRAWAL,
                 refId: withdrawalNanoId,
                 toronetTxId: "",
                 currency: "NGN",
@@ -228,11 +227,10 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
                 withdrawalResp.message
               );
             } else {
-              TransactionService.recordTransaction({
+              TransactionService.recordWithdrawal({
                 fromUser: user._id as Types.ObjectId,
                 amount,
                 status: TransactionStatus.FAILED,
-                type: TransactionType.WITHDRAWAL,
                 refId: withdrawalNanoId,
                 toronetTxId: "",
                 currency: "NGN",
