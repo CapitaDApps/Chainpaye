@@ -326,7 +326,34 @@ export class WalletService {
     }
 
     const transactions = await Transaction.find({
-      $or: [{ fromUser: user._id }, { toUser: user._id }],
+      $or: [
+        // For TRANSFER transactions:
+        // Show DEBIT entries where user is the sender
+        {
+          type: TransactionType.TRANSFER,
+          entryType: "DEBIT",
+          fromUser: user._id,
+        },
+        // Show CREDIT entries where user is the receiver
+        {
+          type: TransactionType.TRANSFER,
+          entryType: "CREDIT",
+          toUser: user._id,
+        },
+        // For other transaction types (DEPOSIT, WITHDRAWAL, CONVERSION):
+        // Show all where user is the fromUser
+        {
+          type: {
+            $in: [
+              TransactionType.DEPOSIT,
+              TransactionType.WITHDRAWAL,
+              TransactionType.CONVERSION,
+              TransactionType.DIRECT_TRANSFER,
+            ],
+          },
+          fromUser: user._id,
+        },
+      ],
     })
       .sort({ createdAt: -1 })
       .limit(limit)

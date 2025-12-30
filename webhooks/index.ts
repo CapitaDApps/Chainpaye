@@ -202,6 +202,8 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
                           ? "Transfer"
                           : tx.type === TransactionType.WITHDRAWAL
                           ? "Withdrawal"
+                          : tx.type === TransactionType.CONVERSION
+                          ? "Conversion"
                           : tx.type;
 
                       const txStatus =
@@ -225,9 +227,14 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
                         { hour: "2-digit", minute: "2-digit" }
                       );
 
-                      statusMessage += `${index + 1}. *${txType}* - ${
-                        tx.amount
-                      } ${tx.currency}\n`;
+                      // Add entry type information (DEBIT/CREDIT)
+                      const entryType = tx.entryType ? `(${tx.entryType})` : "";
+
+                      statusMessage += `${
+                        index + 1
+                      }. *${txType}* ${entryType} - ${tx.amount} ${
+                        tx.currency
+                      }\n`;
                       statusMessage += `   Status: ${txStatus}\n`;
                       statusMessage += `   Date: ${date} at ${time}\n`;
                       statusMessage += `   ID: ${txIdDisplay}\n\n`;

@@ -31,6 +31,21 @@ export class TransactionService {
     failureReason?: string;
     fees?: number;
   }) {
+    // Determine entry type based on transaction type
+    let entryType: "DEBIT" | "CREDIT" | undefined;
+    if (
+      type === TransactionType.DEPOSIT ||
+      type === TransactionType.CONVERSION ||
+      type === TransactionType.DIRECT_TRANSFER
+    ) {
+      entryType = "CREDIT";
+    } else if (
+      type === TransactionType.TRANSFER ||
+      type === TransactionType.WITHDRAWAL
+    ) {
+      entryType = "DEBIT";
+    }
+
     const transaction = await Transaction.create({
       referenceId: refId,
       toronetTransactionId: toronetTxId,
@@ -45,6 +60,7 @@ export class TransactionService {
       fromUser,
       ...(toUser && { toUser }),
       ...(failureReason && { failureReason }),
+      ...(entryType && { entryType }),
     });
 
     return transaction;
@@ -70,8 +86,9 @@ export class TransactionService {
     toUser: Types.ObjectId;
     failureReason?: string;
   }) {
-    const params: any = {
-      refId,
+    // Create DEBIT transaction for sender
+    const debitParams: any = {
+      refId: `${refId}_DEBIT`,
       toronetTxId,
       type: TransactionType.TRANSFER,
       currency,
@@ -79,13 +96,37 @@ export class TransactionService {
       amount,
       fromUser,
       toUser,
+      entryType: "DEBIT",
+    };
+
+    // Create CREDIT transaction for receiver
+    const creditParams: any = {
+      refId: `${refId}_CREDIT`,
+      toronetTxId,
+      type: TransactionType.TRANSFER,
+      currency,
+      status,
+      amount,
+      fromUser,
+      toUser,
+      entryType: "CREDIT",
     };
 
     if (failureReason) {
-      params.failureReason = failureReason;
+      debitParams.failureReason = failureReason;
+      creditParams.failureReason = failureReason;
     }
 
-    return this.recordTransaction(params);
+    // Create both transactions
+    const [debitTransaction, creditTransaction] = await Promise.all([
+      this.recordTransaction(debitParams),
+      this.recordTransaction(creditParams),
+    ]);
+
+    return {
+      debit: debitTransaction,
+      credit: creditTransaction,
+    };
   }
 
   static async recordDeposit({

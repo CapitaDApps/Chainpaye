@@ -61,6 +61,8 @@ export interface ITransaction extends Document {
   toCurrency?: "USD" | "NGN";
   fromAmount?: number;
   toAmount?: number;
+  // DEBIT/CREDIT fields for transaction history formatting
+  entryType?: "DEBIT" | "CREDIT";
   markAsCompleted: (toronetTransactionId?: string) => void;
 }
 
@@ -167,6 +169,12 @@ const TransactionSchema: Schema = new Schema(
     toAmount: {
       type: Number,
       min: 0,
+      required: false,
+    },
+    // DEBIT/CREDIT fields for transaction history formatting
+    entryType: {
+      type: String,
+      enum: ["DEBIT", "CREDIT"],
       required: false,
     },
     fees: {
