@@ -42,6 +42,7 @@ export async function getConversionFlowScreen(decryptedBody: {
   const phone = userPhone?.startsWith("+") ? userPhone : `+${userPhone}`;
   const quoteId = `QUOTE_${phone}`;
   // handle initial request when opening the flow
+  console.log({ data });
   if (action === "INIT") {
     if (!userPhone) {
       return {
