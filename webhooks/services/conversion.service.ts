@@ -42,64 +42,35 @@ export async function getConversionFlowScreen(decryptedBody: {
   const phone = userPhone?.startsWith("+") ? userPhone : `+${userPhone}`;
   const quoteId = `QUOTE_${phone}`;
   // handle initial request when opening the flow
-  console.log({ data });
+
   if (action === "INIT") {
-    if (!userPhone) {
-      return {
-        screen: "CONVERT_ENTRY",
-        data: {
-          error_message: "Session expired. Restart flow a new message",
-        },
-      };
-    }
-    const userToroWallet = await userService.getUserToroWallet(phone, true);
-
-    const [usdBalanceResult, ngnBalanceResult] = await Promise.all([
-      toronetService.getBalanceUSD(userToroWallet.publicKey),
-      toronetService.getBalanceNGN(userToroWallet.publicKey),
-    ]);
-
-    const usdBalance = usdBalanceResult.balance;
-    const ngnBalance = ngnBalanceResult.balance;
-
-    console.log({ usdBalance, ngnBalance });
-
-    await redisClient.set(
-      quoteId,
-      JSON.stringify({ usdBalance, ngnBalance }),
-      "EX"
-    );
-
     return {
       screen: "CONVERT_ENTRY",
-      data: {
-        balance_USD: parseFloat(String(usdBalance)).toFixed(2),
-        balance_NGN: parseFloat(String(ngnBalance)).toFixed(2),
-      },
+      data: {},
     };
   }
 
   if (action === "data_exchange") {
-    if (!userPhone) {
-      return {
-        screen: "CONVERT_ENTRY",
-        data: {
-          error_message: "Session expired. Restart flow a new message",
-        },
-      };
-    }
-
     switch (screen) {
       case "CONVERT_ENTRY": {
-        const balances = await redisClient.get(quoteId);
-        if (!balances)
+        if (!userPhone) {
           return {
             screen: "CONVERT_ENTRY",
             data: {
-              error_message: "Could not fetch wallet balance",
+              error_message: "Session expired. Restart flow a new message",
             },
           };
-        const { usdBalance, ngnBalance } = JSON.parse(balances);
+        }
+
+        const toronetWallet = await userService.getUserToroWallet(phone);
+
+        const [usdBalanceResult, ngnBalanceResult] = await Promise.all([
+          toronetService.getBalanceUSD(toronetWallet.publicKey),
+          toronetService.getBalanceNGN(toronetWallet.publicKey),
+        ]);
+
+        const usdBalance = usdBalanceResult.balance;
+        const ngnBalance = ngnBalanceResult.balance;
 
         const { fromCurrency, toCurrency, amount } = data;
 
@@ -131,8 +102,6 @@ export async function getConversionFlowScreen(decryptedBody: {
             },
           };
         }
-
-        const toronetWallet = await userService.getUserToroWallet(phone);
 
         const [nairaExchangeRate, simulationResult] = await Promise.all([
           toronetService.getNairaToDollarExchangeRate(),
