@@ -95,7 +95,7 @@ definitionss();
 async function scheduleProcessDeposit(transactionId: string) {
   console.log("Scheduling PROCESS_DEPOSIT job...");
   await agenda.start();
-  const end = new Date(Date.now() + 10 * 60 * 1000); // run for 8 mins
+  const end = new Date(Date.now() + 15 * 60 * 1000); // run for 5 mins
   await agenda.every<ProcessDeposit>(
     "30 seconds",
     "PROCESS_DEPOSIT",
