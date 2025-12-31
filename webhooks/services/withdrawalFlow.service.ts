@@ -9,6 +9,7 @@ import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService"
 import { CONSTANTS } from "../../utils/config";
 import { TransactionStatus } from "../../models/Transaction";
 import { nanoid } from "nanoid";
+import { sendTransactionReceipt } from "../../utils/sendReceipt";
 
 export async function getWithdrawalFlowScreen(decryptedBody: {
   screen: string;
@@ -213,7 +214,7 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
           })
           .then(async (withdrawalResp) => {
             if (withdrawalResp.success) {
-              TransactionService.recordWithdrawal({
+              const tx = await TransactionService.recordWithdrawal({
                 fromUser: user._id as Types.ObjectId,
                 amount,
                 status: TransactionStatus.COMPLETED,
@@ -221,13 +222,19 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
                 toronetTxId: "",
                 currency: "NGN",
               });
-              whatsappBusinessService.sendVideoContent(
-                phone,
-                CONSTANTS.MONEY_OUT_MEDIA,
-                withdrawalResp.message
+              // whatsappBusinessService.sendVideoContent(
+              //   phone,
+              //   CONSTANTS.MONEY_OUT_MEDIA,
+              //   withdrawalResp.message
+              // );
+
+              // Send receipt asynchronously
+              await sendTransactionReceipt(
+                (tx._id as Types.ObjectId).toString(),
+                phone
               );
             } else {
-              TransactionService.recordWithdrawal({
+              const tx = await TransactionService.recordWithdrawal({
                 fromUser: user._id as Types.ObjectId,
                 amount,
                 status: TransactionStatus.FAILED,
@@ -238,6 +245,12 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
               });
               whatsappBusinessService.sendNormalMessage(
                 withdrawalResp.message,
+                phone
+              );
+
+              // Send receipt asynchronously for failed withdrawal
+              await sendTransactionReceipt(
+                (tx._id as Types.ObjectId).toString(),
                 phone
               );
             }

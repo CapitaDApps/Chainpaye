@@ -3,6 +3,7 @@ import { redisClient } from "../../services/redis";
 import { ToronetService } from "../../services/ToronetService";
 import { UserService } from "../../services/UserService";
 import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService";
+import { sendTransactionReceipt } from "../../utils/sendReceipt";
 
 export async function getConversionFlowScreen(decryptedBody: {
   screen: string;
@@ -166,10 +167,18 @@ export async function getConversionFlowScreen(decryptedBody: {
           .then((result) => {
             if (result.success) {
               redisClient.del(quoteId);
-              whatsappBusinessService.sendNormalMessage(
-                `Conversion of ${amountToPay} ${fromCurrency} to ${toCurrency} was successful. You have received ${toCurrency} ${result.toAmount}`,
-                phone
-              );
+              // whatsappBusinessService.sendNormalMessage(
+              //   `Conversion of ${amountToPay} ${fromCurrency} to ${toCurrency} was successful. You have received ${toCurrency} ${result.toAmount}`,
+              //   phone
+              // );
+
+              // Send receipt asynchronously
+              if (result.transaction) {
+                sendTransactionReceipt(
+                  (result.transaction._id as Types.ObjectId).toString(),
+                  phone
+                ).catch((err) => console.log("Error sending receipt", err));
+              }
             }
           })
           .catch((error) => {

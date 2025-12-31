@@ -38,6 +38,9 @@ export const getTransferScreen = async (decryptedBody: {
   try {
     // Get user phone number from Redis using flow_token
     const userPhone = await redisClient.get(flow_token);
+    // const userPhone = "+2347064229575";
+    // Verify user PIN
+    const phone = userPhone?.startsWith("+") ? userPhone : `+${userPhone}`;
 
     // handle initial request when opening the flow
     if (action === "INIT") {
@@ -79,6 +82,15 @@ export const getTransferScreen = async (decryptedBody: {
             };
           }
 
+          if (user.whatsappNumber === phone) {
+            return {
+              screen: "TRANSFER",
+              data: {
+                error_message: `You can not send to yourself`,
+              },
+            };
+          }
+
           return {
             screen: "TRANSFER_CONFIRMATION",
             data: {
@@ -100,11 +112,6 @@ export const getTransferScreen = async (decryptedBody: {
               },
             };
           }
-
-          // Verify user PIN
-          const phone = userPhone?.startsWith("+")
-            ? userPhone
-            : `+${userPhone}`;
 
           const user = await User.findOne({ whatsappNumber: phone }).select(
             "+pin"
@@ -136,30 +143,29 @@ export const getTransferScreen = async (decryptedBody: {
             .transfer(phone, acctNo, amount, currency)
             .then(async (transferResult) => {
               if (transferResult) {
-                if (transferResult.success) {
-                  // money out for sender
-                  whatsappBusinessService
-                    .sendVideoContent(
-                      userPhone!,
-                      CONSTANTS.MONEY_OUT_MEDIA,
-                      transferResult.message
-                    )
-                    .catch((err) => console.log("Money out error", err));
-
-                  // money in for receiver
-                  whatsappBusinessService
-                    .sendVideoContent(
-                      accountNumber,
-                      CONSTANTS.MONEY_IN_MEDIA,
-                      transferResult.messageTo!
-                    )
-                    .catch((err) => console.log("Money in error", err));
-                } else {
-                  whatsappBusinessService.sendNormalMessage(
-                    transferResult?.message,
-                    userPhone!
-                  );
-                }
+                // if (transferResult.success) {
+                //   // money out for sender
+                //   whatsappBusinessService
+                //     .sendVideoContent(
+                //       userPhone!,
+                //       CONSTANTS.MONEY_OUT_MEDIA,
+                //       transferResult.message
+                //     )
+                //     .catch((err) => console.log("Money out error", err));
+                //   // money in for receiver
+                //   whatsappBusinessService
+                //     .sendVideoContent(
+                //       accountNumber,
+                //       CONSTANTS.MONEY_IN_MEDIA,
+                //       transferResult.messageTo!
+                //     )
+                //     .catch((err) => console.log("Money in error", err));
+                // } else {
+                //   whatsappBusinessService.sendNormalMessage(
+                //     transferResult?.message,
+                //     userPhone!
+                //   );
+                // }
               } else {
                 await whatsappBusinessService.sendNormalMessage(
                   `An error occurred processing transfer`,

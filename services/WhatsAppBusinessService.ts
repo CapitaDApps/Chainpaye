@@ -71,6 +71,51 @@ export class WhatsAppBusinessService {
     });
   }
 
+  async sendImageMessageById(phoneNumber: string, imageId: string) {
+    const data = {
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to: phoneNumber,
+      type: "image",
+      image: {
+        id: imageId,
+      },
+    };
+    const url = `https://graph.facebook.com/v24.0/${this.business_phone_number_id}/messages`;
+    await axios.post(url, data, {
+      headers: {
+        Authorization: `Bearer ${this.GRAPH_API_TOKEN}`,
+      },
+    });
+  }
+  async uploadImageToWhatapp(base64String: string): Promise<string> {
+    const cleanBase64 = base64String.replace(/^data:image\/\w+;base64,/, "");
+
+    // 2. CONVERT TO BUFFER
+    const imageBuffer = Buffer.from(cleanBase64, "base64");
+
+    // 3. CREATE BLOB FROM BUFFER
+    const blob = new Blob([imageBuffer], { type: "image/png" });
+
+    // 4. PREPARE FORM DATA FOR UPLOAD
+    const form = new FormData();
+    form.append("file", blob, "receipt.png");
+    form.append("type", "image/png");
+    form.append("messaging_product", "whatsapp");
+
+    const url = `https://graph.facebook.com/v24.0/${this.business_phone_number_id}/media`;
+    const resp = await axios({
+      method: "POST",
+      url,
+      headers: {
+        Authorization: `Bearer ${this.GRAPH_API_TOKEN}`,
+      },
+      data: form,
+    });
+    const data = resp.data;
+    return data.id;
+  }
+
   async sendTemplateIntroMessage(to: string) {
     const flowToken = uuidv4();
     await redisClient.set(flowToken, to, "EX", 3600); // Store flow_token for 1 hour

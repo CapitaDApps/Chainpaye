@@ -969,7 +969,7 @@ export class ToronetService {
           convertedAmount = calcRespData.amount;
 
           // Record conversion transaction if userId is provided
-          await TransactionService.recordConversion({
+          const transaction = await TransactionService.recordConversion({
             refId: `CONV_${Date.now()}`,
             toronetTxId: `${buyTxHash}_${sellTxHash}`,
             status: TransactionStatus.COMPLETED as any,
@@ -979,6 +979,20 @@ export class ToronetService {
             fromAmount: parseFloat(amount),
             toAmount: parseFloat(convertedAmount),
           });
+
+          // Return transaction in the result
+          return {
+            success: true,
+            fromAmount: amount,
+            fromCurrency: from,
+            toAmount: convertedAmount,
+            toCurrency: to,
+            transactionHashes: {
+              buy: buyTxHash,
+              sell: sellTxHash,
+            },
+            transaction,
+          };
         } else {
           throw new Error(sellData.error);
         }
@@ -1005,7 +1019,7 @@ export class ToronetService {
         if (sellData.result) {
           sellTxHash = sellData.transaction;
 
-          await TransactionService.recordConversion({
+          const transaction = await TransactionService.recordConversion({
             refId: `CONV_${Date.now()}`,
             toronetTxId: `${buyTxHash}_${sellTxHash}`,
             status: TransactionStatus.COMPLETED,
@@ -1015,6 +1029,19 @@ export class ToronetService {
             fromAmount: parseFloat(amount),
             toAmount: parseFloat(convertedAmount),
           });
+
+          return {
+            success: true,
+            fromAmount: amount,
+            fromCurrency: from,
+            toAmount: convertedAmount,
+            toCurrency: to,
+            transactionHashes: {
+              buy: buyTxHash,
+              sell: sellTxHash,
+            },
+            transaction,
+          };
         } else {
           throw new Error(sellData.error);
         }

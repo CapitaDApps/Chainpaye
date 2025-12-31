@@ -63,6 +63,7 @@ export interface ITransaction extends Document {
   toAmount?: number;
   // DEBIT/CREDIT fields for transaction history formatting
   entryType?: "DEBIT" | "CREDIT";
+  receiptImageId?: string; // WhatsApp media ID for the receipt image
   markAsCompleted: (toronetTransactionId?: string) => void;
 }
 
@@ -175,6 +176,10 @@ const TransactionSchema: Schema = new Schema(
     entryType: {
       type: String,
       enum: ["DEBIT", "CREDIT"],
+      required: false,
+    },
+    receiptImageId: {
+      type: String,
       required: false,
     },
     fees: {

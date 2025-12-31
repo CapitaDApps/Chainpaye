@@ -9,6 +9,7 @@ import {
   TransactionStatus,
   TransactionType,
 } from "../models/Transaction";
+import { sendTransferReceipts } from "../utils/sendReceipt";
 
 export class WalletService {
   private toronetService: ToronetService;
@@ -79,6 +80,7 @@ export class WalletService {
         `Could not find wallet for user with phone number - [${to}]`
       );
 
+    const senderFullName = `${user.firstName} ${user.lastName}`;
     const fullName = `${toUser.firstName} ${toUser.lastName}`;
 
     switch (currency) {
@@ -106,7 +108,7 @@ export class WalletService {
         );
 
         if (transferRespUSD.result) {
-          TransactionService.recordTransfer({
+          const txResult = await TransactionService.recordTransfer({
             refId: transferRespUSD.transactionHash,
             toronetTxId: transferRespUSD.transactionHash,
             amount: amount,
@@ -114,17 +116,24 @@ export class WalletService {
             toUser: toUser._id as Types.ObjectId,
             currency: "USD",
             status: TransactionStatus.COMPLETED,
-          }).catch((err) =>
-            console.log("Error recording successful transaction", err)
-          );
+          });
+
+          // Send receipts asynchronously
+          sendTransferReceipts(
+            (txResult.debit._id as Types.ObjectId).toString(),
+            (txResult.credit._id as Types.ObjectId).toString(),
+            from,
+            to
+          ).catch((err) => console.log("Error sending receipt", err));
+
           return {
             success: true,
             type: "transfer success",
             message: `Transfer of ${amount} USD to ${fullName} was successful`,
-            messageTo: `You've received ${amount} USD from ${fullName}`,
+            messageTo: `You've received ${amount} USD from ${senderFullName}`,
           };
         } else {
-          TransactionService.recordTransfer({
+          const txResult = await TransactionService.recordTransfer({
             refId: transferRespUSD.transactionHash,
             toronetTxId: transferRespUSD.transactionHash,
             amount: amount,
@@ -133,9 +142,16 @@ export class WalletService {
             currency: "USD",
             status: TransactionStatus.FAILED,
             failureReason: transferRespUSD.message,
-          }).catch((err) =>
-            console.log("Error recording successful transaction", err)
-          );
+          });
+
+          // Send receipts asynchronously for failed transaction
+          sendTransferReceipts(
+            (txResult.debit._id as Types.ObjectId).toString(),
+            (txResult.credit._id as Types.ObjectId).toString(),
+            from,
+            to
+          ).catch((err) => console.log("Error sending receipt", err));
+
           return {
             success: false,
             type: "transfer failed",
@@ -165,7 +181,7 @@ export class WalletService {
         );
 
         if (transferRespNGN.result) {
-          TransactionService.recordTransfer({
+          const txResult = await TransactionService.recordTransfer({
             refId: transferRespNGN.transactionHash,
             toronetTxId: transferRespNGN.transactionHash,
             amount: amount,
@@ -173,17 +189,24 @@ export class WalletService {
             toUser: toUser._id as Types.ObjectId,
             currency: "NGN",
             status: TransactionStatus.COMPLETED,
-          }).catch((err) =>
-            console.log("Error recording successful transaction", err)
-          );
+          });
+
+          // Send receipts asynchronously
+          sendTransferReceipts(
+            (txResult.debit._id as Types.ObjectId).toString(),
+            (txResult.credit._id as Types.ObjectId).toString(),
+            from,
+            to
+          ).catch((err) => console.log("Error sending receipt", err));
+
           return {
             success: true,
             type: "transfer success",
             message: `Transfer of ${amount} NGN to ${fullName} was successful`,
-            messageTo: `You've received ${amount} NGN from ${fullName}`,
+            messageTo: `You've received ${amount} NGN from ${senderFullName}`,
           };
         } else {
-          TransactionService.recordTransfer({
+          const txResult = await TransactionService.recordTransfer({
             refId: transferRespNGN.transactionHash,
             toronetTxId: transferRespNGN.transactionHash,
             amount: amount,
@@ -192,9 +215,16 @@ export class WalletService {
             currency: "NGN",
             status: TransactionStatus.FAILED,
             failureReason: transferRespNGN.message,
-          }).catch((err) =>
-            console.log("Error recording successful transaction", err)
-          );
+          });
+
+          // Send receipts asynchronously for failed transaction
+          sendTransferReceipts(
+            (txResult.debit._id as Types.ObjectId).toString(),
+            (txResult.credit._id as Types.ObjectId).toString(),
+            from,
+            to
+          ).catch((err) => console.log("Error sending receipt", err));
+
           return {
             success: false,
             type: "transfer failed",

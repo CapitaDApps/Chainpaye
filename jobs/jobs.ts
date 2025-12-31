@@ -5,6 +5,8 @@ import { WalletService } from "../services/WalletService";
 import { WhatsAppBusinessService } from "../services/WhatsAppBusinessService";
 import { IUser } from "../models/User";
 import { CONSTANTS } from "../utils/config";
+import { sendTransactionReceipt } from "../utils/sendReceipt";
+import { Types } from "mongoose";
 
 enum JobNames {
   PROCESS_DEPOSIT = "PROCESS_DEPOSIT",
@@ -33,15 +35,24 @@ async function processDepositHandler(job: Job<ProcessDeposit>) {
 
   const result = await walletService.checkTransactionStatus(transactionId);
   if (result.success) {
-    await whatsappBusinessService.sendVideoContent(
-      (transaction.fromUser as IUser).whatsappNumber,
-      CONSTANTS.MONEY_IN_MEDIA,
-      result.message
-    );
+    // await whatsappBusinessService.sendVideoContent(
+    //   (transaction.fromUser as IUser).whatsappNumber,
+    //   CONSTANTS.MONEY_IN_MEDIA,
+    //   result.message
+    // );
     await Transaction.updateOne(
       { toronetTransactionId: transactionId },
       { status: TransactionStatus.COMPLETED }
     );
+
+    // Send receipt asynchronously
+    if (transaction.fromUser) {
+      await sendTransactionReceipt(
+        (transaction._id as Types.ObjectId).toString(),
+        (transaction.fromUser as IUser).whatsappNumber
+      );
+    }
+
     await agenda.cancel({ name: JobNames.PROCESS_DEPOSIT });
     return;
   }
@@ -53,6 +64,18 @@ async function processDepositHandler(job: Job<ProcessDeposit>) {
           `,
         (transaction.fromUser as IUser).whatsappNumber
       );
+
+      // Send receipt for failed deposit
+      await Transaction.updateOne(
+        { toronetTransactionId: transactionId },
+        { status: TransactionStatus.FAILED }
+      );
+      if (transaction.fromUser) {
+        await sendTransactionReceipt(
+          (transaction._id as Types.ObjectId).toString(),
+          (transaction.fromUser as IUser).whatsappNumber
+        );
+      }
     }
     await agenda.cancel({ name: JobNames.PROCESS_DEPOSIT });
   }

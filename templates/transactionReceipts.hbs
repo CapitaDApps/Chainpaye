@@ -11,7 +11,6 @@
         body {
             font-family: 'Inter', sans-serif;
             background-color: #005bea; /* Main blue background */
-            /* Optional: Add the swoosh patterns here using background-image if desired */
             display: flex;
             justify-content: center;
             align-items: center;
@@ -40,7 +39,6 @@
             left: 0;
             width: 100%;
             height: 20px;
-            /* CSS magic for jagged edge using radial gradient */
             background-color: transparent;
             background-size: 20px 20px;
             background-image: radial-gradient(circle at 10px -5px, transparent 12px, #fff 13px);
@@ -54,7 +52,6 @@
         }
 
         .brand-logo {
-            /* Placeholder for Chainpaye Logo */
             font-weight: 900;
             font-size: 24px;
             color: #005bea;
@@ -62,6 +59,11 @@
             display: flex;
             align-items: center;
             justify-content: center;
+        }
+        .brand-logo img {
+            width: 150px;
+            height: auto;
+            object-fit: contain;
         }
         .brand-icon-box {
              background: #005bea; color: white; width: 32px; height: 32px; border-radius: 8px; margin-right: 8px; display: flex; align-items: center; justify-content: center;
@@ -94,7 +96,7 @@
             justify-content: space-between;
             align-items: flex-start;
         }
-        
+
         .conversion-header-text {
              font-size: 18px;
              color: #666;
@@ -106,24 +108,32 @@
              color: #1a1a1a;
         }
 
-
         .corner-logo {
-            /* Small logo icon on the right */
             background: #005bea;
             color: white;
-            width: 40px; height: 40px;
+            width: 50px;
+            height: 50px;
             border-radius: 12px;
-            display: flex; align-items: center; justify-content: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             font-weight: 900;
             font-size: 20px;
+            flex-shrink: 0;
+        }
+        .corner-logo img {
+            width: 40px;
+            height: 40px;
+            object-fit: contain;
+            border-radius: 8px;
         }
 
         /* Body Section (Details List) */
         .details-body {
-            background-color: #f8faff; /* Slightly different shade for body */
+            background-color: #f8faff;
             padding: 24px;
             border-radius: 20px;
-            margin: 0 16px 40px 16px; /* Margin bottom to clear the jagged footer */
+            margin: 0 16px 40px 16px;
         }
 
         /* Reusable Status Tag */
@@ -160,8 +170,16 @@
             font-size: 15px;
             color: #1a1a1a;
             font-weight: 600;
-            word-break: break-word; /* Ensure long refs wrap */
+            word-break: break-word;
             line-height: 1.4;
+        }
+
+        .detail-value.highlight {
+            color: #005bea;
+        }
+
+        .detail-value.error {
+            color: #dc2626;
         }
     </style>
 </head>
@@ -170,7 +188,8 @@
 <div class="receipt-container">
     <div class="header">
         <div class="brand-logo">
-            <div class="brand-icon-box">C</div> Chainpaye
+            <img src="/logo.jpg" />
+            {{!-- <div class="brand-icon-box"></div> --}}
         </div>
 
         <div class="transaction-summary">
@@ -184,10 +203,12 @@
             {{else}}
                 <div class="amount-large">
                     {{mainAmount}}
-                    <div class="corner-logo">C</div>
+                    <div class="corner-logo">
+                        <img src="/logo-icon.jpg" />
+                    </div>
                 </div>
             {{/if}}
-           
+
         </div>
     </div>
 
@@ -201,6 +222,13 @@
              <span class="detail-label">Status</span>
              <span class="status-tag {{statusClass}}">{{status}}</span>
         </div>
+
+        {{#if failureReason}}
+        <div class="detail-row">
+             <span class="detail-label">Reason</span>
+             <span class="detail-value error">{{failureReason}}</span>
+        </div>
+        {{/if}}
 
         {{#if senderName}}
         <div class="detail-row">
@@ -229,14 +257,41 @@
              <span class="detail-value">{{beneficiaryInstitution}}</span>
         </div>
         {{/if}}
-        
+
         {{#if exchangeRate}}
         <div class="detail-row">
              <span class="detail-label">Exchange Rate</span>
-             <span class="detail-value">{{exchangeRate}}</span>
+             <span class="detail-value highlight">{{exchangeRate}}</span>
         </div>
         {{/if}}
 
+        {{#if fees}}
+        <div class="detail-row">
+             <span class="detail-label">Fees</span>
+             <span class="detail-value">{{fees}}</span>
+        </div>
+        {{/if}}
+
+        {{#if totalAmount}}
+        <div class="detail-row">
+             <span class="detail-label">Total Amount</span>
+             <span class="detail-value highlight">{{totalAmount}}</span>
+        </div>
+        {{/if}}
+
+        {{#if description}}
+        <div class="detail-row">
+             <span class="detail-label">Description</span>
+             <span class="detail-value">{{description}}</span>
+        </div>
+        {{/if}}
+
+        {{#if transactionHash}}
+        <div class="detail-row">
+             <span class="detail-label">Transaction Hash</span>
+             <span class="detail-value" style="font-size: 12px; word-break: break-all;">{{transactionHash}}</span>
+        </div>
+        {{/if}}
 
         <div class="detail-row">
              <span class="detail-label">Transaction Date</span>

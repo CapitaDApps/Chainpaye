@@ -20,7 +20,7 @@ import {
 
 dotenv.config();
 export const app: Express = express();
-
+app.use(express.static("public"));
 // Apply helmet security middleware
 app.use(
   helmet({
