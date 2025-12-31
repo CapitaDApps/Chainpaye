@@ -253,7 +253,8 @@ export function formatTransactionData(
   if (senderName) standardReceipt.senderName = senderName;
   if (sourceInstitution) standardReceipt.sourceInstitution = sourceInstitution;
   if (beneficiary) standardReceipt.beneficiary = beneficiary;
-  if (beneficiaryInstitution) standardReceipt.beneficiaryInstitution = beneficiaryInstitution;
+  if (beneficiaryInstitution)
+    standardReceipt.beneficiaryInstitution = beneficiaryInstitution;
   if (fees) standardReceipt.fees = fees;
   if (totalAmount) standardReceipt.totalAmount = totalAmount;
   if (failureReason) standardReceipt.failureReason = failureReason;
@@ -287,8 +288,13 @@ function prepareTemplateData(data: ReceiptData): any {
 export async function generateReceipt(data: ReceiptData): Promise<string> {
   const browser = await puppeteer.launch({
     headless: true, // Use new headless mode
-    args: ["--no-sandbox"],
-    executablePath: "/usr/bin/google-chrome",
+    args: [
+      "--no-sandbox", // <--- REQUIRED for EC2 root user
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage", // Prevents memory crashes on low-RAM instances
+      "--disable-gpu",
+    ],
+    executablePath: "/usr/bin/chromium-browser",
   });
   const page = await browser.newPage();
 
@@ -300,7 +306,9 @@ export async function generateReceipt(data: ReceiptData): Promise<string> {
   const logoIconBuffer = await fs.readFile(logoIconPath);
 
   const logoBase64 = `data:image/jpeg;base64,${logoBuffer.toString("base64")}`;
-  const logoIconBase64 = `data:image/jpeg;base64,${logoIconBuffer.toString("base64")}`;
+  const logoIconBase64 = `data:image/jpeg;base64,${logoIconBuffer.toString(
+    "base64"
+  )}`;
 
   // Read and compile template
   const templateHtml = await fs.readFile(
