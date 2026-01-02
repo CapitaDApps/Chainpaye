@@ -15,6 +15,7 @@ export class TransactionService {
     currency,
     status,
     amount,
+    totalAmount,
     fromUser,
     toUser,
     failureReason,
@@ -26,6 +27,7 @@ export class TransactionService {
     currency: CurrencyType;
     status: TransactionStatus;
     amount: number;
+    totalAmount: number;
     fromUser: Types.ObjectId;
     toUser?: Types.ObjectId;
     failureReason?: string;

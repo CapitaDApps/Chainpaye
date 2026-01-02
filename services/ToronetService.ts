@@ -340,10 +340,11 @@ export class ToronetService {
     });
     const data = resp.data;
     console.log({ getTransactionStatusData: data });
-
+    const txData = data.data || [];
     return {
       result: data.result,
       status: data.status,
+      data: txData,
     };
   }
 

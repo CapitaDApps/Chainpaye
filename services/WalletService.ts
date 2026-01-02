@@ -300,6 +300,18 @@ export class WalletService {
         transaction.toronetTransactionId!,
         transaction.currency
       );
+      if (result.result) {
+        const st = await this.toronetService.getTransactionStatus(
+          transaction.toronetTransactionId!
+        );
+        if (st.status === 2) {
+          const data = st.data[0];
+          await Transaction.updateOne(
+            { toronetTransactionId: transactionId },
+            { amount: data.TX_Amount, totalAmount: data.TX_TotalAmount }
+          );
+        }
+      }
     } else {
       transaction.markAsCompleted();
       transaction.save();
