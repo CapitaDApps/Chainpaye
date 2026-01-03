@@ -420,7 +420,7 @@ export class WhatsAppBusinessService {
         data: JSON.stringify(body),
       });
     } catch (error) {
-      console.log("error sending withdraw flow", error);
+      console.log("error sending text only flow", error);
       throw error;
     }
   }

@@ -135,7 +135,10 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
                 res.sendStatus(200);
                 return;
               }
-              await commandRouteHandler(message.from, message.text.body);
+              const phone = message.from.startsWith("+")
+                ? message.from
+                : `+${message.from}`;
+              await commandRouteHandler(phone, message.text.body);
             }
 
             if (message.type == "button") {
