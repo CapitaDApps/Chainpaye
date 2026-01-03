@@ -21,6 +21,13 @@ export async function commandRouteHandler(from: string, command: string) {
   } else if (COMMANDS.deposit.includes(command)) {
     await handleTopUp(from);
   } else {
-    await whatsappBusinessService.sendIntroMessageByFlowId(from);
+    try {
+      await whatsappBusinessService.sendIntroMessageByFlowId(from);
+    } catch (err) {
+      console.log(
+        "Error sending intro flow",
+        (err as { response: any }).response.data
+      );
+    }
   }
 }
