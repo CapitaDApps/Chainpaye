@@ -1,12 +1,95 @@
-const COMMANDS = {
-  withdraw: "/banktransfer", // Transfer from your chainpaye wallet to bank accounts
-  transfer: "/sendmoney", // Transfer money to another chainpaye user
-  balance: "/balance", // Check your wallet balance
-  convert: "/convert", // Convert between fiat currencies
-  updatePin: "/updatepin",
-  deposit: "/deposit", // Top up your chainpaye wallet
-  myAccount: "/myaccount", // View your account details
-  transactionHistory: "/transactionhistory", // View your past transactions
+export type TriggerPhrase = string | RegExp;
+
+interface CommandConfig {
+  triggers: TriggerPhrase[]; // Array of strings and regex patterns
+  description: string;
+}
+
+const COMMANDS: Record<string, CommandConfig> = {
+  withdraw: {
+    triggers: [
+      "/banktransfer",
+      "bank transfer",
+      "withdraw",
+      "send to bank",
+      "transfer to bank",
+      "cash out",
+    ],
+    description: "Transfer from your chainpaye wallet to bank accounts",
+  },
+  transfer: {
+    triggers: [
+      "/sendmoney",
+      "send money",
+      "transfer",
+      "send to user",
+      "pay user",
+    ],
+    description: "Transfer money to another chainpaye user",
+  },
+  balance: {
+    triggers: [
+      "/balance",
+      "balance",
+      "check balance",
+      "my balance",
+      "show balance",
+      "what is my balance",
+      "how much do i have",
+      "account balance",
+      "wallet balance",
+      "get balance",
+      "view balance",
+    ],
+    description: "Check your wallet balance",
+  },
+  convert: {
+    triggers: [
+      "/convert",
+      "convert",
+      "currency",
+      "exchange",
+      "convert currency",
+    ],
+    description: "Convert between fiat currencies",
+  },
+  updatePin: {
+    triggers: ["/updatepin", "update pin", "change pin", "new pin"],
+    description: "Update your PIN",
+  },
+  deposit: {
+    triggers: [
+      "/deposit",
+      "deposit",
+      "top up",
+      "add money",
+      "fund wallet",
+      "add funds",
+    ],
+    description: "Top up your chainpaye wallet",
+  },
+  myAccount: {
+    triggers: [
+      "/myaccount",
+      "my account",
+      "account details",
+      "my details",
+      "profile",
+    ],
+    description: "View your account details",
+  },
+  transactionHistory: {
+    triggers: [
+      "/transactionhistory",
+      "history",
+      "transactions",
+      "transaction history",
+      "my transactions",
+      "past transactions",
+      "view history",
+    ],
+    description: "View your past transactions",
+  },
 };
 
 export { COMMANDS };
