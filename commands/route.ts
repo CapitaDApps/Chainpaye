@@ -7,8 +7,11 @@ import {
   handleTransactionHistory,
   handleWithdrawal,
 } from "./handlers";
+import dotenv from "dotenv";
+dotenv.config();
 
 export async function commandRouteHandler(from: string, command: string) {
+  command = command.toLowerCase();
   // routing logic here
   if (COMMANDS.balance.includes(command)) {
     await handleBalance(from);
