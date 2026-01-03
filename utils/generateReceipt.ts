@@ -296,60 +296,73 @@ export async function generateReceipt(data: ReceiptData): Promise<string> {
     ],
     executablePath: "/usr/bin/chromium-browser",
   });
-  const page = await browser.newPage();
 
-  // Read logo images and convert to base64
-  const logoPath = path.join(__dirname, "../public/logo.jpg");
-  const logoIconPath = path.join(__dirname, "../public/logo-icon.jpg");
+  try {
+    const page = await browser.newPage();
 
-  const logoBuffer = await fs.readFile(logoPath);
-  const logoIconBuffer = await fs.readFile(logoIconPath);
+    // Read logo images and convert to base64
+    const logoPath = path.join(__dirname, "../public/logo.jpg");
+    const logoIconPath = path.join(__dirname, "../public/logo-icon.jpg");
 
-  const logoBase64 = `data:image/jpeg;base64,${logoBuffer.toString("base64")}`;
-  const logoIconBase64 = `data:image/jpeg;base64,${logoIconBuffer.toString(
-    "base64"
-  )}`;
+    const logoBuffer = await fs.readFile(logoPath);
+    const logoIconBuffer = await fs.readFile(logoIconPath);
 
-  // Read and compile template
-  const templateHtml = await fs.readFile(
-    path.join(__dirname, "../templates/transactionReceipts.hbs"),
-    "utf-8"
-  );
-  const template = handlebars.compile(templateHtml);
+    const logoBase64 = `data:image/jpeg;base64,${logoBuffer.toString(
+      "base64"
+    )}`;
+    const logoIconBase64 = `data:image/jpeg;base64,${logoIconBuffer.toString(
+      "base64"
+    )}`;
 
-  // Prepare data with necessary CSS classes and logo base64 strings
-  const compiledData = prepareTemplateData(data);
-  const html = template({
-    ...compiledData,
-    logoBase64,
-    logoIconBase64,
-  });
+    // Read and compile template
+    const templateHtml = await fs.readFile(
+      path.join(__dirname, "../templates/transactionReceipts.hbs"),
+      "utf-8"
+    );
+    const template = handlebars.compile(templateHtml);
 
-  // Replace image src attributes with base64 data URIs
-  const htmlWithImages = html
-    .replace('src="/logo.jpg"', `src="${logoBase64}"`)
-    .replace('src="/logo-icon.jpg"', `src="${logoIconBase64}"`);
+    // Prepare data with necessary CSS classes and logo base64 strings
+    const compiledData = prepareTemplateData(data);
+    const html = template({
+      ...compiledData,
+      logoBase64,
+      logoIconBase64,
+    });
 
-  // Set content and wait for fonts to load for consistent rendering
-  await page.setContent(htmlWithImages, { waitUntil: "networkidle0" });
+    // Replace image src attributes with base64 data URIs
+    const htmlWithImages = html
+      .replace('src="/logo.jpg"', `src="${logoBase64}"`)
+      .replace('src="/logo-icon.jpg"', `src="${logoIconBase64}"`);
 
-  // Important: Set viewport size to ensure the receipt renders fully within the view
-  await page.setViewport({ width: 600, height: 1000, deviceScaleFactor: 2 });
+    // Set content and wait for fonts to load for consistent rendering
+    await page.setContent(htmlWithImages, { waitUntil: "networkidle0" });
 
-  // Select the receipt element itself to avoid taking a screenshot of the whole body background
-  const receiptElement = await page.$(".receipt-container");
+    // Important: Set viewport size to ensure the receipt renders fully within the view
+    await page.setViewport({
+      width: 600,
+      height: 1000,
+      deviceScaleFactor: 2,
+    });
 
-  if (!receiptElement) {
-    throw new Error("Receipt container not found in template");
+    // Select the receipt element itself to avoid taking a screenshot of the whole body background
+    const receiptElement = await page.$(".receipt-container");
+
+    if (!receiptElement) {
+      throw new Error("Receipt container not found in template");
+    }
+
+    // Take screenshot of just the receipt element with transparent background and return as base64
+    const result = await receiptElement.screenshot({
+      omitBackground: true, // ensures the jagged edge doesn't have white boxes behind it
+      encoding: "base64",
+    });
+    await browser.close();
+
+    console.log(`Receipt generated successfully`);
+    return `data:image/png;base64,${result}`;
+  } catch (error) {
+    console.error("Error generating receipt:", error);
+    await browser.close();
+    throw error;
   }
-
-  // Take screenshot of just the receipt element with transparent background and return as base64
-  const result = await receiptElement.screenshot({
-    omitBackground: true, // ensures the jagged edge doesn't have white boxes behind it
-    encoding: "base64",
-  });
-
-  await browser.close();
-  console.log(`Receipt generated successfully`);
-  return `data:image/png;base64,${result}`;
 }
