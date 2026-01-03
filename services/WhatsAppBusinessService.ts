@@ -258,7 +258,7 @@ export class WhatsAppBusinessService {
 
   async sendMenuMessageMyFlowId(to: string) {
     const topUpFlowId = "1513776869736922";
-    const topupScreenInitId = "TOPUP_WALLET";
+    const topupScreenInitId = "TOPUP_WALLET" as const;
     await this.sendTextOnlyFlowById(to, topUpFlowId, topupScreenInitId, {
       header: "What Chainpaye can do for you...",
       body: `*Send Money Instantly:* Need to send funds to a friend abroad? Do it in the middle of a conversation. No new logins, no delays—just seamless, secure peer-to-peer transfers.
@@ -270,7 +270,7 @@ export class WhatsAppBusinessService {
 
   async sendTopUpFlowById(to: string) {
     const topUpFlowId = "1513776869736922";
-    const topUpScreenInitId = "TOPUP_WALLET";
+    const topUpScreenInitId = "TOPUP_WALLET" as const;
     await this.sendTextOnlyFlowById(to, topUpFlowId, topUpScreenInitId, {
       header: "Top up Wallet",
       body: "Top up your Chainpaye wallet in seconds and start sending or receiving money globally.",
@@ -280,7 +280,7 @@ export class WhatsAppBusinessService {
 
   async sendTransferFlowById(to: string) {
     const transferFlowId = "1882173995991922";
-    const transferScreenInitId = "TRANSFER";
+    const transferScreenInitId = "TRANSFER" as const;
     await this.sendTextOnlyFlowById(to, transferFlowId, transferScreenInitId, {
       header: "Transfer Money",
       body: "Send money to friends and family globally with ease and speed.",
@@ -290,7 +290,7 @@ export class WhatsAppBusinessService {
 
   async sendWithdrawalFlowById(to: string) {
     const withdrawFlowId = "1654062222645036";
-    const screenId = "WITHDRAWAL_CURRENCY";
+    const screenId = "WITHDRAWAL_CURRENCY" as const;
     await this.sendTextOnlyFlowById(to, withdrawFlowId, screenId, {
       header: "Withdraw to Bank",
       body: "Withdraw your funds to your bank account.",
