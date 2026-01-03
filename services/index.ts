@@ -1,3 +1,6 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import { ToronetService } from "./ToronetService";
 import { TransactionService } from "./TransactionService";
 import { UserService } from "./UserService";

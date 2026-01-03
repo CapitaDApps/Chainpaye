@@ -10,6 +10,8 @@ import {
   TransactionType,
 } from "../models/Transaction";
 import { sendTransferReceipts } from "../utils/sendReceipt";
+import dotenv from "dotenv";
+dotenv.config();
 
 export class WalletService {
   private toronetService: ToronetService;
