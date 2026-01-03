@@ -23,7 +23,7 @@ export async function commandRouteHandler(from: string, command: string) {
     await handleTopUp(from);
   } else {
     try {
-      await whatsappBusinessService.sendIntroMessageByFlowId(from);
+      await whatsappBusinessService.sendMenuMessageMyFlowId(from);
     } catch (err) {
       console.log(
         "Error sending intro flow",
