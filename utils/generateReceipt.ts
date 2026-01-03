@@ -3,13 +3,8 @@ import fs from "fs-extra";
 import path from "path";
 import handlebars from "handlebars";
 import { fileURLToPath } from "url";
-import {
-  ITransaction,
-  TransactionType,
-  TransactionStatus,
-} from "../models/Transaction";
+import { TransactionType, TransactionStatus } from "../models/Transaction";
 import { IUser } from "../models/User";
-import { Types } from "mongoose";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
