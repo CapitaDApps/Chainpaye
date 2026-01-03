@@ -1,8 +1,6 @@
-import { redisClient } from "../../services/redis";
-import { WalletService } from "../../services/WalletService";
 import { User } from "../../models/User";
-import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService";
-import { CONSTANTS } from "../../utils/config";
+import { walletService, whatsappBusinessService } from "../../services";
+import { redisClient } from "../../services/redis";
 
 export const getTransferScreen = async (decryptedBody: {
   screen: string;
@@ -12,8 +10,6 @@ export const getTransferScreen = async (decryptedBody: {
   flow_token: string;
 }) => {
   const { screen, data, version, action, flow_token } = decryptedBody;
-  const walletService = new WalletService();
-  const whatsappBusinessService = new WhatsAppBusinessService();
 
   // handle health check request
   if (action === "ping") {
@@ -38,7 +34,7 @@ export const getTransferScreen = async (decryptedBody: {
   try {
     // Get user phone number from Redis using flow_token
     const userPhone = await redisClient.get(flow_token);
-    // const userPhone = "+2347064229575";
+
     // Verify user PIN
     const phone = userPhone?.startsWith("+") ? userPhone : `+${userPhone}`;
 
@@ -142,31 +138,7 @@ export const getTransferScreen = async (decryptedBody: {
           walletService
             .transfer(phone, acctNo, amount, currency)
             .then(async (transferResult) => {
-              if (transferResult) {
-                // if (transferResult.success) {
-                //   // money out for sender
-                //   whatsappBusinessService
-                //     .sendVideoContent(
-                //       userPhone!,
-                //       CONSTANTS.MONEY_OUT_MEDIA,
-                //       transferResult.message
-                //     )
-                //     .catch((err) => console.log("Money out error", err));
-                //   // money in for receiver
-                //   whatsappBusinessService
-                //     .sendVideoContent(
-                //       accountNumber,
-                //       CONSTANTS.MONEY_IN_MEDIA,
-                //       transferResult.messageTo!
-                //     )
-                //     .catch((err) => console.log("Money in error", err));
-                // } else {
-                //   whatsappBusinessService.sendNormalMessage(
-                //     transferResult?.message,
-                //     userPhone!
-                //   );
-                // }
-              } else {
+              if (!transferResult) {
                 await whatsappBusinessService.sendNormalMessage(
                   `An error occurred processing transfer`,
                   userPhone!
@@ -179,36 +151,6 @@ export const getTransferScreen = async (decryptedBody: {
             screen: "PROCESSING",
             data: {},
           };
-
-          // if (transferResult?.success) {
-          //   return {
-          //     screen: "SUCCESS",
-          //     data: {
-          //       message: transferResult.message,
-          //     },
-          //   };
-          // } else {
-          //   return {
-          //     screen: "PIN",
-          //     data: {
-          //       error_message:
-          //         transferResult?.message ||
-          //         "Transfer failed. Please try again.",
-          //     },
-          //   };
-          // }
-          // return {
-          //   screen: "SUCCESS",
-          //   data: {
-          //     extension_message_response: {
-          //       params: {
-          //         flow_token: flow_token,
-          //         optional_param1: amount,
-          //         optional_param2: accountNumber,
-          //       },
-          //     },
-          //   },
-          // };
         }
 
         default:

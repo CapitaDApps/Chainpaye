@@ -1,13 +1,10 @@
-import { IUser, User } from "../models/User";
-import { ToronetService } from "./ToronetService";
-import mongoose, { Types } from "mongoose";
-import { WalletService } from "./WalletService";
-import { CurrencyType } from "../types/toronetService.types";
-import { Wallet } from "../models/Wallet";
-import { WhatsAppBusinessService } from "./WhatsAppBusinessService";
-import { nanoid } from "nanoid";
-import { getCountryCodeFromPhoneNumber } from "../utils/countryCodeMapping";
 import argon2 from "argon2";
+import mongoose from "mongoose";
+import { nanoid } from "nanoid";
+import { User } from "../models/User";
+import { Wallet } from "../models/Wallet";
+import { getCountryCodeFromPhoneNumber } from "../utils/countryCodeMapping";
+import { walletService } from ".";
 
 type CreateUserType = {
   whatsappNumber: string;
@@ -21,16 +18,6 @@ type UpdateUserAfterBvnVerified = {
 };
 
 export class UserService {
-  private toronetService: ToronetService;
-  private walletService: WalletService;
-  private whatsappBusinessService: WhatsAppBusinessService;
-
-  constructor() {
-    this.toronetService = new ToronetService();
-    this.walletService = new WalletService();
-    this.whatsappBusinessService = new WhatsAppBusinessService();
-  }
-
   async getUser(phoneNumber: string, includePin = false) {
     phoneNumber = phoneNumber.startsWith("+") ? phoneNumber : `+${phoneNumber}`;
     const user = await User.findOne({ whatsappNumber: phoneNumber }).select(
@@ -89,7 +76,7 @@ export class UserService {
             { session }
           );
 
-          await this.walletService.addWallet(
+          await walletService.addWallet(
             {
               userId,
               country: extractedCountry,

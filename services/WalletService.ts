@@ -361,10 +361,10 @@ export class WalletService {
 
   // TODO Get Wallet INFO
 
-  async getUserRecentTransactions(userId: string, limit: number = 10) {
-    const user = await User.findOne({ userId });
+  async getUserRecentTransactions(phone: string, limit: number = 10) {
+    const user = await User.findOne({ whatsappNumber: phone });
     if (!user) {
-      throw new Error(`User with userId - [${userId}] not found`);
+      throw new Error(`User with phone number - [${phone}] not found`);
     }
 
     const transactions = await Transaction.find({

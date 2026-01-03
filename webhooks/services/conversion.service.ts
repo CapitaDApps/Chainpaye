@@ -1,9 +1,7 @@
 import { Types } from "mongoose";
 import { redisClient } from "../../services/redis";
-import { ToronetService } from "../../services/ToronetService";
-import { UserService } from "../../services/UserService";
-import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService";
 import { sendTransactionReceipt } from "../../utils/sendReceipt";
+import { toronetService, userService } from "../../services";
 
 export async function getConversionFlowScreen(decryptedBody: {
   screen: string;
@@ -13,9 +11,6 @@ export async function getConversionFlowScreen(decryptedBody: {
   flow_token: string;
 }) {
   const { screen, data, version, action, flow_token } = decryptedBody;
-  const userService = new UserService();
-  const whatsappBusinessService = new WhatsAppBusinessService();
-  const toronetService = new ToronetService();
 
   // handle health check request
   if (action === "ping") {

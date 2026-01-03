@@ -4,7 +4,6 @@ import { Transaction, TransactionStatus } from "../models/Transaction";
 import { WalletService } from "../services/WalletService";
 import { WhatsAppBusinessService } from "../services/WhatsAppBusinessService";
 import { IUser } from "../models/User";
-import { CONSTANTS } from "../utils/config";
 import { sendTransactionReceipt } from "../utils/sendReceipt";
 import { Types } from "mongoose";
 

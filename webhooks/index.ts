@@ -1,22 +1,13 @@
+import axios from "axios";
 import dotenv from "dotenv";
 import express, { Express } from "express";
 import helmet from "helmet";
-import { UserService } from "../services/UserService";
-import { WhatsAppBusinessService } from "../services/WhatsAppBusinessService";
+import { commandRouteHandler } from "../commands/route";
+import { userService, whatsappBusinessService } from "../services";
+import { redisClient } from "../services/redis";
+import { userRateLimiter, verifyWebhookSignature } from "./middleware";
 import flowRouter from "./route/route";
 import { CustomReq } from "./types/request.type";
-import axios from "axios";
-import { User } from "../models/User";
-import { redisClient } from "../services/redis";
-import { ToronetService } from "../services/ToronetService";
-import { IWallet } from "../models/Wallet";
-import { WalletService } from "../services/WalletService";
-import { TransactionType } from "../models/Transaction";
-import {
-  userRateLimiter,
-  strictRateLimiter,
-  verifyWebhookSignature,
-} from "./middleware";
 
 dotenv.config();
 export const app: Express = express();
@@ -35,11 +26,6 @@ app.use(
     crossOriginEmbedderPolicy: false,
   })
 );
-
-const userService = new UserService();
-const whatsappBusinessService = new WhatsAppBusinessService();
-const toronetService = new ToronetService();
-const walletService = new WalletService();
 
 app.use(
   express.json({
@@ -118,14 +104,6 @@ async function replyingMessage(messageId: string) {
 app.post("/webhook", verifyWebhookSignature, async (req, res) => {
   console.log("Incoming webhook message:", JSON.stringify(req.body, null, 2));
 
-  // const ipDetails = await getIpData(req.ip);
-  // console.log({ ip: req.ip?.split(":") });
-
-  // const ipDetails = await getIpData("8.8.8.8");
-
-  // if (!ipDetails) throw new Error("Couldn't detect user's location");
-
-  // console.log({ ipDetails });
   const message = req.body.entry?.[0]?.changes[0]?.value?.messages?.[0];
   const contact = req.body.entry[0].changes[0].value.contacts?.[0];
 
@@ -143,7 +121,7 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
           if (!user || !user.firstName || !user.lastName || !user.isVerified) {
             await replyingMessage(message.id);
             // send welcome mesage
-            await whatsappBusinessService.sendTemplateIntroMessage(
+            await whatsappBusinessService.sendIntroMessageByFlowId(
               message.from
             );
           } else {
@@ -151,130 +129,13 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
             if (message.type == "text" && message.text.body) {
               await replyingMessage(message.id);
               if (user.country == "NG" && !user.isVerified) {
-                await whatsappBusinessService.sendTemplateIntroMessage(
+                await whatsappBusinessService.sendIntroMessageByFlowId(
                   message.from
                 );
                 res.sendStatus(200);
                 return;
               }
-              if (
-                message.text.body.toLowerCase().includes("balance") ||
-                message.text.body == "/balance"
-              ) {
-                const userWallet = await userService.getUserToroWallet(
-                  message.from
-                );
-                // Only update virtual wallet for Nigerian users
-                if (user.country === "NG") {
-                  await toronetService.updateVirtualWallet(
-                    userWallet.publicKey
-                  );
-                }
-                const [NGNBal, USDBal] = await Promise.all([
-                  toronetService.getBalanceNGN(userWallet.publicKey),
-                  toronetService.getBalanceUSD(userWallet.publicKey),
-                ]);
-                await whatsappBusinessService.sendNormalMessage(
-                  `*Your balance:* 
-*USD:* ${USDBal.balance}
-*NGN:* ${NGNBal.balance}
-                  `,
-                  message.from
-                );
-              } else if (message.text.body.startsWith("/transactionHistory")) {
-                try {
-                  const transactions =
-                    await walletService.getUserRecentTransactions(user.userId);
-
-                  if (transactions.length === 0) {
-                    await whatsappBusinessService.sendNormalMessage(
-                      "You don't have any transactions yet.",
-                      message.from
-                    );
-                  } else {
-                    let statusMessage = "*Your Recent Transactions:*\n\n";
-
-                    transactions.forEach((tx, index) => {
-                      const txType =
-                        tx.type === TransactionType.DEPOSIT
-                          ? "Deposit"
-                          : tx.type === TransactionType.TRANSFER
-                          ? "Transfer"
-                          : tx.type === TransactionType.WITHDRAWAL
-                          ? "Withdrawal"
-                          : tx.type === TransactionType.CONVERSION
-                          ? "Conversion"
-                          : tx.type;
-
-                      const txStatus =
-                        tx.status === "completed"
-                          ? "✅ Completed"
-                          : tx.status === "pending"
-                          ? "⏳ Pending"
-                          : tx.status === "failed"
-                          ? "❌ Failed"
-                          : tx.status;
-
-                      // Truncate transaction ID for display
-                      const txIdDisplay = tx.toronetTransactionId
-                        ? `${tx.toronetTransactionId.substring(0, 8)}...`
-                        : "N/A";
-
-                      // Format date
-                      const date = new Date(tx.createdAt).toLocaleDateString();
-                      const time = new Date(tx.createdAt).toLocaleTimeString(
-                        [],
-                        { hour: "2-digit", minute: "2-digit" }
-                      );
-
-                      // Add entry type information (DEBIT/CREDIT)
-                      const entryType = tx.entryType ? `(${tx.entryType})` : "";
-
-                      statusMessage += `${
-                        index + 1
-                      }. *${txType}* ${entryType} - ${tx.amount} ${
-                        tx.currency
-                      }\n`;
-                      statusMessage += `   Status: ${txStatus}\n`;
-                      statusMessage += `   Date: ${date} at ${time}\n`;
-                      statusMessage += `   ID: ${txIdDisplay}\n\n`;
-                    });
-
-                    await whatsappBusinessService.sendNormalMessage(
-                      statusMessage,
-                      message.from
-                    );
-                  }
-                } catch (error) {
-                  console.error("Error fetching transactions:", error);
-                  await whatsappBusinessService.sendNormalMessage(
-                    "Sorry, I couldn't retrieve your transaction history. Please try again later.",
-                    message.from
-                  );
-                }
-              } else if (message.text.body === "/convert") {
-                const convertFlowId = "773377672429898";
-                const convertFlowScreen = "CONVERT_ENTRY";
-
-                await whatsappBusinessService.sendConvertFlowById(
-                  message.from,
-                  convertFlowId,
-                  convertFlowScreen,
-                  {
-                    header: "Convert",
-                    body: "Convert naira to dollar and vice versa",
-                    cta: "Convert",
-                  }
-                );
-              } else {
-                if (message.text.body) {
-                  await whatsappBusinessService.sendTemplateInteractiveMessage(
-                    "menumessage",
-                    message.from,
-                    "en"
-                  );
-                }
-              }
+              await commandRouteHandler(message.from, message.text.body);
             }
 
             if (message.type == "button") {

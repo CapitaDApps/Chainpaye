@@ -5,35 +5,26 @@
  */
 
 import axios from "axios";
-import { WalletService } from "./WalletService";
+import { walletService } from ".";
 import { redisClient } from "./redis";
 import { v4 as uuidv4 } from "uuid";
 import { User } from "../models/User";
 import { Wallet } from "../models/Wallet";
+import { CONSTANTS } from "../config/constants";
 
 type ButtonPayloadType =
   | "My Account"
   | "Withdraw to Bank"
   | "Copy Account NO"
   | "Invoice a Client";
-type CommandTextType =
-  | "transfer-usd"
-  | "transfer-ngn"
-  | "deposit"
-  | "deposit-usd"
-  | "deposit-ngn"
-  | "status"
-  | "setup pin";
 
 export class WhatsAppBusinessService {
   private GRAPH_API_TOKEN: string;
   private business_phone_number_id: string;
-  private walletService: WalletService;
 
   constructor() {
     this.GRAPH_API_TOKEN = process.env.GRAPH_API_TOKEN || "";
     this.business_phone_number_id = process.env.BUSINESS_PHONE_NUMBER_ID || "";
-    this.walletService = new WalletService();
   }
 
   async sendNormalMessage(message: string, to: string) {
@@ -88,6 +79,7 @@ export class WhatsAppBusinessService {
       },
     });
   }
+
   async uploadImageToWhatapp(base64String: string): Promise<string> {
     const cleanBase64 = base64String.replace(/^data:image\/\w+;base64,/, "");
 
@@ -118,7 +110,7 @@ export class WhatsAppBusinessService {
 
   async sendTemplateIntroMessage(to: string) {
     const flowToken = uuidv4();
-    await redisClient.set(flowToken, to, "EX", 3600); // Store flow_token for 1 hour
+    await redisClient.set(flowToken, to, "EX", CONSTANTS.CACHE_24HRS); // Store flow_token for 1 hour
 
     await axios({
       method: "POST",
@@ -149,45 +141,6 @@ export class WhatsAppBusinessService {
               ],
             },
 
-            {
-              type: "button",
-              sub_type: "flow",
-              index: "0",
-              parameters: [
-                {
-                  type: "action",
-                  action: {
-                    flow_token: flowToken,
-                  },
-                },
-              ],
-            },
-          ],
-        },
-      },
-    });
-  }
-
-  async sendPinFlowTempMessage(to: string) {
-    const flowToken = uuidv4();
-    await redisClient.set(flowToken, to, "EX", 3600); // Store flow_token for 1 hour
-    await axios({
-      method: "POST",
-      url: `https://graph.facebook.com/v24.0/${this.business_phone_number_id}/messages`,
-      headers: {
-        Authorization: `Bearer ${this.GRAPH_API_TOKEN}`,
-      },
-      data: {
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to,
-        type: "template",
-        template: {
-          name: "appointment",
-          language: {
-            code: "en",
-          },
-          components: [
             {
               type: "button",
               sub_type: "flow",
@@ -240,7 +193,7 @@ export class WhatsAppBusinessService {
     bodyParameters?: any[]
   ) {
     const flowToken = uuidv4();
-    await redisClient.set(flowToken, to, "EX", 3600); // Store flow_token for 1 hour
+    await redisClient.set(flowToken, to, "EX", CONSTANTS.CACHE_24HRS); // Store flow_token for 1 hour
     await axios({
       method: "POST",
       url: `https://graph.facebook.com/v24.0/${this.business_phone_number_id}/messages`,
@@ -290,9 +243,83 @@ export class WhatsAppBusinessService {
     });
   }
 
-  async sendFlowById(to: string, flowId: string, screenId: string, data?: any) {
+  async sendIntroMessageByFlowId(to: string) {
+    const introFlowId = "4356747454606025";
+    const introInitScreedId = "PERSONAL_INFO";
+    const link =
+      "https://chainpaye-public.s3.us-east-1.amazonaws.com/chainpaye-img.jpg";
+
+    await this.sendImageFlowById(to, introFlowId, introInitScreedId, {
+      link,
+      body: "💸 Send and Receive USD, GBP, EUR, and settle in your local currency - all with our AI Agent on WhatsApp!\n💰 Pay or get paid in USD, GBP, EUR within seconds with our payment link!\n🔥 Off-ramp your crypto assets without conversion to stablecoin and get credited under 50 seconds of asset sent confirmation!\n📲 No app downloads, just KYC and banking with blockchain speed!",
+      cta: "Sign Up",
+    });
+  }
+
+  async sendMenuMessageMyFlowId(to: string) {
+    const topUpFlowId = "1513776869736922";
+    const topupScreenInitId = "TOPUP_WALLET";
+    await this.sendTextOnlyFlowById(to, topUpFlowId, topupScreenInitId, {
+      header: "What Chainpaye can do for you...",
+      body: `*Send Money Instantly:* Need to send funds to a friend abroad? Do it in the middle of a conversation. No new logins, no delays—just seamless, secure peer-to-peer transfers.
+
+*Get Paid Faster:* Running a business? Don't let payment friction kill your sale. Generate professional payment links instantly within WhatsApp and get paid by clients anywhere in the world, right then and there.`,
+      cta: "Top up Wallet",
+    });
+  }
+
+  async sendTopUpFlowById(to: string) {
+    const topUpFlowId = "1513776869736922";
+    const topUpScreenInitId = "TOPUP_WALLET";
+    await this.sendTextOnlyFlowById(to, topUpFlowId, topUpScreenInitId, {
+      header: "Top up Wallet",
+      body: "Top up your Chainpaye wallet in seconds and start sending or receiving money globally.",
+      cta: "Start Top-up",
+    });
+  }
+
+  async sendTransferFlowById(to: string) {
+    const transferFlowId = "1882173995991922";
+    const transferScreenInitId = "TRANSFER";
+    await this.sendTextOnlyFlowById(to, transferFlowId, transferScreenInitId, {
+      header: "Transfer Money",
+      body: "Send money to friends and family globally with ease and speed.",
+      cta: "Start Transfer",
+    });
+  }
+
+  async sendWithdrawalFlowById(to: string) {
+    const withdrawFlowId = "1654062222645036";
+    const screenId = "WITHDRAWAL_CURRENCY";
+    await this.sendTextOnlyFlowById(to, withdrawFlowId, screenId, {
+      header: "Withdraw to Bank",
+      body: "Withdraw your funds to your bank account.",
+      cta: "Start Withdrawal",
+    });
+  }
+
+  async sendConvertFiatFlowById(to: string) {
+    const convertFlowId = "773377672429898";
+    const convertFlowScreen = "CONVERT_ENTRY";
+    await this.sendTextOnlyFlowById(to, convertFlowId, convertFlowScreen, {
+      header: "Convert Fiat",
+      body: "Convert your local currency to USD or NGN seamlessly.",
+      cta: "Start Conversion",
+    });
+  }
+
+  private async sendImageFlowById(
+    to: string,
+    flowId: string,
+    screenId: string,
+    data: {
+      link: string;
+      body: string;
+      cta: string;
+    }
+  ) {
     const flowToken = uuidv4();
-    await redisClient.set(flowToken, to, "EX", 3600); // Store flow_token for 1 hour
+    await redisClient.set(flowToken, to, "EX", CONSTANTS.CACHE_24HRS);
     const body = {
       messaging_product: "whatsapp",
       to,
@@ -301,11 +328,13 @@ export class WhatsAppBusinessService {
       interactive: {
         type: "flow",
         header: {
-          type: "text",
-          text: "Withdraw",
+          type: "image",
+          image: {
+            link: data.link,
+          },
         },
         body: {
-          text: "Open flow to complete withdrawal",
+          text: data.body,
         },
 
         action: {
@@ -315,9 +344,9 @@ export class WhatsAppBusinessService {
             flow_action: "navigate",
             flow_token: flowToken,
             flow_id: flowId,
-            flow_cta: "Withdraw",
+            flow_cta: data.cta,
             flow_action_payload: {
-              screen: "WITHDRAWAL_CURRENCY",
+              screen: screenId,
             },
           },
         },
@@ -338,14 +367,18 @@ export class WhatsAppBusinessService {
     }
   }
 
-  async sendConvertFlowById(
+  private async sendTextOnlyFlowById(
     to: string,
     flowId: string,
     screenId: string,
-    data?: any
+    data: {
+      header: string;
+      body: string;
+      cta: string;
+    }
   ) {
     const flowToken = uuidv4();
-    await redisClient.set(flowToken, to, "EX", 3600); // Store flow_token for 1 hour
+    await redisClient.set(flowToken, to, "EX", CONSTANTS.CACHE_24HRS);
     const body = {
       messaging_product: "whatsapp",
       to,
@@ -355,10 +388,10 @@ export class WhatsAppBusinessService {
         type: "flow",
         header: {
           type: "text",
-          text: "Convert",
+          text: data.header,
         },
         body: {
-          text: "Convert naira to dollar and vice versa",
+          text: data.body,
         },
 
         action: {
@@ -368,9 +401,9 @@ export class WhatsAppBusinessService {
             flow_action: "navigate",
             flow_token: flowToken,
             flow_id: flowId,
-            flow_cta: "Convert",
+            flow_cta: data.cta,
             flow_action_payload: {
-              screen: "CONVERT_ENTRY",
+              screen: screenId,
             },
           },
         },
@@ -386,7 +419,7 @@ export class WhatsAppBusinessService {
         data: body,
       });
     } catch (error) {
-      console.log("error sending convert flow", error);
+      console.log("error sending withdraw flow", error);
       throw error;
     }
   }
@@ -406,8 +439,8 @@ export class WhatsAppBusinessService {
         }
 
         const [ngnBalance, usdBalance] = await Promise.all([
-          await this.walletService.ngnBalance(wallet.publicKey),
-          await this.walletService.usdBalance(wallet.publicKey),
+          await walletService.ngnBalance(wallet.publicKey),
+          await walletService.usdBalance(wallet.publicKey),
         ]);
 
         const params = [
@@ -445,14 +478,14 @@ export class WhatsAppBusinessService {
           await this.sendTemplateIntroMessage(to);
           return;
         }
-        // if (!user.isVerified) {
-        //   await this.sendTemplateInteractiveMessage("completekyce", to, "en");
-        //   return;
-        // }
-        // send withdraw flow
+
         const withdrawFlowId = "1654062222645036";
-        const initScreen = "WITHDRAWAL_CURRENCY";
-        this.sendFlowById(to, withdrawFlowId, initScreen);
+        const screenId = "WITHDRAWAL_CURRENCY";
+        this.sendTextOnlyFlowById(to, withdrawFlowId, screenId, {
+          header: "Withdraw to Bank",
+          body: "Withdraw your funds to your bank account.",
+          cta: "Start Withdrawal",
+        });
         break;
       }
 
@@ -472,37 +505,6 @@ export class WhatsAppBusinessService {
 
       default:
         // invalid payload
-        break;
-    }
-  }
-
-  async handleCommandText(
-    command: CommandTextType,
-    text: string | undefined,
-    to: string
-  ) {
-    text = text ? text : "";
-    const [amount, to_phone_number] = text.split(",");
-
-    switch (command) {
-      case "status":
-        const txId = text.trim();
-        if (!txId)
-          return await this.sendNormalMessage(
-            "Please pass the transaction id in the required format. status: transactionid",
-            to
-          );
-        const txStatusData = await this.walletService.checkTransactionStatus(
-          txId
-        );
-
-        await this.sendNormalMessage(
-          `${txStatusData.message}
-          `,
-          to
-        );
-        break;
-      default:
         break;
     }
   }

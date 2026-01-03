@@ -6,7 +6,6 @@ import { ToronetService } from "../../services/ToronetService";
 import { TransactionService } from "../../services/TransactionService";
 import { UserService } from "../../services/UserService";
 import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService";
-import { CONSTANTS } from "../../utils/config";
 import { TransactionStatus } from "../../models/Transaction";
 import { nanoid } from "nanoid";
 import { sendTransactionReceipt } from "../../utils/sendReceipt";

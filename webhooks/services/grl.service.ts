@@ -1,9 +1,6 @@
 import { User } from "../../models/User";
 import { Wallet } from "../../models/Wallet";
 import { redisClient } from "../../services/redis";
-import { ToronetService } from "../../services/ToronetService";
-import { UserService } from "../../services/UserService";
-import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService";
 
 interface AllowedMethod {
   id: string;
@@ -33,9 +30,7 @@ export async function getGenerateLinkScreen(decryptedBody: {
   flow_token: string;
 }) {
   const { screen, data, version, action, flow_token } = decryptedBody;
-  const userService = new UserService();
-  const whatsappBusinessService = new WhatsAppBusinessService();
-  const toronetService = new ToronetService();
+
   // handle health check request
   if (action === "ping") {
     return {
