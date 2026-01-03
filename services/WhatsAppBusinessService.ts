@@ -409,7 +409,7 @@ export class WhatsAppBusinessService {
         },
       },
     };
-    console.log("Sending flow message", body);
+
     try {
       await axios({
         method: "POST",
@@ -417,10 +417,13 @@ export class WhatsAppBusinessService {
         headers: {
           Authorization: `Bearer ${this.GRAPH_API_TOKEN}`,
         },
-        data: JSON.stringify(body),
+        data: body,
       });
     } catch (error) {
-      console.log("error sending text only flow", error);
+      console.log(
+        "error sending text only flow",
+        (error as { response: any }).response.data
+      );
       throw error;
     }
   }
