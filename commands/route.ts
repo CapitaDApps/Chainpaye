@@ -6,6 +6,7 @@ import {
   handleTopUp,
   handleTransactionHistory,
   handleWithdrawal,
+  handleTransfer,
 } from "./handlers";
 
 export async function commandRouteHandler(from: string, command: string) {
@@ -21,6 +22,8 @@ export async function commandRouteHandler(from: string, command: string) {
     await handleTransactionHistory(from);
   } else if (COMMANDS.deposit.includes(command)) {
     await handleTopUp(from);
+  } else if (COMMANDS.transfer.includes(command)) {
+    await handleTransfer(from);
   } else {
     try {
       await whatsappBusinessService.sendMenuMessageMyFlowId(from);
