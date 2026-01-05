@@ -6,7 +6,11 @@
 import axios, { AxiosInstance, AxiosResponse } from "axios";
 import cryptojs from "crypto-js";
 import { nanoid } from "nanoid";
-import { CurrencyType, KycDataType } from "../types/toronetService.types";
+import {
+  CoinType,
+  CurrencyType,
+  KycDataType,
+} from "../types/toronetService.types";
 import { User } from "../models/User";
 import { redisClient } from "./redis";
 import { Types } from "mongoose";
@@ -43,12 +47,32 @@ type InitializeDepositReturn =
       instruction?: string;
     };
 
+//     {
+//     "result": true,
+//     "txid": "0xa01f1ef580D06f355479A2B7cB7450c67d825bb2_d553135bab996c7f",
+//     "network": "bsc",
+//     "address": "0xa01f1ef580D06f355479A2B7cB7450c67d825bb2",
+//     "accountname": "CapitaDapps Bridge Limited Account ",
+//     "newwallet": false,
+//     "amount": 101.5,
+//     "instruction": "Please deposit the amount shown into your same (Toronet) address on the indicated network (Use the direct blockchain address not the friendly TNS name). On completion, please return and click the Update or Confirm button to check and receive the credit onchain for your deposit. Expected token 100.0000000 usd (Value may change depending on when deposit is completed)."
+// }
+type CryptoInitReturn = {
+  result: boolean;
+  transactionId: string;
+  network: string;
+  address: string;
+  amount: string;
+  totalAmount: string;
+  refId: string;
+};
+
 export class ToronetService {
   private axiosInstance: AxiosInstance;
-  private encryptionKey: string;
   private adminPassword: string;
   private adminAddress: string;
   private baseUrl: string;
+  private currentVersion = 2;
 
   constructor() {
     const instance = axios.create({
@@ -57,9 +81,21 @@ export class ToronetService {
     });
     this.axiosInstance = instance;
     this.baseUrl = "https://api.toronet.org";
-    this.encryptionKey = process.env.ENCRYPTION_KEY || "";
     this.adminPassword = process.env.TORONET_ADMIN_PASSWORD || "";
     this.adminAddress = process.env.TORONET_ADMIN_ADDRESS || "";
+  }
+
+  private getEncryptionKey(currentVersion: number) {
+    switch (currentVersion) {
+      case 1:
+        return process.env.ENCRYPTION_KEY_V1 || "";
+
+      case 2:
+        return process.env.ENCRYPTION_KEY_V2 || "";
+
+      default:
+        return process.env.ENCRYPTION_KEY_V2 || "";
+    }
   }
 
   async createWallet(): Promise<{ walletAddress: string; password: string }> {
@@ -220,6 +256,136 @@ export class ToronetService {
     };
   }
 
+  async initCryptoDeposit({
+    receiverAddress,
+    amount,
+    currency,
+    description,
+    password,
+  }: {
+    receiverAddress: string;
+    amount: string;
+    password: string;
+    description?: string;
+    currency: CoinType;
+  }): Promise<CryptoInitReturn> {
+    const refId = this.generateRandomReferenceId();
+    console.log({ password, decryptedPassword: this.decrypt(password) });
+    const body = {
+      op: "paymentinitialize",
+      params: [
+        {
+          name: "address",
+          value: receiverAddress,
+        },
+        {
+          name: "pwd",
+          value: this.decrypt(password),
+        },
+        {
+          name: "token",
+          value: "USD",
+        },
+        {
+          name: "currency",
+          value: currency,
+        },
+        {
+          name: "amount",
+          value: amount,
+        },
+        {
+          name: "success_url",
+          value: "",
+        },
+        {
+          name: "cancel_url",
+          value: "",
+        },
+        {
+          name: "paymenttype",
+          value: "crypto",
+        },
+        {
+          name: "passthrough",
+          value: "0",
+        },
+        {
+          name: "commissionrate",
+          value: "0.01",
+        },
+        {
+          name: "exchange",
+          value: "72",
+        },
+        {
+          name: "payername",
+          value: "Jon Doe",
+        },
+        {
+          name: "payeraddress",
+          value: "null",
+        },
+        {
+          name: "payercity",
+          value: "null",
+        },
+        {
+          name: "payerstate",
+          value: "null",
+        },
+        {
+          name: "payercountry",
+          value: "null",
+        },
+        {
+          name: "payerzipcode",
+          value: "null",
+        },
+        {
+          name: "payerphone",
+          value: "null",
+        },
+        {
+          name: "reusewallet",
+          value: "1",
+        },
+        {
+          name: "description",
+          value: description ? description : "",
+        },
+        {
+          name: "reference",
+          value: refId,
+        },
+      ],
+    };
+    console.log(body.params);
+    const resp = await this.axiosInstance.post("/payment/toro/", body, {
+      headers: {
+        adminpwd: this.adminPassword,
+        admin: this.adminAddress,
+      },
+    });
+
+    const data = resp.data;
+    console.log({ data });
+
+    if (!data.result) {
+      throw new Error(data.error);
+    }
+
+    return {
+      result: data.result,
+      transactionId: data.txid,
+      network: data.network,
+      address: data.address,
+      amount,
+      totalAmount: data.amount,
+      refId,
+    };
+  }
+
   async recordTransaction(transactionId: string, currency: CurrencyType) {
     const url = `/payment/toro/`;
 
@@ -250,6 +416,47 @@ export class ToronetService {
     });
     const data = resp.data;
     console.log({ recordTransactionData: data });
+    return {
+      result: data.result,
+      transactionHash: data.transactionHash,
+    };
+  }
+
+  async recordCryptoTransaction(transactionId: string, currency: CoinType) {
+    const body = {
+      op: "recordpayment",
+      params: [
+        {
+          name: "currency",
+          value: currency, //current options are USD, EUR, NGN - defaut
+        },
+        {
+          name: "txid",
+          value: transactionId,
+        },
+        {
+          name: "checkouttype",
+          value: "paymentintent",
+        },
+        {
+          name: "paymenttype",
+          value: "crypto", //options are card, bank or ach, wire. if omitted the lowest fee is default
+        },
+        {
+          name: "reusewallet",
+          value: "1", //default or ommitted is set as 0, 1 ureuses virtual wallets
+        },
+      ],
+    };
+
+    const resp = await this.axiosInstance.post("/payment/toro/", body, {
+      headers: {
+        adminpwd: this.adminPassword,
+        admin: this.adminAddress,
+      },
+    });
+    const data = resp.data;
+    console.log({ recordCryptoTransactionData: data });
     return {
       result: data.result,
       transactionHash: data.transactionHash,
@@ -997,7 +1204,6 @@ export class ToronetService {
         } else {
           throw new Error(sellData.error);
         }
-        break;
       }
       case "USD": {
         if (!toroReceivedAmount) throw new Error("Error converting to usd");
@@ -1046,23 +1252,10 @@ export class ToronetService {
         } else {
           throw new Error(sellData.error);
         }
-        break;
       }
       default:
         throw new Error(`Invalid target currency passed - ${to}`);
     }
-
-    return {
-      success: true,
-      fromAmount: amount,
-      fromCurrency: from,
-      toAmount: convertedAmount,
-      toCurrency: to,
-      transactionHashes: {
-        buy: buyTxHash,
-        sell: sellTxHash,
-      },
-    };
   }
 
   async simulateConversion({
@@ -1257,11 +1450,26 @@ export class ToronetService {
   }
 
   private encrypt(data: string): string {
-    return cryptojs.AES.encrypt(data, this.encryptionKey).toString();
+    const version = `v${this.currentVersion}`;
+    const encryptionKey = this.getEncryptionKey(this.currentVersion);
+    if (!encryptionKey) throw new Error("Encryption key is not set");
+
+    return `${version}:${cryptojs.AES.encrypt(data, encryptionKey).toString()}`;
   }
 
   private decrypt(data: string): string {
-    const bytes = cryptojs.AES.decrypt(data, this.encryptionKey);
+    const versionList = data.split(":");
+    const version = versionList[0];
+    let versionNumber = 1;
+    if (version && versionList.length > 1) {
+      versionNumber = Number(version.split("")[1]!);
+      if (isNaN(versionNumber))
+        throw new Error("Invalid encryption version number");
+    }
+    const encryptionKey = this.getEncryptionKey(versionNumber);
+    if (!encryptionKey) throw new Error("Encryption key is not set");
+
+    const bytes = cryptojs.AES.decrypt(data, encryptionKey);
     return bytes.toString(cryptojs.enc.Utf8);
   }
 

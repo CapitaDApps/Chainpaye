@@ -58,7 +58,9 @@ export async function getConversionFlowScreen(decryptedBody: {
           };
         }
 
-        const toronetWallet = await userService.getUserToroWallet(phone);
+        const { wallet: toronetWallet } = await userService.getUserToroWallet(
+          phone
+        );
 
         const [usdBalanceResult, ngnBalanceResult] = await Promise.all([
           toronetService.getBalanceUSD(toronetWallet.publicKey),
@@ -130,7 +132,7 @@ export async function getConversionFlowScreen(decryptedBody: {
         const { fromCurrency, amountToReceive, amountToPay, toCurrency, pin } =
           data;
 
-        const [user, userToroWallet] = await Promise.all([
+        const [user, { wallet: userToroWallet }] = await Promise.all([
           userService.getUser(phone, true),
           userService.getUserToroWallet(phone, true),
         ]);

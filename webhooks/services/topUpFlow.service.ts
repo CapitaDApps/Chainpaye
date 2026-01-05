@@ -1,9 +1,6 @@
-import { scheduleProcessDeposit } from "../../jobs/jobs";
-import { Transaction } from "../../models/Transaction";
+import { scheduleProcessDeposit } from "../../jobs/topUp/job";
+import { userService, walletService } from "../../services";
 import { redisClient } from "../../services/redis";
-import { UserService } from "../../services/UserService";
-import { WalletService } from "../../services/WalletService";
-import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService";
 
 export const getTopUpScreen = async (decryptedBody: {
   screen: string;
@@ -14,9 +11,6 @@ export const getTopUpScreen = async (decryptedBody: {
 }) => {
   const { screen, data, version, action, flow_token } = decryptedBody;
 
-  const userService = new UserService();
-  const walletService = new WalletService();
-  const whatsappBusinessService = new WhatsAppBusinessService();
   // handle health check request
   if (action === "ping") {
     return {
@@ -93,14 +87,6 @@ export const getTopUpScreen = async (decryptedBody: {
         );
 
         const is_usd = data.currency == "USD";
-
-        // "amount": { "type": "string", "__example__": "100.00" },
-        // "currency": { "type": "string", "__example__": "USD" },
-        // "accountName": { "type": "string", "__example__": "John Doe" },
-        // "bankName": { "type": "string", "__example__": "Chase Bank" },
-        // "accountNumber": { "type": "string", "__example__": "1234567890" },
-        // "routingNO": { "type": "string", "__example__": "021000021" },
-        // "transactionId": { "type": "string", "__example__": "TXN_123456789" },
 
         switch (data.currency) {
           case "USD":

@@ -4,7 +4,7 @@ import {
   TransactionStatus,
   TransactionType,
 } from "../models/Transaction";
-import { CurrencyType } from "../types/toronetService.types";
+import { CoinType, CurrencyType } from "../types/toronetService.types";
 
 export class TransactionService {
   // Generic recordTransaction for backward compatibility
@@ -56,9 +56,7 @@ export class TransactionService {
       status,
       fees: fees || (type === TransactionType.DEPOSIT ? amount * 0.015 : 0), // 1.5% fee for deposits
       amount,
-      totalAmount:
-        amount +
-        (fees || (type === TransactionType.DEPOSIT ? amount * 0.015 : 0)),
+      totalAmount,
       fromUser,
       ...(toUser && { toUser }),
       ...(failureReason && { failureReason }),
@@ -109,6 +107,7 @@ export class TransactionService {
       currency,
       status,
       amount,
+      totalAmount: amount,
       fromUser,
       toUser,
       entryType: "CREDIT",
@@ -155,7 +154,44 @@ export class TransactionService {
       currency,
       status,
       amount,
+      totalAmount: amount,
       fromUser,
+    };
+
+    if (failureReason) {
+      params.failureReason = failureReason;
+    }
+
+    return this.recordTransaction(params);
+  }
+
+  static async recordCryptoDeposit({
+    refId,
+    toronetTxId,
+    currency,
+    status,
+    amount,
+    fromUser,
+    failureReason,
+  }: {
+    refId: string;
+    toronetTxId: string;
+    currency: CoinType;
+    status: TransactionStatus;
+    amount: number;
+    fromUser: Types.ObjectId;
+    failureReason?: string;
+  }) {
+    const params: any = {
+      refId,
+      toronetTxId,
+      type: TransactionType.OFF_RAMP,
+      currency,
+      status,
+      amount,
+      totalAmount: amount,
+      fromUser,
+      fees: 0.01, // Flat fee for crypto deposits
     };
 
     if (failureReason) {
@@ -189,6 +225,7 @@ export class TransactionService {
       currency,
       status,
       amount,
+      totalAmount: amount,
       fromUser,
     };
 
@@ -225,6 +262,7 @@ export class TransactionService {
       currency,
       status,
       amount,
+      totalAmount: amount,
       fromUser,
     };
 

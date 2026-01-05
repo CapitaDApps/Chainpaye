@@ -121,24 +121,20 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
           if (!user || !user.firstName || !user.lastName || !user.isVerified) {
             await replyingMessage(message.id);
             // send welcome mesage
-            await whatsappBusinessService.sendIntroMessageByFlowId(
-              message.from
-            );
+            whatsappBusinessService.sendIntroMessageByFlowId(message.from);
           } else {
             // send other messages
             if (message.type == "text" && message.text.body) {
               await replyingMessage(message.id);
               if (user.country == "NG" && !user.isVerified) {
-                await whatsappBusinessService.sendIntroMessageByFlowId(
-                  message.from
-                );
+                whatsappBusinessService.sendIntroMessageByFlowId(message.from);
                 res.sendStatus(200);
                 return;
               }
               const phone = message.from.startsWith("+")
                 ? message.from
                 : `+${message.from}`;
-              await commandRouteHandler(phone, message.text.body);
+              commandRouteHandler(phone, message.text.body);
             }
 
             if (message.type == "button") {
@@ -174,17 +170,7 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
                     }*, welcome to Chainpaye.`,
                     message.from
                   );
-                  await whatsappBusinessService.sendTemplateInteractiveMessage(
-                    "menumessage",
-                    message.from,
-                    "en"
-                  );
-                }
-
-                if (responseJson.type == "processing_started") {
-                  await replyingMessage(message.id);
-                  await whatsappBusinessService.sendNormalMessage(
-                    `Payment link generation feature in development...`,
+                  await whatsappBusinessService.sendMenuMessageMyFlowId(
                     message.from
                   );
                 }
@@ -197,7 +183,6 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
       console.log(error);
     }
   }
-
   res.sendStatus(200);
 });
 

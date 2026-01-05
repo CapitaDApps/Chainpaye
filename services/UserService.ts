@@ -40,7 +40,7 @@ export class UserService {
     if (!wallet)
       throw new Error(`Wallet for user - ${phoneNumber} was not found`);
 
-    return wallet;
+    return { wallet, user };
   }
 
   async createUser(data: CreateUserType) {

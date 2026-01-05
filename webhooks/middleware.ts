@@ -42,9 +42,3 @@ export function verifyWebhookSignature(
     return res.status(403).json({ error: "Signature verification failed" });
   }
 }
-
-export async function decryptionMiddleware(
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {}

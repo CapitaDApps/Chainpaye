@@ -5,7 +5,19 @@
 
 import mongoose, { Schema, Document } from "mongoose";
 import { IUser } from "./User";
+import { CoinType, CurrencyType } from "../types/toronetService.types";
 
+//   usdcbase,
+//   usdtbsc,
+//   usdcbsc,
+//   usdtpoly,
+//   usdcpoly,
+//   usdttrx,
+//   usdctrx,
+//   usdtsol,
+//   usdcsol,
+//   usdteth,
+//   usdceth;
 /**
  * Transaction types
  */
@@ -16,6 +28,7 @@ export enum TransactionType {
   WITHDRAWAL = "withdrawal",
   DIRECT_TRANSFER = "direct_transfer",
   CONVERSION = "conversion",
+  OFF_RAMP = "off_ramp",
 }
 
 /**
@@ -39,7 +52,7 @@ export interface ITransaction extends Document {
   fromUser?: mongoose.Types.ObjectId | IUser;
   toUser?: mongoose.Types.ObjectId;
   amount: number;
-  currency: "USD" | "NGN";
+  currency: any;
   description?: string;
   toronetTransactionId?: string;
   bankDetails?: {
@@ -59,6 +72,7 @@ export interface ITransaction extends Document {
   // Fields for conversion transactions
   fromCurrency?: "USD" | "NGN";
   toCurrency?: "USD" | "NGN";
+  asset?: CoinType;
   fromAmount?: number;
   toAmount?: number;
   // DEBIT/CREDIT fields for transaction history formatting
@@ -130,7 +144,21 @@ const TransactionSchema: Schema = new Schema(
     currency: {
       type: String,
       required: true,
-      enum: ["USD", "NGN"],
+      enum: [
+        "USD",
+        "NGN",
+        "USDCBASE",
+        "USDTBSC",
+        "USDCBSC",
+        "USDTPOLY",
+        "USDCPOLY",
+        "USDTTRX",
+        "USDCTRX",
+        "USDTSOL",
+        "USDCSOL",
+        "USDTETH",
+        "USDCETH",
+      ],
       trim: true,
     },
     description: {
@@ -162,6 +190,7 @@ const TransactionSchema: Schema = new Schema(
       enum: ["USD", "NGN"],
       required: false,
     },
+
     fromAmount: {
       type: Number,
       min: 0,

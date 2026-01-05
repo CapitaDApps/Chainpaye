@@ -2,7 +2,7 @@ import { ClientSession, Document, mongo, Types } from "mongoose";
 import { Wallet } from "../models/Wallet";
 import { IUser, User } from "../models/User";
 import { ToronetService } from "./ToronetService";
-import { CurrencyType } from "../types/toronetService.types";
+import { CoinType, CurrencyType } from "../types/toronetService.types";
 import { TransactionService } from "./TransactionService";
 import {
   Transaction,
@@ -10,15 +10,9 @@ import {
   TransactionType,
 } from "../models/Transaction";
 import { sendTransferReceipts } from "../utils/sendReceipt";
-import dotenv from "dotenv";
-dotenv.config();
+import { toronetService, userService } from ".";
 
 export class WalletService {
-  private toronetService: ToronetService;
-  constructor() {
-    this.toronetService = new ToronetService();
-  }
-
   async addWallet(
     { userId, country }: { userId: string; country: string },
     session: mongo.ClientSession
@@ -26,7 +20,7 @@ export class WalletService {
     const wallet = await Wallet.findOne({ userId });
 
     if (!wallet) {
-      const toronetWallet = await this.toronetService.createWallet();
+      const toronetWallet = await toronetService.createWallet();
       console.log({ toronetWallet });
       await Wallet.create(
         [
@@ -38,14 +32,6 @@ export class WalletService {
         ],
         { session }
       );
-
-      // Only create NGN virtual wallet for Nigerian users
-      // if (country === "NG") {
-      //   await this.toronetService.createVirtualWalletNGN({
-      //     address: toronetWallet.walletAddress,
-      //     fullName,
-      //   });
-      // }
     }
   }
 
@@ -87,7 +73,7 @@ export class WalletService {
 
     switch (currency) {
       case "USD":
-        const respUSD = await this.toronetService.getBalanceUSD(
+        const respUSD = await toronetService.getBalanceUSD(
           fromWallet.publicKey
         );
 
@@ -102,7 +88,7 @@ export class WalletService {
             message: "Insufficient balance to make transfer",
           };
 
-        const transferRespUSD = await this.toronetService.transferUSD(
+        const transferRespUSD = await toronetService.transferUSD(
           fromWallet.publicKey,
           toWallet.publicKey,
           amount.toString(),
@@ -162,7 +148,7 @@ export class WalletService {
         }
 
       case "NGN":
-        const respNGN = await this.toronetService.getBalanceNGN(
+        const respNGN = await toronetService.getBalanceNGN(
           fromWallet.publicKey
         );
 
@@ -175,7 +161,7 @@ export class WalletService {
             message: "Insufficient balance to make transfer",
           };
 
-        const transferRespNGN = await this.toronetService.transferNGN(
+        const transferRespNGN = await toronetService.transferNGN(
           fromWallet.publicKey,
           toWallet.publicKey,
           amount.toString(),
@@ -254,7 +240,7 @@ export class WalletService {
         `User with phone number - [+${phoneNumber}] does not have a wallet`
       );
 
-    const data = await this.toronetService.initializeDeposit({
+    const data = await toronetService.initializeDeposit({
       receiverAddress: wallet.publicKey,
       amount,
       currency,
@@ -263,6 +249,34 @@ export class WalletService {
     console.log(data);
 
     await TransactionService.recordDeposit({
+      refId: data.refId,
+      toronetTxId: data.transactionId,
+      currency,
+      status: TransactionStatus.PENDING,
+      amount: +amount,
+      fromUser: user._id as Types.ObjectId,
+    });
+    return data;
+  }
+
+  async depositCrypto(phoneNumber: string, amount: string, currency: CoinType) {
+    console.log({ phoneNumber });
+    phoneNumber = phoneNumber.startsWith("+") ? phoneNumber : `+${phoneNumber}`;
+    console.log({ phoneNumber });
+
+    const { wallet: userToroWallet, user } =
+      await userService.getUserToroWallet(phoneNumber, true);
+
+    const data = await toronetService.initCryptoDeposit({
+      receiverAddress: userToroWallet.publicKey,
+      amount,
+      currency,
+      password: userToroWallet.password,
+    });
+
+    console.log(data);
+
+    await TransactionService.recordCryptoDeposit({
       refId: data.refId,
       toronetTxId: data.transactionId,
       currency,
@@ -291,19 +305,85 @@ export class WalletService {
       };
     }
 
-    let statusResult = await this.toronetService.getTransactionStatus(
+    let statusResult = await toronetService.getTransactionStatus(
       transaction.toronetTransactionId!
     );
 
     let result: any;
 
     if (+statusResult.status == 0) {
-      result = await this.toronetService.recordTransaction(
+      result = await toronetService.recordTransaction(
         transaction.toronetTransactionId!,
         transaction.currency
       );
       if (result.result) {
-        const st = await this.toronetService.getTransactionStatus(
+        const st = await toronetService.getTransactionStatus(
+          transaction.toronetTransactionId!
+        );
+        if (st.status === 2) {
+          const data = st.data[0];
+          await Transaction.updateOne(
+            { toronetTransactionId: transactionId },
+            { amount: data.TX_Amount, totalAmount: data.TX_TotalAmount }
+          );
+        }
+      }
+    } else {
+      transaction.markAsCompleted();
+      transaction.save();
+      return {
+        success: true,
+        message: `Transaction with id - [${transactionId}] has been processed successfully`,
+      };
+    }
+
+    if (result.result) {
+      transaction.markAsCompleted();
+      transaction.save();
+
+      return {
+        success: true,
+        message: `Deposit amount of ${transaction.amount} ${transaction.currency} has been processed successfully`,
+      };
+    } else {
+      return {
+        success: false,
+        message: `Transaction with id - [${transactionId}] still pending`,
+      };
+    }
+  }
+
+  async checkCryptoTransactionStatus(transactionId: string) {
+    const transaction = await Transaction.findOne({
+      toronetTransactionId: transactionId,
+    });
+
+    if (!transaction)
+      return {
+        success: false,
+        message: `Transaction with id - [${transactionId}] was not found`,
+      };
+
+    if (transaction.status == TransactionStatus.COMPLETED) {
+      return {
+        success: true,
+        message: `Transaction with id - [${transactionId}] has been processed successfully`,
+      };
+    }
+
+    let statusResult = await toronetService.getTransactionStatus(
+      transaction.toronetTransactionId!
+    );
+
+    let result: any;
+
+    if (+statusResult.status == 0) {
+      result = await toronetService.recordCryptoTransaction(
+        transaction.toronetTransactionId!,
+        transaction.currency
+      );
+      if (result.result) {
+        const st = await toronetService.getTransactionStatus(
           transaction.toronetTransactionId!
         );
         if (st.status === 2) {
@@ -340,12 +420,12 @@ export class WalletService {
   }
 
   async ngnBalance(address: string) {
-    const bal = await this.toronetService.getBalanceNGN(address);
+    const bal = await toronetService.getBalanceNGN(address);
     return bal;
   }
 
   async usdBalance(address: string) {
-    const bal = await this.toronetService.getBalanceUSD(address);
+    const bal = await toronetService.getBalanceUSD(address);
     return bal;
   }
 

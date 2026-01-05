@@ -138,7 +138,8 @@ export const userSetupScreen = async (decryptedBody: {
             });
           }
 
-          const userToroWallet = await userService.getUserToroWallet(phone);
+          const { wallet: userToroWallet } =
+            await userService.getUserToroWallet(phone);
 
           if (data.bvn) {
             const kycResult = await toronetService.performKYC({

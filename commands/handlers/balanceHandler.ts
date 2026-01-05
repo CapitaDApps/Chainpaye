@@ -6,7 +6,7 @@ import {
 
 export async function handleBalance(from: string) {
   try {
-    const userWallet = await userService.getUserToroWallet(from);
+    const { wallet: userWallet } = await userService.getUserToroWallet(from);
     const user = (await userService.getUser(from))!;
     // Only update virtual wallet for Nigerian users
     if (user.country === "NG") {
@@ -18,8 +18,8 @@ export async function handleBalance(from: string) {
     ]);
     await whatsappBusinessService.sendNormalMessage(
       `*Your balance:* 
-*USD:* ${USDBal.balance}
-*NGN:* ${NGNBal.balance}
+*USD:* ${USDBal.balance.toFixed(2)}
+*NGN:* ${NGNBal.balance.toFixed(2)}
                   `,
       from
     );

@@ -7,6 +7,7 @@ import { userSetup } from "../controllers/userSetup.controller";
 import { withdrawalFlow } from "../controllers/withdrawalFlow.controller";
 import { generateLinkFlow } from "../controllers/grl.controller";
 import { conversionFlow } from "../controllers/conversion.controller";
+import { cryptoTopupFlow } from "../controllers/cryptoTopUp.controller";
 
 const router: Router = express.Router();
 
@@ -18,4 +19,5 @@ router.post("/user-setup", userSetup);
 router.post("/withdrawal-flow", withdrawalFlow);
 router.post("/generate-link", generateLinkFlow);
 router.post("/convert", conversionFlow);
+router.post("/offramp", cryptoTopupFlow);
 export default router;
