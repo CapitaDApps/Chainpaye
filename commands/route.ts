@@ -61,8 +61,7 @@ export async function commandRouteHandler(from: string, message: string) {
     await handleTransfer(from);
   } else if (matchingCommand === "offramp") {
     await handleCryptoTopUp(from);
-  }
-  {
+  } else {
     try {
       await whatsappBusinessService.sendMenuMessageMyFlowId(from);
     } catch (err) {
