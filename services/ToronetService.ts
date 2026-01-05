@@ -72,7 +72,7 @@ export class ToronetService {
   private adminPassword: string;
   private adminAddress: string;
   private baseUrl: string;
-  private currentVersion = 2;
+  currentVersion = 2;
 
   constructor() {
     const instance = axios.create({
@@ -1475,5 +1475,8 @@ export class ToronetService {
 
   decryptPassword(password: string): string {
     return this.decrypt(password);
+  }
+  encryptPassword(password: string): string {
+    return this.encrypt(password);
   }
 }

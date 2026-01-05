@@ -1,5 +1,11 @@
 import { User } from "../../models/User";
-import { walletService, whatsappBusinessService } from "../../services";
+import { Wallet } from "../../models/Wallet";
+import {
+  toronetService,
+  userService,
+  walletService,
+  whatsappBusinessService,
+} from "../../services";
 import { redisClient } from "../../services/redis";
 
 export const getTransferScreen = async (decryptedBody: {
@@ -109,9 +115,35 @@ export const getTransferScreen = async (decryptedBody: {
             };
           }
 
-          const user = await User.findOne({ whatsappNumber: phone }).select(
-            "+pin"
+          const { user, wallet } = await userService.getUserToroWallet(
+            phone,
+            true,
+            true
           );
+
+          const walletPassword = wallet.password;
+          const passList = walletPassword.split(":");
+          const version = passList[0];
+          let versionNumber = 1;
+          if (version && passList.length > 1) {
+            versionNumber = Number(version.split("")[1]!);
+            if (isNaN(versionNumber)) {
+              versionNumber = 1;
+            }
+
+            if (versionNumber < toronetService.currentVersion) {
+              const decryptedPassword =
+                toronetService.decryptPassword(walletPassword);
+
+              // re encrypt password with latest version
+              const reEncryptedPassword =
+                toronetService.encryptPassword(decryptedPassword);
+              Wallet.updateOne(
+                { _id: wallet._id },
+                { password: reEncryptedPassword }
+              );
+            }
+          }
 
           if (!user?.pin) {
             return {
