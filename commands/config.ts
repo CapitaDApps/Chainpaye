@@ -29,7 +29,13 @@ const COMMANDS: Record<string, CommandConfig> = {
   },
   balance: {
     triggers: [
-      "/balance",
+      "/myaccount",
+      "my account",
+      "check my account",
+      "account details",
+      "my details",
+      "profile",
+      "my profile",
       "balance",
       "check balance",
       "my balance",
@@ -41,7 +47,7 @@ const COMMANDS: Record<string, CommandConfig> = {
       "get balance",
       "view balance",
     ],
-    description: "Check your wallet balance",
+    description: "View your account details and balance",
   },
   convert: {
     triggers: [

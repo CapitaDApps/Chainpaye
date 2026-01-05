@@ -1,7 +1,7 @@
 import { whatsappBusinessService } from "../services";
 import { COMMANDS, TriggerPhrase } from "./config";
 import {
-  handleBalance,
+  handleAccountInfo,
   handleConversion,
   handleTopUp,
   handleTransactionHistory,
@@ -47,7 +47,7 @@ export async function commandRouteHandler(from: string, message: string) {
 
   // routing logic here
   if (matchingCommand === "balance") {
-    await handleBalance(from);
+    await handleAccountInfo(from);
   } else if (matchingCommand === "withdraw") {
     await handleWithdrawal(from);
   } else if (matchingCommand === "convert") {

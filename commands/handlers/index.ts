@@ -1,4 +1,4 @@
-export { handleBalance } from "./balanceHandler";
+export { handleAccountInfo } from "./balanceHandler";
 export { handleConversion } from "./conversionHandler";
 export { handleWithdrawal } from "./withdrawalHandler";
 export { handleTopUp } from "./topUpHandler";

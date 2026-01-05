@@ -5,7 +5,7 @@
  */
 
 import axios from "axios";
-import { walletService } from ".";
+import { toronetService, userService, walletService } from ".";
 import { redisClient } from "./redis";
 import { v4 as uuidv4 } from "uuid";
 import { User } from "../models/User";
@@ -306,6 +306,47 @@ export class WhatsAppBusinessService {
       body: "Convert your local currency to USD or NGN seamlessly.",
       cta: "Start Conversion",
     });
+  }
+
+  async sendCrptoTopUpFlowById(to: string) {
+    const cryptoTopUpFlowId = "1621168422100040";
+    const cryptoTopUpScreenId = "OFFRAMP_NETWORK";
+    await this.sendTextOnlyFlowById(
+      to,
+      cryptoTopUpFlowId,
+      cryptoTopUpScreenId,
+      {
+        header: "Crypto Off ramp",
+        body: "Off ramp your crypto assets directly to your Chainpaye wallet in seconds.",
+        cta: "Start Crypto Off ramp",
+      }
+    );
+  }
+
+  async sendMyAccountInfo(to: string) {
+    const phone = to.startsWith("+") ? to : `+${to}`;
+    const { user, wallet } = await userService.getUserToroWallet(phone);
+    const [usdBalance, ngnBalance] = await Promise.all([
+      toronetService.getBalanceUSD(wallet.publicKey),
+      toronetService.getBalanceNGN(wallet.publicKey),
+    ]);
+
+    if (user.country === "NG") {
+      await toronetService.updateVirtualWallet(wallet.publicKey); // update wallet for indirect transfers
+    }
+
+    // message should contain the user's account, number, name and balances
+    const message = `*My Account Summary* 
+
+Account No: ${user.whatsappNumber.replace("+", "")}
+
+Available Balances:
+🇳🇬 NGN: ₦ ${ngnBalance.balance.toFixed(2)}
+🇺🇸 USD: $${usdBalance.balance.toFixed(2)}   
+    
+    `;
+
+    await this.sendNormalMessage(message, to);
   }
 
   private async sendImageFlowById(
