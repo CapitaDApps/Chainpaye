@@ -27,7 +27,7 @@ const COMMANDS: Record<string, CommandConfig> = {
     ],
     description: "Transfer money to another chainpaye user",
   },
-  balance: {
+  myAccount: {
     triggers: [
       "/myaccount",
       "my account",
@@ -59,10 +59,7 @@ const COMMANDS: Record<string, CommandConfig> = {
     ],
     description: "Convert between fiat currencies",
   },
-  updatePin: {
-    triggers: ["/updatepin", "update pin", "change pin", "new pin"],
-    description: "Update your PIN",
-  },
+
   deposit: {
     triggers: [
       "/deposit",
@@ -73,16 +70,6 @@ const COMMANDS: Record<string, CommandConfig> = {
       "add funds",
     ],
     description: "Top up your chainpaye wallet",
-  },
-  myAccount: {
-    triggers: [
-      "/myaccount",
-      "my account",
-      "account details",
-      "my details",
-      "profile",
-    ],
-    description: "View your account details",
   },
   transactionHistory: {
     triggers: [
@@ -95,6 +82,24 @@ const COMMANDS: Record<string, CommandConfig> = {
       "view history",
     ],
     description: "View your past transactions",
+  },
+  offramp: {
+    triggers: [
+      "/offramp",
+      "off ramp",
+      "offramp",
+      "sell crypto",
+      "crypto to cash",
+      "crypto to fiat",
+      "convert crypto",
+      "cash out crypto",
+      "sell crypto for cash",
+      "convert to fiat",
+      "withdraw crypto",
+      "crypto withdrawal",
+    ],
+    description:
+      "Offramp crypto to fiat and receive it in your chainpaye wallet",
   },
 };
 

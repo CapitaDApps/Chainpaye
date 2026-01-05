@@ -7,6 +7,7 @@ import {
   handleTransactionHistory,
   handleWithdrawal,
   handleTransfer,
+  handleCryptoTopUp,
 } from "./handlers";
 
 /**
@@ -46,7 +47,7 @@ export async function commandRouteHandler(from: string, message: string) {
   const matchingCommand = findMatchingCommand(message);
 
   // routing logic here
-  if (matchingCommand === "balance") {
+  if (matchingCommand === "myAccount") {
     await handleAccountInfo(from);
   } else if (matchingCommand === "withdraw") {
     await handleWithdrawal(from);
@@ -58,7 +59,10 @@ export async function commandRouteHandler(from: string, message: string) {
     await handleTopUp(from);
   } else if (matchingCommand === "transfer") {
     await handleTransfer(from);
-  } else {
+  } else if (matchingCommand === "offramp") {
+    await handleCryptoTopUp(from);
+  }
+  {
     try {
       await whatsappBusinessService.sendMenuMessageMyFlowId(from);
     } catch (err) {
