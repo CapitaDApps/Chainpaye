@@ -1,6 +1,7 @@
 import { scheduleCryptoProcessDeposit } from "../../jobs/cryptoTopUp/job";
 
 import { userService, walletService } from "../../services";
+import { redisClient } from "../../services/redis";
 
 type Network = "bsc" | "sol" | "eth" | "poly" | "trx" | "base";
 
@@ -76,8 +77,8 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
   }
 
   if (action === "data_exchange") {
-    // const userPhone = await redisClient.get(flow_token);
-    const userPhone = "+2348110236998";
+    const userPhone = await redisClient.get(flow_token);
+    // const userPhone = "+2348110236998";
     if (!userPhone) {
       return {
         screen: "OFFRAMP_NETWORK",
