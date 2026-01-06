@@ -274,14 +274,14 @@ export class WhatsAppBusinessService {
 
 *Available Commands:*
 
-*/myaccount* - View your account details and balance
-*/sendmoney* - Transfer money to another chainpaye user
 */banktransfer* - Transfer from your chainpaye wallet to bank accounts
-*/deposit* - Top up your chainpaye wallet
 */convert* - Convert between fiat currencies
-*/transactionhistory* - View your past transactions
-*/offramp* - Offramp crypto to fiat and receive it in your chainpaye wallet`,
-      cta: "Get Started",
+*/deposit* - Top up your chainpaye wallet
+*/myaccount* - View your account details and balance
+*/offramp* - Offramp crypto to fiat and receive it in your chainpaye wallet
+*/sendmoney* - Transfer money to another chainpaye user
+*/transactionhistory* - View your past transactions`,
+      cta: "Top Up Wallet",
     });
   }
 
