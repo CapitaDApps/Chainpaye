@@ -94,6 +94,7 @@ export class TransactionService {
       currency,
       status,
       amount,
+      totalAmount: amount,
       fromUser,
       toUser,
       entryType: "DEBIT",
