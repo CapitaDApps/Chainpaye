@@ -269,7 +269,6 @@ export class WhatsAppBusinessService {
     const topUpFlowId = "1513776869736922";
     const topupScreenInitId = "TOPUP_WALLET";
     await this.sendTextOnlyFlowById(to, topUpFlowId, topupScreenInitId, {
-      header: "What Chainpaye can do for you...",
       body: `Hi, it’s Chainpaye 💳🏦! What’s good? 😊
 
 What can I do for you?
@@ -430,7 +429,7 @@ Available Balances:
     flowId: string,
     screenId: string,
     data: {
-      header: string;
+      header?: string;
       body: string;
       cta: string;
     }
@@ -444,10 +443,12 @@ Available Balances:
       type: "interactive",
       interactive: {
         type: "flow",
-        header: {
-          type: "text",
-          text: data.header,
-        },
+        ...(data.header && {
+          header: {
+            type: "text",
+            text: data.header,
+          },
+        }),
         body: {
           text: data.body,
         },
