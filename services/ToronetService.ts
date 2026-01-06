@@ -1458,17 +1458,29 @@ export class ToronetService {
 
   private decrypt(data: string): string {
     const versionList = data.split(":");
+    console.log({ versionList });
     const version = versionList[0];
     let versionNumber = 1;
+    console.log({ version });
     if (version && versionList.length > 1) {
       versionNumber = Number(version.split("")[1]!);
       if (isNaN(versionNumber))
         throw new Error("Invalid encryption version number");
     }
+    console.log({ versionNumber });
     const encryptionKey = this.getEncryptionKey(versionNumber);
     if (!encryptionKey) throw new Error("Encryption key is not set");
 
-    const bytes = cryptojs.AES.decrypt(data, encryptionKey);
+    console.log({ encryptionKey });
+
+    let dataPortion = "";
+    if (versionNumber > 1) {
+      dataPortion = data.substring(data.indexOf(":") + 1);
+    } else {
+      dataPortion = data;
+    }
+
+    const bytes = cryptojs.AES.decrypt(dataPortion, encryptionKey);
     return bytes.toString(cryptojs.enc.Utf8);
   }
 

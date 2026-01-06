@@ -5,6 +5,7 @@ import handlebars from "handlebars";
 import { fileURLToPath } from "url";
 import { TransactionType, TransactionStatus } from "../models/Transaction";
 import { IUser } from "../models/User";
+import { toronetService } from "../services";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -100,11 +101,11 @@ function formatDate(date: Date): string {
 /**
  * Format transaction data for receipt generation based on project Transaction model
  */
-export function formatTransactionData(
+export async function formatTransactionData(
   transaction: any,
   user: IUser,
   counterpartyUser?: IUser
-): ReceiptData {
+): Promise<ReceiptData> {
   const status = mapTransactionStatus(transaction.status);
   const transactionDate = formatDate(transaction.createdAt);
 
@@ -127,10 +128,15 @@ export function formatTransactionData(
       transaction.fromCurrency
     );
     const amountTo = formatAmount(transaction.toAmount, transaction.toCurrency);
-    const exchangeRate = `1 ${transaction.fromCurrency} @ ${formatAmount(
-      transaction.toAmount / transaction.fromAmount,
-      transaction.toCurrency
-    ).replace(/[^\d.,]/g, "")} ${transaction.toCurrency}`;
+    // const exchangeRate = `1 ${transaction.fromCurrency} @ ${formatAmount(
+    //   transaction.toAmount / transaction.fromAmount,
+    //   transaction.toCurrency
+    // ).replace(/[^\d.,]/g, "")} ${transaction.toCurrency}`;
+    const nairaRate = await toronetService.getNairaToDollarExchangeRate();
+    const exchangeRate = `1 USD @ ${formatAmount(nairaRate, "NGN").replace(
+      /[^\d.,]/g,
+      ""
+    )} NGN`;
 
     const conversionReceipt: ConversionReceipt = {
       isConversion: true,
@@ -289,7 +295,7 @@ export async function generateReceipt(data: ReceiptData): Promise<string> {
       "--disable-dev-shm-usage", // Prevents memory crashes on low-RAM instances
       "--disable-gpu",
     ],
-    executablePath: "/usr/bin/chromium-browser",
+    executablePath: "/usr/bin/chromium-browser", // Specify path to Chromium on your server
   });
 
   try {

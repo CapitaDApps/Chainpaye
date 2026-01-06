@@ -25,10 +25,14 @@ export async function sendTransactionReceipt(
   // Use setImmediate to run asynchronously without blocking
   setImmediate(async () => {
     try {
-      console.log(`[Receipt] Starting receipt generation for transaction: ${transactionId}`);
+      console.log(
+        `[Receipt] Starting receipt generation for transaction: ${transactionId}`
+      );
 
       // 1. Fetch the transaction
-      const transaction = await Transaction.findById(transactionId).populate("fromUser toUser");
+      const transaction = await Transaction.findById(transactionId).populate(
+        "fromUser toUser"
+      );
       if (!transaction) {
         console.error(`[Receipt] Transaction not found: ${transactionId}`);
         return;
@@ -44,11 +48,17 @@ export async function sendTransactionReceipt(
       // 3. Fetch counterparty if provided (for transfers)
       let counterpartyUser;
       if (counterpartyPhoneNumber) {
-        counterpartyUser = await User.findOne({ whatsappNumber: counterpartyPhoneNumber });
+        counterpartyUser = await User.findOne({
+          whatsappNumber: counterpartyPhoneNumber,
+        });
       }
 
       // 4. Format transaction data for receipt
-      const receiptData = formatTransactionData(transaction, user, counterpartyUser || undefined);
+      const receiptData = await formatTransactionData(
+        transaction,
+        user,
+        counterpartyUser || undefined
+      );
 
       // 5. Generate receipt (returns base64)
       console.log(`[Receipt] Generating receipt image...`);
@@ -68,10 +78,14 @@ export async function sendTransactionReceipt(
         receiptImageId: imageId,
       });
 
-      console.log(`[Receipt] Receipt sent successfully for transaction: ${transactionId}`);
-
+      console.log(
+        `[Receipt] Receipt sent successfully for transaction: ${transactionId}`
+      );
     } catch (error) {
-      console.error(`[Receipt] Error sending receipt for transaction ${transactionId}:`, error);
+      console.error(
+        `[Receipt] Error sending receipt for transaction ${transactionId}:`,
+        error
+      );
       // Don't throw - receipt sending failure shouldn't break the main flow
     }
   });
@@ -92,8 +106,16 @@ export async function sendTransferReceipts(
   receiverPhoneNumber: string
 ): Promise<void> {
   // Send DEBIT receipt to sender
-  await sendTransactionReceipt(debitTransactionId, senderPhoneNumber, receiverPhoneNumber);
+  await sendTransactionReceipt(
+    debitTransactionId,
+    senderPhoneNumber,
+    receiverPhoneNumber
+  );
 
   // Send CREDIT receipt to receiver
-  await sendTransactionReceipt(creditTransactionId, receiverPhoneNumber, senderPhoneNumber);
+  await sendTransactionReceipt(
+    creditTransactionId,
+    receiverPhoneNumber,
+    senderPhoneNumber
+  );
 }

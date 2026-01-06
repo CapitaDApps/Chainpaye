@@ -40,7 +40,7 @@ export const getTransferScreen = async (decryptedBody: {
   try {
     // Get user phone number from Redis using flow_token
     const userPhone = await redisClient.get(flow_token);
-
+    // const userPhone = "+2347064229575"; // --- TEMPORARY HARDCODE FOR TESTING ---
     // Verify user PIN
     const phone = userPhone?.startsWith("+") ? userPhone : `+${userPhone}`;
 
@@ -122,6 +122,7 @@ export const getTransferScreen = async (decryptedBody: {
           );
 
           const walletPassword = wallet.password;
+          console.log({ walletPassword }); // --- IGNORE ---
           const passList = walletPassword.split(":");
           const version = passList[0];
           let versionNumber = 1;
@@ -130,19 +131,22 @@ export const getTransferScreen = async (decryptedBody: {
             if (isNaN(versionNumber)) {
               versionNumber = 1;
             }
+          }
+          console.log({ versionNumber }); // --- IGNORE ---
+          if (versionNumber < toronetService.currentVersion) {
+            const decryptedPassword =
+              toronetService.decryptPassword(walletPassword);
 
-            if (versionNumber < toronetService.currentVersion) {
-              const decryptedPassword =
-                toronetService.decryptPassword(walletPassword);
-
-              // re encrypt password with latest version
-              const reEncryptedPassword =
-                toronetService.encryptPassword(decryptedPassword);
-              Wallet.updateOne(
-                { _id: wallet._id },
-                { password: reEncryptedPassword }
-              );
-            }
+            // re encrypt password with latest version
+            const reEncryptedPassword =
+              toronetService.encryptPassword(decryptedPassword);
+            console.log({ reEncryptedPassword }); // --- IGNORE ---
+            Wallet.updateOne(
+              { _id: wallet._id },
+              { password: reEncryptedPassword }
+            ).catch((err) => {
+              console.error("Error updating wallet password version", err);
+            });
           }
 
           if (!user?.pin) {
