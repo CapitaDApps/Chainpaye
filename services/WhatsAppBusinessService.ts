@@ -249,9 +249,18 @@ export class WhatsAppBusinessService {
     const link =
       "https://chainpaye-public.s3.us-east-1.amazonaws.com/chainpaye-img.jpg";
 
+    // "💸 Send and Receive USD, GBP, EUR, and settle in your local currency - all with our AI Agent on WhatsApp!\n💰 Pay or get paid in USD, GBP, EUR within seconds with our payment link!\n🔥 Off-ramp your crypto assets without conversion to stablecoin and get credited under 50 seconds of asset sent confirmation!\n📲 No app downloads, just KYC and banking with blockchain speed!",
+
     await this.sendImageFlowById(to, introFlowId, introInitScreedId, {
       link,
-      body: "💸 Send and Receive USD, GBP, EUR, and settle in your local currency - all with our AI Agent on WhatsApp!\n💰 Pay or get paid in USD, GBP, EUR within seconds with our payment link!\n🔥 Off-ramp your crypto assets without conversion to stablecoin and get credited under 50 seconds of asset sent confirmation!\n📲 No app downloads, just KYC and banking with blockchain speed!",
+      body: `Chainpaye💳 allows
+
+- Send & Receive money in 🇺🇸 USD, 🇪🇺 EUR, 🇬🇧 GBP 💸
+  ———————————————————
+- Generate payment links in 🇺🇸 USD, 🇪🇺 EUR, 🇬🇧 GBP, 🇳🇬NGN🔗-get paid faster 🤑
+  ———————————————————
+- Off-ramp crypto to fiat 🔄️ in under 50 seconds ⏱️
+  All within WhatsApp 📱 - simple & secure!`,
       cta: "Sign Up",
     });
   }
@@ -261,18 +270,9 @@ export class WhatsAppBusinessService {
     const topupScreenInitId = "TOPUP_WALLET";
     await this.sendTextOnlyFlowById(to, topUpFlowId, topupScreenInitId, {
       header: "What Chainpaye can do for you...",
-      body: `Chainpaye💳 allows
+      body: `Hi, it’s Chainpaye 💳🏦! What’s good? 😊
 
-- Send & Receive money in 🇺🇸 USD, 🇪🇺 EUR, 🇬🇧 GBP 💸
-  ———————————————————
-- Generate payment links in 🇺🇸 USD, 🇪🇺 EUR, 🇬🇧 GBP, 🇳🇬NGN🔗-get paid faster 🤑
-  ———————————————————
-- Off-ramp crypto to fiat 🔄️ in under 50 seconds ⏱️
-  All within WhatsApp 📱 - simple & secure!
-
-━━━━━━━━━━━━━━━━━━━━━━━
-
-*Available Commands:*
+What can I do for you?
 
 */banktransfer* - Transfer from your chainpaye wallet to bank accounts
 */convert* - Convert between fiat currencies
