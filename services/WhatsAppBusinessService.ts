@@ -261,10 +261,27 @@ export class WhatsAppBusinessService {
     const topupScreenInitId = "TOPUP_WALLET";
     await this.sendTextOnlyFlowById(to, topUpFlowId, topupScreenInitId, {
       header: "What Chainpaye can do for you...",
-      body: `*Send Money Instantly:* Need to send funds to a friend abroad? Do it in the middle of a conversation. No new logins, no delays—just seamless, secure peer-to-peer transfers.
+      body: `Chainpaye💳 allows
 
-*Get Paid Faster:* Running a business? Don't let payment friction kill your sale. Generate professional payment links instantly within WhatsApp and get paid by clients anywhere in the world, right then and there.`,
-      cta: "Top up Wallet",
+- Send & Receive money in 🇺🇸 USD, 🇪🇺 EUR, 🇬🇧 GBP 💸
+  ———————————————————
+- Generate payment links in 🇺🇸 USD, 🇪🇺 EUR, 🇬🇧 GBP, 🇳🇬NGN🔗-get paid faster 🤑
+  ———————————————————
+- Off-ramp crypto to fiat 🔄️ in under 50 seconds ⏱️
+  All within WhatsApp 📱 - simple & secure!
+
+━━━━━━━━━━━━━━━━━━━━━━━
+
+*Available Commands:*
+
+*/myaccount* - View your account details and balance
+*/sendmoney* - Transfer money to another chainpaye user
+*/banktransfer* - Transfer from your chainpaye wallet to bank accounts
+*/deposit* - Top up your chainpaye wallet
+*/convert* - Convert between fiat currencies
+*/transactionhistory* - View your past transactions
+*/offramp* - Offramp crypto to fiat and receive it in your chainpaye wallet`,
+      cta: "Get Started",
     });
   }
 
