@@ -270,7 +270,6 @@ export class ToronetService {
     currency: CoinType;
   }): Promise<CryptoInitReturn> {
     const refId = this.generateRandomReferenceId();
-    console.log({ password, decryptedPassword: this.decrypt(password) });
     const body = {
       op: "paymentinitialize",
       params: [
