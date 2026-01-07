@@ -1,5 +1,7 @@
-import dotenv from "dotenv";
-dotenv.config();
+import { loadEnv } from "../config/env";
+
+// Load environment variables
+loadEnv();
 
 import { ToronetService } from "./ToronetService";
 import { TransactionService } from "./TransactionService";

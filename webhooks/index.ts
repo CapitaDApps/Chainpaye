@@ -1,5 +1,4 @@
 import axios from "axios";
-import dotenv from "dotenv";
 import express, { Express } from "express";
 import helmet from "helmet";
 import { commandRouteHandler } from "../commands/route";
@@ -8,8 +7,10 @@ import { redisClient } from "../services/redis";
 import { userRateLimiter, verifyWebhookSignature } from "./middleware";
 import flowRouter from "./route/route";
 import { CustomReq } from "./types/request.type";
+import { loadEnv } from "../config/env";
 
-dotenv.config();
+// Load environment variables
+loadEnv();
 export const app: Express = express();
 app.use(express.static("public"));
 // Apply helmet security middleware

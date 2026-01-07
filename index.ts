@@ -6,11 +6,12 @@
 
 import { connectDatabase } from "./config/database";
 import { logger } from "./utils/logger";
-import dotenv from "dotenv";
+import { loadEnv } from "./config/env";
 import { app } from "./webhooks";
 
 // Load environment variables
-dotenv.config();
+loadEnv();
+logger.info("Environment variables loaded");
 
 /**
  * Main bot initialization function

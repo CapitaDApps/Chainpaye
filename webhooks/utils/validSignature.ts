@@ -1,9 +1,11 @@
 import { Request } from "express";
 
 import crypto from "crypto";
-import dotenv from "dotenv";
 import { CustomReq } from "../types/request.type";
-dotenv.config();
+import { loadEnv } from "../../config/env";
+
+// Load environment variables
+loadEnv(false);
 
 const APP_SECRET = process.env.APP_SECRET;
 

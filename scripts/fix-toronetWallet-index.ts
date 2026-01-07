@@ -5,8 +5,10 @@
 
 import mongoose from "mongoose";
 import { connectDatabase, closeDatabase } from "../config/database";
-import dotenv from "dotenv";
-dotenv.config();
+import { loadEnv } from "../config/env";
+
+// Load environment variables
+loadEnv();
 
 async function fixToronetWalletIndex() {
   try {

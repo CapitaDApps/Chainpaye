@@ -45,11 +45,12 @@ export const getTopUpScreen = async (decryptedBody: {
   }
 
   if (action === "data_exchange") {
+    // const userPhone = "+2348110236998"; // --- TEMPORARY HARDCODE FOR TESTING ---
+    const userPhone = await redisClient.get(flow_token);
+    const phone = userPhone?.startsWith("+") ? userPhone : `+${userPhone}`;
     // handle the request based on the current screen
     switch (screen) {
       case "TOPUP_WALLET": {
-        const userPhone = await redisClient.get(flow_token);
-
         if (!userPhone) {
           return {
             screen: "TOPUP_WALLET",
@@ -58,7 +59,6 @@ export const getTopUpScreen = async (decryptedBody: {
             },
           };
         }
-        const phone = userPhone.startsWith("+") ? userPhone : `+${userPhone}`;
 
         const user = await userService.getUser(phone, true);
 
@@ -123,40 +123,12 @@ export const getTopUpScreen = async (decryptedBody: {
         }
       }
 
-      case "PIN":
-        // { pin: '23456', amount: '12345678', currency: 'USD' }
-        // Get user phone number from Redis using flow_token
-        const userPhone = await redisClient.get(flow_token);
-
+      case "BANK_DETAILS":
         if (!userPhone) {
           return {
-            screen: "PIN",
+            screen: "BANK_DETAILS",
             data: {
               error_message: "Session expired. Restart flow a new message",
-            },
-          };
-        }
-        const phone = userPhone.startsWith("+") ? userPhone : `+${userPhone}`;
-
-        const user = await userService.getUser(phone, true);
-
-        if (!user) {
-          return {
-            screen: "PIN",
-            data: {
-              error_message:
-                "Could not find you in the database. Please try again",
-            },
-          };
-        }
-
-        const isValidPin = await user.comparePin(data.pin);
-
-        if (!isValidPin) {
-          return {
-            screen: "PIN",
-            data: {
-              error_message: "Incorrect pin.",
             },
           };
         }

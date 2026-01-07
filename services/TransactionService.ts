@@ -192,7 +192,7 @@ export class TransactionService {
       amount,
       totalAmount: amount,
       fromUser,
-      fees: 0.01, // Flat fee for crypto deposits
+      fees: amount * 0.01, // Flat fee for crypto deposits
     };
 
     if (failureReason) {

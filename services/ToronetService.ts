@@ -16,6 +16,7 @@ import { redisClient } from "./redis";
 import { Types } from "mongoose";
 import { TransactionStatus } from "../models/Transaction";
 import { TransactionService } from "./TransactionService";
+import { Wallet } from "../models/Wallet";
 
 export interface Bank {
   id: string; // Mapped from bankCode
@@ -519,12 +520,64 @@ export class ToronetService {
       },
     });
     const data = resp.data;
-    console.log({ updateVirtualWalletData: data });
+
+    const wallet = await Wallet.findOne({ publicKey }).select("+password");
+
+    if (data.result) {
+      const resultData = await this.getFiatTransactionsByHash(
+        data.transactionHash
+      );
+      if (resultData.result && resultData.status == 2) {
+        const topUpData = resultData.data[0];
+        const amount = topUpData.TX_Amount;
+
+        console.log("Direct top up amount of ", amount);
+        const fees = Number(amount) * 0.01;
+        if (topUpData.TX_Token == "ngn") {
+          this.transferNGN(
+            publicKey,
+            "0xbdb182ac6b38fd8f4581ab21d29a50287d47a93c",
+            fees.toString(),
+            wallet!.password
+          ).catch((err) => console.log("Error sending fees", err));
+        } else if (topUpData.TX_Token == "usd") {
+          this.transferUSD(
+            publicKey,
+            "0xbdb182ac6b38fd8f4581ab21d29a50287d47a93c",
+            fees.toString(),
+            wallet!.password
+          ).catch((err) => console.log("Error sending fees", err));
+        }
+      }
+    }
 
     return {
       result: data.result,
-      transactionHash: data.transactionHash,
+      transactionHash: data.transactionHash || "",
     };
+  }
+
+  async getFiatTransactionsByHash(hash: string) {
+    const body = {
+      op: "getfiattransactions_chaintxid",
+      params: [
+        {
+          name: "txid",
+          value: hash,
+        },
+      ],
+    };
+
+    const resp = await this.axiosInstance.post("/payment/toro/", body, {
+      headers: {
+        adminpwd: this.adminPassword,
+        admin: this.adminAddress,
+      },
+    });
+
+    const data = resp.data;
+
+    return data;
   }
 
   async getTransactionStatus(txId: string) {

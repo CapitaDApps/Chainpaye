@@ -6,9 +6,11 @@ import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService"
 import { IUser } from "../../models/User";
 import { sendTransactionReceipt } from "../../utils/sendReceipt";
 import { Types } from "mongoose";
-import { JobNames, ProcessDeposit } from "../types";
+import { JobNames, ProcessCryptoDeposit } from "../types";
 
-export async function processCryptoDepositHandler(job: Job<ProcessDeposit>) {
+export async function processCryptoDepositHandler(
+  job: Job<ProcessCryptoDeposit>
+) {
   console.log("Handling PROCESS_CRYPTO_DEPOSIT job...");
   const walletService = new WalletService();
   const whatsappBusinessService = new WhatsAppBusinessService();
@@ -76,7 +78,7 @@ async function scheduleCryptoProcessDeposit(transactionId: string) {
   console.log("Scheduling CRYPTO_PROCESS_DEPOSIT job...");
   await agenda.start();
   const end = new Date(Date.now() + 15 * 60 * 1000); // run for 15 mins
-  await agenda.every<ProcessDeposit>(
+  await agenda.every<ProcessCryptoDeposit>(
     "30 seconds",
     JobNames.PROCESS_CRYPTO_DEPOSIT,
     {

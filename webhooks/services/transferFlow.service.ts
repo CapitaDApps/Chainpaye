@@ -40,7 +40,7 @@ export const getTransferScreen = async (decryptedBody: {
   try {
     // Get user phone number from Redis using flow_token
     const userPhone = await redisClient.get(flow_token);
-    // const userPhone = "+2347064229575"; // --- TEMPORARY HARDCODE FOR TESTING ---
+    //   const userPhone = "+2348110236998"; // --- TEMPORARY HARDCODE FOR TESTING ---
     // Verify user PIN
     const phone = userPhone?.startsWith("+") ? userPhone : `+${userPhone}`;
 
