@@ -39,23 +39,12 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
   //const userPhone = "+2348110236998";
   const phone = userPhone?.startsWith("+") ? userPhone : `+${userPhone}`;
 
-  // let offrampData: any = await redisClient.get(`OFFRAMP_${phone}`);
-  // if (offrampData) {
-  //   offrampData = JSON.parse(offrampData);
-  // }
-  const offrampData = { network: "Solana", asset: "usdc" };
+  // const offrampData = { network: "Solana", asset: "usdc" };
   // handle initial request when opening the flow
   if (action === "INIT") {
     return {
       screen: "OFFRAMP_INPUT",
-      ...(offrampData
-        ? {
-            data: {
-              network: offrampData.network,
-              asset: offrampData.asset,
-            },
-          }
-        : { data: {} }),
+      data: {},
     };
   }
 
@@ -72,7 +61,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
     // handle the request based on the current screen
     switch (screen) {
       case "OFFRAMP_INPUT": {
-        const { asset, network, amount } = data;
+        const { amount } = data;
 
         const { wallet: userToroWallet } = await userService.getUserToroWallet(
           phone,
@@ -88,6 +77,17 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
             },
           };
         }
+
+        let offrampData: any = await redisClient.get(`OFFRAMP_${phone}`);
+        if (offrampData) {
+          offrampData = JSON.parse(offrampData);
+        }
+
+        if (!offrampData)
+          return { screen, data: { error_message: "Invalid asset" } };
+
+        const { network, asset } = offrampData;
+
         const net = getNetworkShortName(network);
 
         const result = await walletService.depositCrypto(
@@ -104,6 +104,8 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
             fee: estimatedFees.toFixed(2),
             receive_amount: (Number(amount) - estimatedFees).toFixed(2),
             transactionId: result.transactionId,
+            network: network,
+            asset: asset,
           },
         };
       }
