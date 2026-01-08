@@ -353,15 +353,10 @@ What can I do for you?
       toronetService.getBalanceNGN(wallet.publicKey),
     ]);
 
-    let vw: any;
-    if (user.country === "NG") {
-      // update wallet for indirect transfers
-      const [virtualWallet] = await Promise.all([
-        toronetService.getVirtualWalletByAddress(wallet.publicKey),
-        toronetService.updateVirtualWallet(wallet.publicKey),
-      ]);
-      vw = virtualWallet;
-    }
+    // if (user.country === "NG") {
+    //   // update wallet for indirect transfers
+
+    // }
 
     // message should contain the user's account, number, name and balances
     let message = `*My Account Summary* 
@@ -373,6 +368,11 @@ Available Balances:
 🇺🇸 USD: $${usdBalance.balance.toFixed(2)}`;
 
     if (user.country === "NG") {
+      const [vw] = await Promise.all([
+        toronetService.getVirtualWalletByAddress(wallet.publicKey),
+        toronetService.updateVirtualWallet(wallet.publicKey),
+      ]);
+
       message += `\n\n
 *📥 FUND YOUR ACCOUNT*
 

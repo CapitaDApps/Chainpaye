@@ -483,14 +483,21 @@ export class ToronetService {
       ],
     };
 
-    const resp = await this.axiosInstance.post("/payment", body, {
-      headers: {
-        adminpwd: this.adminPassword,
-        admin: this.adminAddress,
-      },
-    });
+    const data = await redisClient.getOrSetCache(
+      `VIR_${publicKey}`,
+      async () => {
+        const resp = await this.axiosInstance.post("/payment", body, {
+          headers: {
+            adminpwd: this.adminPassword,
+            admin: this.adminAddress,
+          },
+        });
 
-    const data = resp.data;
+        const data = resp.data;
+        return data;
+      }
+    );
+
     return data;
   }
 
