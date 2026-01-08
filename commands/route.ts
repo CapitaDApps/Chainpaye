@@ -7,8 +7,34 @@ import {
   handleTransactionHistory,
   handleWithdrawal,
   handleTransfer,
-  handleCryptoTopUp,
+  handleOfframp,
+  handleCryptoSellResponse,
 } from "./handlers";
+
+/**
+ * Checks if a message is a crypto sell request (e.g., "usdc solana", "usdt on ethereum")
+ */
+function isCryptoSellRequest(message: string): boolean {
+  const normalizedMessage = message.toLowerCase().trim();
+
+  // Check if message contains a token (usdc, usdt) and a network
+  const hasToken = /\b(usdc|usdt)\b/i.test(normalizedMessage);
+  const hasNetwork =
+    /\b(bsc|sol(ana)?|eth(ereum)?|poly(gon)?|tron?|base)\b/i.test(
+      normalizedMessage
+    );
+
+  // Check if it has words like "sell", "cash out", "convert", "withdraw" or just token+network
+  const hasActionWord = /^(sell|cash out|convert|withdraw)\s+/i.test(
+    normalizedMessage
+  );
+
+  return (
+    hasToken &&
+    hasNetwork &&
+    (hasActionWord || /^\s*\w+\s+(on|to|at)?\s*\w+\s*$/.test(normalizedMessage))
+  );
+}
 
 /**
  * Checks if a message matches any trigger phrase
@@ -44,6 +70,12 @@ function findMatchingCommand(message: string): string | null {
 }
 
 export async function commandRouteHandler(from: string, message: string) {
+  // Check if this is a crypto sell request first (before checking commands)
+  if (isCryptoSellRequest(message)) {
+    await handleCryptoSellResponse(from, message);
+    return;
+  }
+
   const matchingCommand = findMatchingCommand(message);
 
   // routing logic here
@@ -59,6 +91,8 @@ export async function commandRouteHandler(from: string, message: string) {
     await handleTopUp(from);
   } else if (matchingCommand === "transfer") {
     await handleTransfer(from);
+  } else if (matchingCommand === "offramp") {
+    await handleOfframp(from);
   } else {
     try {
       await whatsappBusinessService.sendMenuMessageMyFlowId(from);
@@ -70,6 +104,3 @@ export async function commandRouteHandler(from: string, message: string) {
     }
   }
 }
-// else if (matchingCommand === "offramp") {
-//     await handleCryptoTopUp(from);
-//   }

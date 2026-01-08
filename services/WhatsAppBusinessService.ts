@@ -11,6 +11,7 @@ import { v4 as uuidv4 } from "uuid";
 import { User } from "../models/User";
 import { Wallet } from "../models/Wallet";
 import { CONSTANTS } from "../config/constants";
+import { NormalizedNetworkType } from "../commands/types";
 
 type ButtonPayloadType =
   | "My Account"
@@ -342,6 +343,76 @@ What can I do for you?
         body: "Off ramp your crypto assets directly to your Chainpaye wallet in seconds.",
         cta: "Start Crypto Off ramp",
       }
+    );
+  }
+
+  async sendOfframpInstructions(to: string) {
+    const message = `🪙 *Sell Crypto for Fiat*
+
+To sell your crypto and receive fiat in your Chainpaye wallet, please specify:
+
+*Supported Cryptocurrencies:*
+• USDC - BNB Smart Chain, Solana, Ethereum, Polygon, Tron, Base
+• USDT - BNB Smart Chain, Solana, Ethereum, Polygon, Tron
+
+*How to specify what to sell:*
+Just send a message with the token and network. Here are some examples:
+• "usdc solana" or "usdc on solana"
+• "usdt ethereum" or "usdt on ethereum"
+• "usdc bsc" or "usdt bsc"
+
+*Supported Networks:*
+• BNB Smart Chain (BSC)
+• Solana (SOL)
+• Ethereum (ETH)
+• Polygon (POLY)
+• Tron (TRX)
+• Base
+
+What would you like to sell?`;
+
+    await this.sendNormalMessage(message, to);
+  }
+
+  async sendCryptoDepositAddress(
+    to: string,
+    token: string,
+    network: NormalizedNetworkType,
+    address: string
+  ) {
+    // Message 1: Send the deposit address
+    // await this.sendNormalMessage(
+    //   `📥 *Deposit Address*\n\nSend your ${token.toUpperCase()} on ${network.toUpperCase()} to:\n\n\`${address}\`\n\n⚠️ Only send ${token.toUpperCase()} on ${network.toUpperCase()} network.`,
+    //   to
+    // );
+
+    await this.sendNormalMessage(address, to);
+
+    // Message 2: Instructions and start the flow
+    // await this.sendNormalMessage(
+    //   `1. Copy the address above\n2. Send your ${token.toUpperCase()} to the address\n3. Once sent, click below to complete the offramp process`,
+    //   to
+    // );
+
+    // Start the flow
+    const cryptoTopUpFlowId = "1621168422100040";
+    const cryptoTopUpScreenId = "OFFRAMP_INPUT";
+    await this.sendTextOnlyFlowById(
+      to,
+      cryptoTopUpFlowId,
+      cryptoTopUpScreenId,
+      {
+        header: "Complete Off ramp",
+        body: `Copy address above 👆\n\n Send your ${token.toUpperCase()} on ${network.toUpperCase()} \n\n⚠️ Only send ${token.toUpperCase()} on ${network.toUpperCase()} network.
+     
+     `,
+        cta: "Complete Off ramp",
+      }
+    );
+    await redisClient.set(
+      `OFFRAMP_${to}`,
+      JSON.stringify({ asset: token, network }),
+      "EX"
     );
   }
 

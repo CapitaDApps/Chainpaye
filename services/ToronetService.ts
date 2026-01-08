@@ -197,7 +197,7 @@ export class ToronetService {
         },
         {
           name: "commissionrate",
-          value: "0.01",
+          value: "0",
         },
         {
           name: "exchange",
@@ -312,7 +312,7 @@ export class ToronetService {
         },
         {
           name: "commissionrate",
-          value: "0.01",
+          value: "0",
         },
         {
           name: "exchange",
@@ -529,35 +529,35 @@ export class ToronetService {
     });
     const data = resp.data;
 
-    const wallet = await Wallet.findOne({ publicKey }).select("+password");
+    // const wallet = await Wallet.findOne({ publicKey }).select("+password");
 
-    if (data.result) {
-      const resultData = await this.getFiatTransactionsByHash(
-        data.transactionHash
-      );
-      if (resultData.result && resultData.status == 2) {
-        const topUpData = resultData.data[0];
-        const amount = topUpData.TX_Amount;
+    // if (data.result) {
+    //   const resultData = await this.getFiatTransactionsByHash(
+    //     data.transactionHash
+    //   );
+    //   if (resultData.result && resultData.status == 2) {
+    //     const topUpData = resultData.data[0];
+    //     const amount = topUpData.TX_Amount;
 
-        console.log("Direct top up amount of ", amount);
-        const fees = Number(amount) * 0.01;
-        if (topUpData.TX_Token == "ngn") {
-          this.transferNGN(
-            publicKey,
-            "0xbdb182ac6b38fd8f4581ab21d29a50287d47a93c",
-            fees.toString(),
-            wallet!.password
-          ).catch((err) => console.log("Error sending fees", err));
-        } else if (topUpData.TX_Token == "usd") {
-          this.transferUSD(
-            publicKey,
-            "0xbdb182ac6b38fd8f4581ab21d29a50287d47a93c",
-            fees.toString(),
-            wallet!.password
-          ).catch((err) => console.log("Error sending fees", err));
-        }
-      }
-    }
+    //     console.log("Direct top up amount of ", amount);
+    //     const fees = Number(amount) * 0.01;
+    //     if (topUpData.TX_Token == "ngn") {
+    //       this.transferNGN(
+    //         publicKey,
+    //         "0xbdb182ac6b38fd8f4581ab21d29a50287d47a93c",
+    //         fees.toString(),
+    //         wallet!.password
+    //       ).catch((err) => console.log("Error sending fees", err));
+    //     } else if (topUpData.TX_Token == "usd") {
+    //       this.transferUSD(
+    //         publicKey,
+    //         "0xbdb182ac6b38fd8f4581ab21d29a50287d47a93c",
+    //         fees.toString(),
+    //         wallet!.password
+    //       ).catch((err) => console.log("Error sending fees", err));
+    //     }
+    //   }
+    // }
 
     return {
       result: data.result,
@@ -952,7 +952,7 @@ export class ToronetService {
     return bankList;
   }
 
-  async resolveBankAccountName(
+  async resolveBankAccountNameNGN(
     accountNumber: string,
     bankCode: string
   ): Promise<string> {
@@ -1467,6 +1467,58 @@ export class ToronetService {
 
   async getDollarToNairaExchangeRate() {}
 
+  async generateOrGetSolAndTrxAddress(data: {
+    network: "trx" | "sol";
+    asset: "usdc" | "usdt";
+    userAddress: string;
+    userWalletPassword: string;
+    fullName: string;
+  }): Promise<string> {
+    const body = {
+      op: "generatevirtualwallet",
+      params: [
+        {
+          name: "address", //Toronet address
+          value: data.userAddress,
+        },
+        {
+          name: "pwd", //Toronet keyfile password
+          value: this.decrypt(data.userWalletPassword),
+        },
+        {
+          name: "payername",
+          value: data.fullName, //name of the account holder
+        },
+        {
+          name: "currency",
+          value: `${data.asset}${data.network}`, //current options are USD, EUR, NGN - defaut
+        },
+      ],
+    };
+
+    const address = await redisClient.getOrSetCache(
+      `${data.network}_${data.userAddress}`,
+      async () => {
+        const resp = await this.axiosInstance.post("/payment", body, {
+          headers: {
+            adminpwd: this.adminPassword,
+            admin: this.adminAddress,
+          },
+        });
+
+        const respData = resp.data;
+
+        if (!respData.result)
+          throw new Error(
+            `Could not get wallet address for token - ${data.network}`
+          );
+
+        return respData.accountnumber;
+      }
+    );
+    return address;
+  }
+
   private formBuyToroBody(address: string, password: string, amount: string) {
     return {
       op: "buytoro",
@@ -1519,20 +1571,15 @@ export class ToronetService {
 
   private decrypt(data: string): string {
     const versionList = data.split(":");
-    console.log({ versionList });
     const version = versionList[0];
     let versionNumber = 1;
-    console.log({ version });
     if (version && versionList.length > 1) {
       versionNumber = Number(version.split("")[1]!);
       if (isNaN(versionNumber))
         throw new Error("Invalid encryption version number");
     }
-    console.log({ versionNumber });
     const encryptionKey = this.getEncryptionKey(versionNumber);
     if (!encryptionKey) throw new Error("Encryption key is not set");
-
-    console.log({ encryptionKey });
 
     let dataPortion = "";
     if (versionNumber > 1) {

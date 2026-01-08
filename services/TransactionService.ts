@@ -54,10 +54,10 @@ export class TransactionService {
       type,
       currency,
       status,
-      fees: fees || (type === TransactionType.DEPOSIT ? amount * 0.015 : 0), // 1.5% fee for deposits
       amount,
       totalAmount,
       fromUser,
+      ...(fees && { fees }),
       ...(toUser && { toUser }),
       ...(failureReason && { failureReason }),
       ...(entryType && { entryType }),
@@ -174,6 +174,7 @@ export class TransactionService {
     amount,
     fromUser,
     failureReason,
+    fees,
   }: {
     refId: string;
     toronetTxId: string;
@@ -182,6 +183,7 @@ export class TransactionService {
     amount: number;
     fromUser: Types.ObjectId;
     failureReason?: string;
+    fees: number;
   }) {
     const params: any = {
       refId,
@@ -192,7 +194,7 @@ export class TransactionService {
       amount,
       totalAmount: amount,
       fromUser,
-      fees: amount * 0.01, // Flat fee for crypto deposits
+      fees,
     };
 
     if (failureReason) {

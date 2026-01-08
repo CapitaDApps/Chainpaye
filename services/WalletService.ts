@@ -276,14 +276,20 @@ export class WalletService {
 
     console.log(data);
 
-    await TransactionService.recordCryptoDeposit({
+    // console.log("deposit crypto result", result);
+    const estimatedFees = Number(data.totalAmount) - Number(amount);
+
+    TransactionService.recordCryptoDeposit({
       refId: data.refId,
       toronetTxId: data.transactionId,
       currency,
       status: TransactionStatus.PENDING,
       amount: +amount,
       fromUser: user._id as Types.ObjectId,
-    });
+      fees: estimatedFees,
+    }).catch((error) =>
+      console.log("Error recording crypto transaction", error)
+    );
     return data;
   }
 

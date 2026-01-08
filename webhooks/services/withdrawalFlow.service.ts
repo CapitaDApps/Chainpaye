@@ -51,10 +51,10 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
 
   if (action === "data_exchange") {
     const userPhone = await redisClient.get(flow_token);
-
+    //const userPhone = "+2347064229575";
     if (!userPhone) {
       return {
-        screen: "WITHDRAWAL_CURRENCY",
+        screen,
         data: {
           error_message: "Session expired. Restart flow a new message",
         },
@@ -112,10 +112,11 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
             },
           };
         }
-        const accountName = await toronetService.resolveBankAccountName(
+        const accountName = await toronetService.resolveBankAccountNameNGN(
           accountNumber,
           bankCode
         );
+
         if (!accountName)
           return {
             screen: "WITHDRAWAL_DETAILS",
@@ -124,6 +125,17 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
                 "Could not verify account name, check acct NO and try again.",
             },
           };
+
+        // const { user, wallet } = await userService.getUserToroWallet(phone);
+
+        // const balanceNGN = await toronetService.getBalanceNGN(wallet.publicKey);
+
+        const cbnCharge = Number(amount) >= 10000 ? 50 + 10 : 10;
+        const toronetCharge = Number(amount) * 0.005; // 0.5%
+        const chainpayeCharge = Number(amount) * 0.015; // 1.5%
+        const totalAmount =
+          Number(amount) + cbnCharge + toronetCharge + chainpayeCharge;
+
         return {
           screen: "SUMMARY",
           data: {
@@ -133,26 +145,27 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
             resolvedAccountName: accountName,
             resolvedBankName: chosenBank.title,
             bankCode,
+            totalAmount: totalAmount.toFixed(2),
           },
         };
       }
 
       case "PIN": {
-        const { bankCode, accountName, accountNumber, amount, pin } = data;
+        const {
+          bankCode,
+          accountName,
+          accountNumber,
+          amount,
+          pin,
+          totalAmount,
+        } = data;
         console.log({ pinData: data });
 
-        const user = await User.findOne({ whatsappNumber: phone }).select(
-          "+pin"
+        const { user, wallet } = await userService.getUserToroWallet(
+          phone,
+          true,
+          true
         );
-        if (!user)
-          throw new Error(`User with phone number - [${phone}] not found`);
-
-        const wallet = await Wallet.findOne({ userId: user.userId }).select(
-          "+password"
-        );
-
-        if (!wallet)
-          throw new Error(`Wallet for user with phone - [${phone}] not found`);
 
         const isValidPin = await user.comparePin(pin);
 
@@ -198,7 +211,25 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
           };
         }
 
+        if (balanceNGN.balance < totalAmount) {
+          return {
+            screen: "PIN",
+            data: {
+              error_message: `Balance available is not enought to cover withdrwal amount plus fees.`,
+            },
+          };
+        }
+        const chainpayeCharge = Number(amount) * 0.015; // 1.5%
         const withdrawalNanoId = nanoid();
+
+        toronetService
+          .transferNGN(
+            wallet.publicKey,
+            "0xbdb182ac6b38fd8f4581ab21d29a50287d47a93c",
+            chainpayeCharge.toString(),
+            wallet.password
+          )
+          .catch((err) => console.log("Error sending fees", err));
 
         toronetService
           .withdrawNGN({
@@ -254,7 +285,7 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
               );
             }
           })
-          .catch((error) => console.log("Error processig withdrawal", error));
+          .catch((error) => console.log("Error processing withdrawal", error));
 
         return {
           screen: "PROCESSING",
