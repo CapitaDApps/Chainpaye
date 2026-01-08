@@ -266,22 +266,28 @@ export class WhatsAppBusinessService {
   }
 
   async sendMenuMessageMyFlowId(to: string) {
-    const topUpFlowId = "1513776869736922";
-    const topupScreenInitId = "TOPUP_WALLET";
-    await this.sendTextOnlyFlowById(to, topUpFlowId, topupScreenInitId, {
-      body: `Hi, it’s Chainpaye 💳🏦! What’s good? 😊
+    // const topUpFlowId = "1513776869736922";
+    // const topupScreenInitId = "TOPUP_WALLET";
+    await this.sendNormalMessage(
+      `Hi, it’s Chainpaye 💳🏦! What’s good? 😊
 
 What can I do for you?
 
-- */banktransfer* - Transfer from your chainpaye wallet to bank accounts
-- */convert* - Convert between fiat currencies
-- */deposit* - Top up your chainpaye wallet
-- */myaccount* - View your account details and balance
-- */offramp* - Offramp crypto to fiat and receive it in your chainpaye wallet
-- */sendmoney* - Transfer money to another chainpaye user
-- */transactionhistory* - View your past transactions`,
-      cta: "Top Up Wallet",
-    });
+🏦 /banktransfer — Transfer from chainpaye wallet to bank accounts
+
+💱 /convert — Convert between fiat currencies
+
+💰 /deposit — Top up your Chainpaye wallet
+
+👤 /myaccount — View account details and balance
+
+🪙 /offramp — Crypto to fiat directly to your wallet
+
+💸 /sendmoney — Instant transfer to other chainpaye users
+
+📜 /transactionhistory — View your past transactions`,
+      to
+    );
   }
 
   async sendTopUpFlowById(to: string) {
@@ -347,20 +353,35 @@ What can I do for you?
       toronetService.getBalanceNGN(wallet.publicKey),
     ]);
 
+    let vw: any;
     if (user.country === "NG") {
-      await toronetService.updateVirtualWallet(wallet.publicKey); // update wallet for indirect transfers
+      // update wallet for indirect transfers
+      const [virtualWallet] = await Promise.all([
+        toronetService.getVirtualWalletByAddress(wallet.publicKey),
+        toronetService.updateVirtualWallet(wallet.publicKey),
+      ]);
+      vw = virtualWallet;
     }
 
     // message should contain the user's account, number, name and balances
-    const message = `*My Account Summary* 
+    let message = `*My Account Summary* 
 
 Account No: ${user.whatsappNumber.replace("+", "")}
 
 Available Balances:
 🇳🇬 NGN: ₦ ${ngnBalance.balance.toFixed(2)}
-🇺🇸 USD: $${usdBalance.balance.toFixed(2)}   
-    
-    `;
+🇺🇸 USD: $${usdBalance.balance.toFixed(2)}`;
+
+    if (user.country === "NG") {
+      message += `\n\n
+*📥 FUND YOUR ACCOUNT*
+
+To top up your NGN balance, transfer to:
+Bank: FCMB
+Account Name: ${vw.accountname}
+Acct: ${vw.accountnumber}
+      `;
+    }
 
     await this.sendNormalMessage(message, to);
   }
