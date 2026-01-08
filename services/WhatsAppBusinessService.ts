@@ -359,13 +359,15 @@ What can I do for you?
     // }
 
     // message should contain the user's account, number, name and balances
-    let message = `*My Account Summary* 
+    let message = `👋 Hello, ${user.firstName || user.lastName}
 
 Account No: ${user.whatsappNumber.replace("+", "")}
 
 Available Balances:
 🇳🇬 NGN: ₦ ${ngnBalance.balance.toFixed(2)}
 🇺🇸 USD: $${usdBalance.balance.toFixed(2)}`;
+
+    let accountnumber: string | null = null;
 
     if (user.country === "NG") {
       const [vw] = await Promise.all([
@@ -378,14 +380,21 @@ Available Balances:
 *📥 FUND YOUR ACCOUNT*
 
 To top up your NGN balance, transfer to:
+
 Bank: FCMB
 Account Name: ${vw.accountname}
-Acct: ${vw.accountnumber}
+(⚠️ NGN Deposits Only)
+
+Copy the account number below 👇
       `;
+        accountnumber = vw.accountnumber;
       }
     }
 
     await this.sendNormalMessage(message, to);
+    if (accountnumber) {
+      await this.sendNormalMessage(accountnumber, to);
+    }
   }
 
   private async sendImageFlowById(
