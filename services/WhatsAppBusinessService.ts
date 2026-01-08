@@ -331,21 +331,6 @@ What can I do for you?
     });
   }
 
-  async sendCrptoTopUpFlowById(to: string) {
-    const cryptoTopUpFlowId = "1621168422100040";
-    const cryptoTopUpScreenId = "OFFRAMP_NETWORK";
-    await this.sendTextOnlyFlowById(
-      to,
-      cryptoTopUpFlowId,
-      cryptoTopUpScreenId,
-      {
-        header: "Crypto Off ramp",
-        body: "Off ramp your crypto assets directly to your Chainpaye wallet in seconds.",
-        cta: "Start Crypto Off ramp",
-      }
-    );
-  }
-
   async sendOfframpInstructions(to: string) {
     const message = `🪙 *Sell Crypto for Fiat*
 
@@ -395,7 +380,7 @@ What would you like to sell?`;
     // );
 
     // Start the flow
-    const cryptoTopUpFlowId = "1621168422100040";
+    const cryptoTopUpFlowId = "1672205394189200";
     const cryptoTopUpScreenId = "OFFRAMP_INPUT";
     await this.sendTextOnlyFlowById(
       to,
