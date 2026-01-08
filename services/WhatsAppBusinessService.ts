@@ -373,7 +373,8 @@ Available Balances:
         toronetService.updateVirtualWallet(wallet.publicKey),
       ]);
 
-      message += `\n\n
+      if (vw.result) {
+        message += `\n\n
 *📥 FUND YOUR ACCOUNT*
 
 To top up your NGN balance, transfer to:
@@ -381,6 +382,7 @@ Bank: FCMB
 Account Name: ${vw.accountname}
 Acct: ${vw.accountnumber}
       `;
+      }
     }
 
     await this.sendNormalMessage(message, to);
