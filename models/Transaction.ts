@@ -42,6 +42,13 @@ export enum TransactionStatus {
   CANCELLED = "cancelled",
 }
 
+export type BankDetails = {
+  accountNumber: string;
+  accountName: string;
+  bankName: string;
+  routingNumber?: string;
+};
+
 /**
  * Interface for Transaction document
  */
@@ -55,12 +62,7 @@ export interface ITransaction extends Document {
   currency: any;
   description?: string;
   toronetTransactionId?: string;
-  bankDetails?: {
-    accountNumber: string;
-    accountName: string;
-    bankName: string;
-    routingNumber?: string;
-  };
+  bankDetails?: BankDetails;
   exchangeRate?: number;
   fees?: number;
   totalAmount: number;
@@ -174,6 +176,12 @@ const TransactionSchema: Schema = new Schema(
     bankDetails: {
       type: Object,
       default: {},
+      required: function () {
+        return (
+          (this.type as unknown as TransactionType) ===
+          TransactionType.WITHDRAWAL
+        );
+      },
     },
     exchangeRate: {
       type: Number,

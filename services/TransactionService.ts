@@ -1,5 +1,6 @@
 import { Types } from "mongoose";
 import {
+  BankDetails,
   Transaction,
   TransactionStatus,
   TransactionType,
@@ -21,6 +22,7 @@ export class TransactionService {
     failureReason,
     fees,
     entryType,
+    bankDetails,
   }: {
     refId: string;
     toronetTxId: string;
@@ -34,6 +36,7 @@ export class TransactionService {
     failureReason?: string;
     fees?: number;
     entryType: "DEBIT" | "CREDIT";
+    bankDetails?: BankDetails;
   }) {
     // Determine entry type based on transaction type
     // let entryType: "DEBIT" | "CREDIT" | undefined;
@@ -63,6 +66,7 @@ export class TransactionService {
       ...(toUser && { toUser }),
       ...(failureReason && { failureReason }),
       ...(entryType && { entryType }),
+      ...(bankDetails && { bankDetails }),
     });
 
     return transaction;
@@ -216,6 +220,7 @@ export class TransactionService {
     amount,
     fromUser,
     failureReason,
+    bankDetails,
   }: {
     refId: string;
     toronetTxId: string;
@@ -224,6 +229,7 @@ export class TransactionService {
     amount: number;
     fromUser: Types.ObjectId;
     failureReason?: string;
+    bankDetails: BankDetails;
   }) {
     const params: any = {
       refId,
@@ -235,6 +241,7 @@ export class TransactionService {
       totalAmount: amount,
       fromUser,
       entryType: "DEBIT",
+      bankDetails,
     };
 
     if (failureReason) {

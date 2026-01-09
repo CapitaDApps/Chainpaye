@@ -316,6 +316,12 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
                     refId: withdrawalResp.data?.paymentReference!,
                     toronetTxId: withdrawalResp.data?.paymentReference!,
                     currency: "NGN",
+                    bankDetails: {
+                      accountName,
+                      bankName: chosenBank.title,
+                      accountNumber,
+                      routingNumber: chosenBank.id,
+                    },
                   });
                   // whatsappBusinessService.sendVideoContent(
                   //   phone,
@@ -337,6 +343,12 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
                     toronetTxId: "",
                     currency: "NGN",
                     failureReason: withdrawalResp.message,
+                    bankDetails: {
+                      accountName,
+                      bankName: chosenBank.title,
+                      accountNumber,
+                      routingNumber: chosenBank.id,
+                    },
                   });
                   whatsappBusinessService.sendNormalMessage(
                     withdrawalResp.message,
