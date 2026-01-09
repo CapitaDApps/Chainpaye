@@ -344,6 +344,11 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
               .catch((error) =>
                 console.log("Error processing withdrawal", error)
               );
+
+            return {
+              screen: "PROCESSING",
+              data: {},
+            };
           }
 
           case "NGN": {
@@ -469,6 +474,9 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
               data: {},
             };
           }
+
+          default:
+            throw new Error(`Invalid currency - ${currency}`);
         }
       }
     }
