@@ -748,7 +748,7 @@ export class ToronetService {
   }
 
   // TODO: Implement Withdrawal NGN
-  async withdrawNGN(data: {
+  async withdraw(data: {
     userAddress: string;
     password: string;
     amount: string;
@@ -846,11 +846,11 @@ export class ToronetService {
         },
         {
           name: "recipientstate",
-          value: "Lagos",
+          value: "",
         },
         {
           name: "recipientzip",
-          value: "11776",
+          value: "",
         },
         {
           name: "recipientphone",

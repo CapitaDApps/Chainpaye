@@ -75,6 +75,7 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
               data: {
                 currency,
                 banks: usdBanks,
+                acct_name_visible: true,
               },
             };
           case "NGN":
@@ -85,6 +86,7 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
               data: {
                 currency,
                 banks: ngnBanks,
+                acct_name_visible: false,
               },
             };
           default:
@@ -104,7 +106,6 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
         console.log({ bankCode });
         switch (currency) {
           case "USD":
-            // TODO: resolve usd bank account name
             const usdBanks = await toronetService.getBankListUSD();
             const chosenBank = usdBanks.find((bk) => bk.id == bankCode);
             if (!chosenBank) {
@@ -115,22 +116,20 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
                 },
               };
             }
-            const accountName = "";
-
-            if (!accountName)
+            if (!data.accountName) {
               return {
                 screen: "WITHDRAWAL_DETAILS",
                 data: {
-                  error_message:
-                    "Could not verify account name, check acct NO and try again.",
+                  error_message: "Account name is required",
                 },
               };
+            }
+            const accountName = data.accountName;
 
-            // const cbnCharge = Number(amount) >= 10000 ? 50 + 10 : 10;
-            // const toronetCharge = Number(amount) * 0.005; // 0.5%
-            // const chainpayeCharge = Number(amount) * 0.015; // 1.5%
-            // const totalAmount =
-            //   Number(amount) + cbnCharge + toronetCharge + chainpayeCharge;
+            const toronetCharge = Number(amount) * 0.005; // 0.5%
+            const chainpayeCharge = Number(amount) * 0.015; // 1.5%
+            const totalAmount =
+              Number(amount) + toronetCharge + chainpayeCharge;
 
             return {
               screen: "SUMMARY",
@@ -141,7 +140,7 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
                 resolvedAccountName: accountName,
                 resolvedBankName: chosenBank.title,
                 bankCode,
-                totalAmount: amount.toFixed(2),
+                totalAmount: totalAmount.toFixed(2),
               },
             };
 
@@ -169,10 +168,6 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
                     "Could not verify account name, check acct NO and try again.",
                 },
               };
-
-            // const { user, wallet } = await userService.getUserToroWallet(phone);
-
-            // const balanceNGN = await toronetService.getBalanceNGN(wallet.publicKey);
 
             const cbnCharge = Number(amount) >= 10000 ? 50 + 10 : 10;
             const toronetCharge = Number(amount) * 0.005; // 0.5%
@@ -238,14 +233,117 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
         }
         switch (currency) {
           case "USD": {
-            // TODO: Implement withdrawal to USD
-            // No api to fetch user bank name currently
-            return {
-              screen: "PIN",
-              data: {
-                error_message: "USD withdrawal currently unavailable",
-              },
-            };
+            console.log({ bankCode });
+            const usdBanks = await toronetService.getBankListUSD();
+            const chosenBank = usdBanks.find((bk) => bk.id == bankCode);
+
+            if (!chosenBank) {
+              return {
+                screen: "PIN",
+                data: {
+                  error_message: "Selected bank not found",
+                },
+              };
+            }
+
+            const balanceUSD = await toronetService.getBalanceUSD(
+              wallet.publicKey
+            );
+
+            if (+balanceUSD.balance < +amount) {
+              return {
+                screen: "PIN",
+                data: {
+                  error_message: "Insufficient balance for withdrawal",
+                },
+              };
+            }
+
+            if (balanceUSD.balance < +totalAmount) {
+              return {
+                screen: "PIN",
+                data: {
+                  error_message: `Balance available is not enought to cover withdrwal amount plus fees.`,
+                },
+              };
+            }
+            const chainpayeCharge = Number(amount) * 0.015; // 1.5%
+            const withdrawalNanoId = nanoid();
+
+            toronetService
+              .withdraw({
+                userAddress: wallet.publicKey,
+                password: wallet.password,
+                bankName: chosenBank.title,
+                routingNo: chosenBank.id,
+                accountName,
+                accoountNo: accountNumber,
+                phoneNumber: phone,
+                amount,
+                currency,
+                fullName: `${user.firstName} ${user.lastName}`,
+              })
+              .then(async (withdrawalResp) => {
+                if (withdrawalResp.success) {
+                  toronetService
+                    .transferUSD(
+                      wallet.publicKey,
+                      "0xbdb182ac6b38fd8f4581ab21d29a50287d47a93c",
+                      chainpayeCharge.toString(),
+                      wallet.password
+                    )
+                    .catch((err) => console.log("Error sending fees", err));
+                  const tx = await TransactionService.recordWithdrawal({
+                    fromUser: user._id as Types.ObjectId,
+                    amount,
+                    status: TransactionStatus.COMPLETED,
+                    refId: withdrawalResp.data?.paymentReference!,
+                    toronetTxId: withdrawalResp.data?.paymentReference!,
+                    currency: "USD",
+                    bankDetails: {
+                      accountName,
+                      bankName: chosenBank.title,
+                      accountNumber,
+                      routingNumber: chosenBank.id,
+                    },
+                  });
+
+                  // Send receipt asynchronously
+                  await sendTransactionReceipt(
+                    (tx._id as Types.ObjectId).toString(),
+                    phone
+                  );
+                } else {
+                  const tx = await TransactionService.recordWithdrawal({
+                    fromUser: user._id as Types.ObjectId,
+                    amount,
+                    status: TransactionStatus.FAILED,
+                    refId: withdrawalNanoId,
+                    toronetTxId: "",
+                    currency: "USD",
+                    failureReason: withdrawalResp.message,
+                    bankDetails: {
+                      accountName,
+                      bankName: chosenBank.title,
+                      accountNumber,
+                      routingNumber: chosenBank.id,
+                    },
+                  });
+                  whatsappBusinessService.sendNormalMessage(
+                    withdrawalResp.message,
+                    phone
+                  );
+
+                  // Send receipt asynchronously for failed withdrawal
+                  await sendTransactionReceipt(
+                    (tx._id as Types.ObjectId).toString(),
+                    phone
+                  );
+                }
+              })
+              .catch((error) =>
+                console.log("Error processing withdrawal", error)
+              );
           }
 
           case "NGN": {
@@ -275,7 +373,7 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
               };
             }
 
-            if (balanceNGN.balance < totalAmount) {
+            if (balanceNGN.balance < +totalAmount) {
               return {
                 screen: "PIN",
                 data: {
@@ -287,7 +385,7 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
             const withdrawalNanoId = nanoid();
 
             toronetService
-              .withdrawNGN({
+              .withdraw({
                 userAddress: wallet.publicKey,
                 password: wallet.password,
                 bankName: chosenBank.title,
