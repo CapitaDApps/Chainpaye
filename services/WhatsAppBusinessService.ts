@@ -332,27 +332,17 @@ What can I do for you?
   }
 
   async sendOfframpInstructions(to: string) {
-    const message = `🪙 *Sell Crypto for Fiat*
+    const message = `🪙 Sell Crypto for Fiat
 
-To sell your crypto and receive fiat in your Chainpaye wallet, please specify:
+1. Supported Tokens:
+💲 USDC
+💲 USDT
 
-*Supported Cryptocurrencies:*
-• USDC - BNB Smart Chain, Solana, Ethereum, Polygon, Tron, Base
-• USDT - BNB Smart Chain, Solana, Ethereum, Polygon, Tron
+2. Supported Networks:
+🌐 BNB Smart Chain (BSC), Solana, Ethereum, Polygon, Tron, Base
 
-*How to specify what to sell:*
-Just send a message with the token and network. Here are some examples:
-• "usdc solana" or "usdc on solana"
-• "usdt ethereum" or "usdt on ethereum"
-• "usdc bsc" or "usdt bsc"
-
-*Supported Networks:*
-• BNB Smart Chain (BSC)
-• Solana (SOL)
-• Ethereum (ETH)
-• Polygon (POLY)
-• Tron (TRX)
-• Base
+To proceed, reply with Token and Network 
+Eg: USDC BASE
 
 What would you like to sell?`;
 
@@ -387,8 +377,7 @@ What would you like to sell?`;
       cryptoTopUpFlowId,
       cryptoTopUpScreenId,
       {
-        header: "Complete Off ramp",
-        body: `Copy address above 👆\n\n Send your ${token.toUpperCase()} on ${network.toUpperCase()} \n\n⚠️ Only send ${token.toUpperCase()} on ${network.toUpperCase()} network.
+        body: `*💸 Complete Off-Ramp*\n\n👆 Copy the address above.\n\n Please send ${token.toUpperCase()} on ${network.toUpperCase()} network \n\n⚠️ Warning: Sending on other networks will result in lost funds..
      
      `,
         cta: "Complete Off ramp",
