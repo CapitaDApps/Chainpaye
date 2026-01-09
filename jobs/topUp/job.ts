@@ -15,6 +15,7 @@ export async function processDepositHandler(job: Job<ProcessDeposit>) {
   const transactionId = job.attrs.data.transactionId;
   const endDate = job.attrs.endDate;
   const now = Date.now();
+  const JOB_INTERVAL = 30000; // 30secs
 
   const transaction = await Transaction.findOne({
     toronetTransactionId: transactionId,
@@ -43,7 +44,7 @@ export async function processDepositHandler(job: Job<ProcessDeposit>) {
     await agenda.cancel({ name: JobNames.PROCESS_DEPOSIT });
     return;
   }
-  if (endDate && now + 30000 > new Date(endDate).getTime()) {
+  if (endDate && now + JOB_INTERVAL > new Date(endDate).getTime()) {
     console.log("LAST RUN...");
     if (!result.success) {
       await whatsappBusinessService.sendNormalMessage(
