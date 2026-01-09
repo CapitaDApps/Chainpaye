@@ -52,7 +52,10 @@ function matchesTrigger(message: string, triggers: TriggerPhrase[]): boolean {
     }
     // For string triggers, check if the message contains the phrase
     // This handles both exact matches like "/balance" and natural phrases like "check my balance"
-    return normalizedMessage.includes(trigger.toLowerCase());
+    return (
+      normalizedMessage.includes(trigger.toLowerCase()) ||
+      trigger.toLowerCase().includes(normalizedMessage)
+    );
   });
 }
 
