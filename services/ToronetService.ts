@@ -757,6 +757,8 @@ export class ToronetService {
     accoountNo: string;
     accountName: string;
     phoneNumber: string;
+    currency: CurrencyType;
+    fullName: string;
   }) {
     const decryptedPassword = this.decrypt(data.password);
     const body = {
@@ -772,43 +774,43 @@ export class ToronetService {
         },
         {
           name: "currency",
-          value: "NGN",
+          value: data.currency,
         },
         {
           name: "token",
-          value: "NGN",
+          value: data.currency,
         },
         {
           name: "payername",
-          value: "Zab Alabs",
+          value: data.fullName,
         },
         {
           name: "payeremail",
-          value: "email@gmail.com",
+          value: "",
         },
         {
           name: "payeraddress",
-          value: "10 Peachtree Rd",
+          value: "",
         },
         {
           name: "payercity",
-          value: "Pear St",
+          value: "",
         },
         {
           name: "payerstate",
-          value: "DE",
+          value: "",
         },
         {
           name: "payercountry",
-          value: "US",
+          value: "",
         },
         {
           name: "payerzipcode",
-          value: "19801",
+          value: "",
         },
         {
           name: "payerphone",
-          value: "6313003000",
+          value: "",
         },
         {
           name: "description",
@@ -872,6 +874,8 @@ export class ToronetService {
       return {
         success: true,
         message: "Withdrawal successful",
+        data: withdrawResp.data.data as { paymentReference: string },
+        hash: withdrawResp.transaction as string,
       };
     }
 

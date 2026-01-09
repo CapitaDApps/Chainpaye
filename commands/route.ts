@@ -9,6 +9,7 @@ import {
   handleTransfer,
   handleOfframp,
   handleCryptoSellResponse,
+  handleSupport,
 } from "./handlers";
 
 /**
@@ -93,6 +94,8 @@ export async function commandRouteHandler(from: string, message: string) {
     await handleTransfer(from);
   } else if (matchingCommand === "offramp") {
     await handleOfframp(from);
+  } else if (matchingCommand === "support") {
+    await handleSupport(from);
   } else {
     try {
       await whatsappBusinessService.sendMenuMessageMyFlowId(from);

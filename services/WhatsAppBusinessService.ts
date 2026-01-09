@@ -453,6 +453,19 @@ Copy the account number below 👇
     }
   }
 
+  async sendSupportMessage(to: string) {
+    const message = `🆘 *Need Help?*
+
+For support, please DM our team:
+
+*📞 Brain:* +2348106535142
+*📞 Ben:* +2348130348865
+
+Our team is ready to assist you!`;
+
+    await this.sendNormalMessage(message, to);
+  }
+
   private async sendImageFlowById(
     to: string,
     flowId: string,

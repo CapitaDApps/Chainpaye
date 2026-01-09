@@ -101,6 +101,10 @@ const COMMANDS: Record<string, CommandConfig> = {
     description:
       "Offramp crypto to fiat and receive it in your chainpaye wallet",
   },
+  support: {
+    triggers: ["/support", "support", "help", "customer support", "helpdesk"],
+    description: "Get support contact information",
+  },
 };
 
 export { COMMANDS };

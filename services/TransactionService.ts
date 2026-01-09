@@ -20,6 +20,7 @@ export class TransactionService {
     toUser,
     failureReason,
     fees,
+    entryType,
   }: {
     refId: string;
     toronetTxId: string;
@@ -32,21 +33,22 @@ export class TransactionService {
     toUser?: Types.ObjectId;
     failureReason?: string;
     fees?: number;
+    entryType: "DEBIT" | "CREDIT";
   }) {
     // Determine entry type based on transaction type
-    let entryType: "DEBIT" | "CREDIT" | undefined;
-    if (
-      type === TransactionType.DEPOSIT ||
-      type === TransactionType.CONVERSION ||
-      type === TransactionType.DIRECT_TRANSFER
-    ) {
-      entryType = "CREDIT";
-    } else if (
-      type === TransactionType.TRANSFER ||
-      type === TransactionType.WITHDRAWAL
-    ) {
-      entryType = "DEBIT";
-    }
+    // let entryType: "DEBIT" | "CREDIT" | undefined;
+    // if (
+    //   type === TransactionType.DEPOSIT ||
+    //   type === TransactionType.CONVERSION ||
+    //   type === TransactionType.DIRECT_TRANSFER
+    // ) {
+    //   entryType = "CREDIT";
+    // } else if (
+    //   type === TransactionType.TRANSFER ||
+    //   type === TransactionType.WITHDRAWAL
+    // ) {
+    //   entryType = "DEBIT";
+    // }
 
     const transaction = await Transaction.create({
       referenceId: refId,
@@ -157,6 +159,7 @@ export class TransactionService {
       amount,
       totalAmount: amount,
       fromUser,
+      entryType: "CREDIT",
     };
 
     if (failureReason) {
@@ -195,6 +198,7 @@ export class TransactionService {
       totalAmount: amount,
       fromUser,
       fees,
+      entryType: "CREDIT",
     };
 
     if (failureReason) {
@@ -230,6 +234,7 @@ export class TransactionService {
       amount,
       totalAmount: amount,
       fromUser,
+      entryType: "DEBIT",
     };
 
     if (failureReason) {
@@ -267,6 +272,7 @@ export class TransactionService {
       amount,
       totalAmount: amount,
       fromUser,
+      entryType: "CREDIT",
     };
 
     if (failureReason) {
