@@ -298,7 +298,7 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
                     amount,
                     status: TransactionStatus.COMPLETED,
                     refId: withdrawalResp.data?.paymentReference!,
-                    toronetTxId: withdrawalResp.data?.paymentReference!,
+                    toronetTxId: `TXID_${withdrawalResp.hash}`,
                     currency: "USD",
                     bankDetails: {
                       accountName,
@@ -319,7 +319,7 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
                     amount,
                     status: TransactionStatus.FAILED,
                     refId: withdrawalNanoId,
-                    toronetTxId: "",
+                    toronetTxId: `TXID_${withdrawalNanoId}`,
                     currency: "USD",
                     failureReason: withdrawalResp.message,
                     bankDetails: {
@@ -417,7 +417,7 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
                     amount,
                     status: TransactionStatus.COMPLETED,
                     refId: withdrawalResp.data?.paymentReference!,
-                    toronetTxId: withdrawalResp.data?.paymentReference!,
+                    toronetTxId: `TXID_${withdrawalResp.hash}`,
                     currency: "NGN",
                     bankDetails: {
                       accountName,
@@ -443,7 +443,7 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
                     amount,
                     status: TransactionStatus.FAILED,
                     refId: withdrawalNanoId,
-                    toronetTxId: "",
+                    toronetTxId: `TXID_${withdrawalNanoId}`,
                     currency: "NGN",
                     failureReason: withdrawalResp.message,
                     bankDetails: {
