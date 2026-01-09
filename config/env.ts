@@ -8,7 +8,7 @@ import path from "path";
  */
 export function loadEnv(log: boolean = true): ReturnType<typeof dotenv.config> {
   const env = process.env.NODE_ENV || "development";
-  const envFile = env === "production" ? ".env" : ".env.development";
+  const envFile = env === "production" ? ".env" : ".env"; // TODO: replace with development ENVs
 
   const result = dotenv.config({ path: envFile });
 
