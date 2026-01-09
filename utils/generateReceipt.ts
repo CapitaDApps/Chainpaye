@@ -295,7 +295,7 @@ export async function generateReceipt(data: ReceiptData): Promise<string> {
       "--disable-dev-shm-usage", // Prevents memory crashes on low-RAM instances
       "--disable-gpu",
     ],
-    executablePath: "/usr/bin/google-chrome", // Specify path to Chromium on your server
+    executablePath: "/usr/bin/chromium-browser", // Specify path to Chromium on your server
   });
 
   try {
