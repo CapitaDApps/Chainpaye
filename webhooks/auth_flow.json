@@ -50,8 +50,8 @@
                 "label": "Date of Birth",
                 "name": "dob",
                 "required": true,
-                "max-date": "1900-01-01",
-                "min-date": "2050-01-01"
+                "min-date": "1900-01-01",
+                "max-date": "2050-01-01"
               },
               {
                 "type": "Footer",
@@ -110,14 +110,6 @@
               {
                 "type": "TextHeading",
                 "text": "Secure your account"
-              },
-              {
-                "type": "TextBody",
-                "text": "${data.error_message}",
-                "visible": "${data.error_message != null}",
-                "style": {
-                  "color": "#EF4444"
-                }
               },
               {
                 "type": "TextBody",
