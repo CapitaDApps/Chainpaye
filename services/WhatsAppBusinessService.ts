@@ -245,7 +245,7 @@ export class WhatsAppBusinessService {
   }
 
   async sendIntroMessageByFlowId(to: string) {
-    const introFlowId = "1218563533748666";
+    const introFlowId = "1435834141223250";
     const introInitScreedId = "PERSONAL_INFO";
     const link =
       "https://chainpaye-public.s3.us-east-1.amazonaws.com/chainpaye-img.jpg";
