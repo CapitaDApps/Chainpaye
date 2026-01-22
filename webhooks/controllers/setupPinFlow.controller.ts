@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
-import { getPinScreen } from "../services/pinFlow.service";
 import { flowMiddleware } from "../middlewares";
+import { getPinScreen } from "../services/pinFlow.service";
 
 export const setupPinFlow = flowMiddleware(
   async (req: Request, res: Response) => {
@@ -14,7 +14,7 @@ export const setupPinFlow = flowMiddleware(
   if (!isValidFlowToken(decryptedBody.flow_token)) {
     const error_response = {
       error_msg: `The message is no longer available`,
-    };
+    }
     return res
       .status(427)
       .send(
@@ -25,5 +25,5 @@ export const setupPinFlow = flowMiddleware(
 
     const screenResponse = await getPinScreen(decryptedBody);
     return screenResponse;
-  }
+  },
 );
