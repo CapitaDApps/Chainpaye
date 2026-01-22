@@ -24,6 +24,12 @@ export const userSetupScreen = async (decryptedBody: {
   flow_token: string;
 }) => {
   const { screen, data, version, action, flow_token } = decryptedBody;
+  console.log("DEBUG: userSetupScreen called", {
+    screen,
+    action,
+    flow_token,
+    data,
+  });
   const userService = new UserService();
   const whatsappBusinessService = new WhatsAppBusinessService();
   const toronetService = new ToronetService();
@@ -50,6 +56,7 @@ export const userSetupScreen = async (decryptedBody: {
   //   Get user phone number from Redis using flow_token
   // const userPhone = "+2348110236998";
   const userPhone = await redisClient.get(flow_token);
+  console.log("DEBUG: Redis get userPhone:", userPhone);
   const phone = userPhone?.startsWith("+") ? userPhone : `+${userPhone}`;
   // handle initial request when opening the flow
   if (action === "INIT") {
@@ -65,6 +72,7 @@ export const userSetupScreen = async (decryptedBody: {
     // handle the request based on the current screen
     switch (screen) {
       case "SECURITY_INFO":
+        console.log("DEBUG: Case SECURITY_INFO");
         try {
           if (!userPhone) {
             return {
@@ -80,6 +88,7 @@ export const userSetupScreen = async (decryptedBody: {
 
           // Validate PIN input
           if (!pin || pin.length < 4 || pin.length > 6) {
+            console.log("DEBUG: PIN validation failed (length)");
             return {
               screen: "SECURITY_INFO",
               data: {
@@ -98,6 +107,7 @@ export const userSetupScreen = async (decryptedBody: {
           }
 
           if (pin !== confirm_pin) {
+            console.log("DEBUG: PIN mismatch");
             return {
               screen: "SECURITY_INFO",
               data: {
@@ -109,6 +119,7 @@ export const userSetupScreen = async (decryptedBody: {
           const currentYear = new Date().getFullYear();
           const yr = Number(data.dob.split("-")[0]);
           if (currentYear - yr < 18) {
+            console.log("DEBUG: Age validation failed", { currentYear, yr });
             return {
               screen: "SECURITY_INFO",
               data: {
@@ -118,6 +129,7 @@ export const userSetupScreen = async (decryptedBody: {
           }
 
           const userCountry = getCountryCodeFromPhoneNumber(phone);
+          console.log("DEBUG: userCountry", userCountry);
 
           if (userCountry == "NG") {
             if (!data.bvn) {
@@ -130,7 +142,9 @@ export const userSetupScreen = async (decryptedBody: {
             }
           }
 
+          console.log("DEBUG: checking userService.getUser");
           const user = await userService.getUser(phone);
+          console.log("DEBUG: user found?", !!user);
 
           if (!user) {
             await userService.createUser({
@@ -142,6 +156,7 @@ export const userSetupScreen = async (decryptedBody: {
             await userService.getUserToroWallet(phone);
 
           if (data.bvn) {
+            console.log("DEBUG: Performing KYC with BVN");
             const kycResult = await toronetService.performKYC({
               firstName: data.first_name.trim(),
               lastName: data.last_name.trim(),
@@ -151,7 +166,9 @@ export const userSetupScreen = async (decryptedBody: {
               phoneNumber: phone,
             });
 
+            console.log("DEBUG: KYC Result", kycResult);
             if (!kycResult.success) {
+              console.warn("DEBUG: KYC Failed");
               return {
                 screen: "SECURITY_INFO",
                 data: {
@@ -172,7 +189,7 @@ export const userSetupScreen = async (decryptedBody: {
                 .then(async (user) => {
                   if (!user) {
                     throw new Error(
-                      `user with phone number - [${phone}] does not exist`
+                      `user with phone number - [${phone}] does not exist`,
                     );
                   }
                   // create virtual wallet
@@ -180,7 +197,7 @@ export const userSetupScreen = async (decryptedBody: {
                   const wallet = await Wallet.findOne({ userId });
                   if (!wallet)
                     throw new Error(
-                      `User with phone number - [${phone}] does not have a wallet`
+                      `User with phone number - [${phone}] does not have a wallet`,
                     );
                   await toronetService.createVirtualWalletNGN({
                     address: wallet.publicKey,
@@ -196,7 +213,7 @@ export const userSetupScreen = async (decryptedBody: {
               fullName: `${data.first_name} ${data.last_name}`,
             }),
             "EX",
-            3600
+            3600,
           );
 
           return {
@@ -215,6 +232,6 @@ export const userSetupScreen = async (decryptedBody: {
 
   console.error("Unhandled request body:", decryptedBody);
   throw new Error(
-    "Unhandled endpoint request. Make sure you handle the request action & screen logged above."
+    "Unhandled endpoint request. Make sure you handle the request action & screen logged above.",
   );
 };

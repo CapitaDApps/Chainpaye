@@ -2,12 +2,12 @@ import axios from "axios";
 import express, { Express } from "express";
 import helmet from "helmet";
 import { commandRouteHandler } from "../commands/route";
+import { loadEnv } from "../config/env";
 import { userService, whatsappBusinessService } from "../services";
 import { redisClient } from "../services/redis";
 import { userRateLimiter, verifyWebhookSignature } from "./middleware";
 import flowRouter from "./route/route";
 import { CustomReq } from "./types/request.type";
-import { loadEnv } from "../config/env";
 
 // Load environment variables
 loadEnv();
@@ -25,7 +25,7 @@ app.use(
       },
     },
     crossOriginEmbedderPolicy: false,
-  })
+  }),
 );
 
 app.use(
@@ -33,10 +33,10 @@ app.use(
     // store the raw request body to use it for signature verification
     verify: (req, res, buf, encoding) => {
       (req as CustomReq).rawBody = buf?.toString(
-        (encoding as BufferEncoding) || "utf8"
+        (encoding as BufferEncoding) || "utf8",
       );
     },
-  })
+  }),
 );
 
 const {
@@ -106,7 +106,7 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
   console.log("Incoming webhook message:", JSON.stringify(req.body, null, 2));
 
   const message = req.body.entry?.[0]?.changes[0]?.value?.messages?.[0];
-  const contact = req.body.entry[0].changes[0].value.contacts?.[0];
+  const contact = req.body.entry?.[0]?.changes?.[0]?.value?.contacts?.[0];
 
   if (message) {
     await readMessage(message.id);
@@ -122,6 +122,17 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
           if (!user || !user.firstName || !user.lastName || !user.isVerified) {
             await replyingMessage(message.id);
             // send welcome mesage
+            //             whatsappBusinessService.sendNormalMessage(
+            //               `Chainpaye💳 allows
+
+            // - Send & Receive money in 🇺🇸 USD, 🇪🇺 EUR, 🇬🇧 GBP 💸
+            //   ———————————————————
+            // - Generate payment links in 🇺🇸 USD, 🇪🇺 EUR, 🇬🇧 GBP, 🇳🇬NGN🔗-get paid faster 🤑
+            //   ———————————————————
+            // - Off-ramp crypto to fiat 🔄️ in under 50 seconds ⏱️
+            //   All within WhatsApp 📱 - simple & secure!`,
+            //               message.from,
+            //             );
             whatsappBusinessService.sendIntroMessageByFlowId(message.from);
           } else {
             // send other messages
@@ -143,7 +154,7 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
               const { payload } = message.button;
               await whatsappBusinessService.handleButtonPayload(
                 payload,
-                message.from
+                message.from,
               );
             }
 
@@ -152,14 +163,14 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
               const interactiveType = interactive.type;
               if (interactiveType == "nfm_reply") {
                 const responseJson = JSON.parse(
-                  interactive.nfm_reply.response_json
+                  interactive.nfm_reply.response_json,
                 );
                 console.log({ responseJson });
 
                 if (responseJson.type == "new-account") {
                   await replyingMessage(message.id);
                   const userAccount = await redisClient.get(
-                    `${responseJson.flow_token}_accountCreation`
+                    `${responseJson.flow_token}_accountCreation`,
                   );
                   let account: any;
                   if (userAccount) {
@@ -169,10 +180,10 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
                     `Hello *${
                       account.fullName || profile.name
                     }*, welcome to Chainpaye.`,
-                    message.from
+                    message.from,
                   );
                   await whatsappBusinessService.sendMenuMessageMyFlowId(
-                    message.from
+                    message.from,
                   );
                 }
               }

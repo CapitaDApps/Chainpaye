@@ -5,13 +5,13 @@
  */
 
 import axios from "axios";
-import { toronetService, userService, walletService } from ".";
-import { redisClient } from "./redis";
 import { v4 as uuidv4 } from "uuid";
+import { toronetService, userService, walletService } from ".";
+import { NormalizedNetworkType } from "../commands/types";
+import { CONSTANTS } from "../config/constants";
 import { User } from "../models/User";
 import { Wallet } from "../models/Wallet";
-import { CONSTANTS } from "../config/constants";
-import { NormalizedNetworkType } from "../commands/types";
+import { redisClient } from "./redis";
 
 type ButtonPayloadType =
   | "My Account"
@@ -164,7 +164,7 @@ export class WhatsAppBusinessService {
   async sendTemplateTextMessage(
     templateName: string,
     to: string,
-    templateLang: string
+    templateLang: string,
   ) {
     await axios({
       method: "POST",
@@ -191,7 +191,7 @@ export class WhatsAppBusinessService {
     templateName: string,
     to: string,
     templateLang: string,
-    bodyParameters?: any[]
+    bodyParameters?: any[],
   ) {
     const flowToken = uuidv4();
     await redisClient.set(flowToken, to, "EX", CONSTANTS.CACHE_24HRS); // Store flow_token for 1 hour
@@ -245,7 +245,7 @@ export class WhatsAppBusinessService {
   }
 
   async sendIntroMessageByFlowId(to: string) {
-    const introFlowId = "4356747454606025";
+    const introFlowId = "877248855237074";
     const introInitScreedId = "PERSONAL_INFO";
     const link =
       "https://chainpaye-public.s3.us-east-1.amazonaws.com/chainpaye-img.jpg";
@@ -287,7 +287,7 @@ What can I do for you?
 💸 /sendmoney — Instant transfer to other chainpaye users
 
 📜 /transactionhistory — View your past transactions`,
-      to
+      to,
     );
   }
 
@@ -353,7 +353,7 @@ What would you like to sell?`;
     to: string,
     token: string,
     network: NormalizedNetworkType,
-    address: string
+    address: string,
   ) {
     // Message 1: Send the deposit address
     // await this.sendNormalMessage(
@@ -380,12 +380,12 @@ What would you like to sell?`;
         body: `👆 Copy the address above.\n\n Please send ${token.toUpperCase()} on ${network.toUpperCase()} network \n\n⚠️ Warning: Sending on other networks will result in lost funds..
      `,
         cta: "Complete Off ramp",
-      }
+      },
     );
     await redisClient.set(
       `OFFRAMP_${to}`,
       JSON.stringify({ asset: token, network }),
-      "EX"
+      "EX",
     );
   }
 
@@ -462,7 +462,7 @@ Our team is ready to assist you!`;
       link: string;
       body: string;
       cta: string;
-    }
+    },
   ) {
     const flowToken = uuidv4();
     await redisClient.set(flowToken, to, "EX", CONSTANTS.CACHE_24HRS);
@@ -521,7 +521,7 @@ Our team is ready to assist you!`;
       header?: string;
       body: string;
       cta: string;
-    }
+    },
   ) {
     const flowToken = uuidv4();
     await redisClient.set(flowToken, to, "EX", CONSTANTS.CACHE_24HRS);
@@ -570,7 +570,7 @@ Our team is ready to assist you!`;
     } catch (error) {
       console.log(
         "error sending text only flow",
-        (error as { response: any }).response.data
+        (error as { response: any }).response.data,
       );
       throw error;
     }
@@ -618,7 +618,7 @@ Our team is ready to assist you!`;
           "receivepayments",
           to,
           "en",
-          params
+          params,
         );
         break;
       }

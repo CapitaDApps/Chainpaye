@@ -5,8 +5,8 @@
  */
 
 import { connectDatabase } from "./config/database";
-import { logger } from "./utils/logger";
 import { loadEnv } from "./config/env";
+import { logger } from "./utils/logger";
 import { app } from "./webhooks";
 
 // Load environment variables

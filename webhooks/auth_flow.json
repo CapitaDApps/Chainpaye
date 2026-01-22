@@ -1,0 +1,199 @@
+{
+  "version": "7.2",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "PERSONAL_INFO": ["SECURITY_INFO"],
+    "SECURITY_INFO": ["SUCCESSFUL"],
+    "SUCCESSFUL": []
+  },
+  "screens": [
+    {
+      "id": "PERSONAL_INFO",
+      "title": "Setup Account",
+      "data": {
+        "is_ng": {
+          "type": "boolean",
+          "__example__": true
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "personal_info_form",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Tell us about yourself"
+              },
+              {
+                "type": "TextBody",
+                "text": "Please enter your details exactly as they appear on your official ID."
+              },
+              {
+                "type": "TextInput",
+                "label": "First Name",
+                "name": "first_name",
+                "required": true,
+                "input-type": "text"
+              },
+              {
+                "type": "TextInput",
+                "label": "Last Name",
+                "name": "last_name",
+                "required": true,
+                "input-type": "text"
+              },
+              {
+                "type": "DatePicker",
+                "label": "Date of Birth",
+                "name": "dob",
+                "required": true,
+                "max-date": "1900-01-01",
+                "min-date": "2050-01-01"
+              },
+              {
+                "type": "Footer",
+                "label": "Continue",
+                "on-click-action": {
+                  "name": "navigate",
+                  "next": {
+                    "type": "screen",
+                    "name": "SECURITY_INFO"
+                  },
+                  "payload": {
+                    "first_name": "${form.first_name}",
+                    "last_name": "${form.last_name}",
+                    "dob": "${form.dob}",
+                    "is_ng": "${data.is_ng}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "SECURITY_INFO",
+      "title": "Security Setup",
+      "data": {
+        "first_name": {
+          "type": "string",
+          "__example__": "John"
+        },
+        "last_name": {
+          "type": "string",
+          "__example__": "Doe"
+        },
+        "dob": {
+          "type": "string",
+          "__example__": "1990-01-01"
+        },
+        "is_ng": {
+          "type": "boolean",
+          "__example__": true
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": "PINs do not match"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "security_form",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Secure your account"
+              },
+              {
+                "type": "TextBody",
+                "text": "${data.error_message}",
+                "visible": "${data.error_message != null}",
+                "style": {
+                  "color": "#EF4444"
+                }
+              },
+              {
+                "type": "TextBody",
+                "text": "Create a 4-6 digit PIN for transactions."
+              },
+              {
+                "type": "TextInput",
+                "label": "Create PIN",
+                "name": "pin",
+                "required": true,
+                "input-type": "password",
+                "helper-text": "4-6 digits"
+              },
+              {
+                "type": "TextInput",
+                "label": "Confirm PIN",
+                "name": "confirm_pin",
+                "required": true,
+                "input-type": "password"
+              },
+              {
+                "type": "TextInput",
+                "label": "BVN (Bank Verification Number)",
+                "name": "bvn",
+                "required": true,
+                "input-type": "number",
+                "visible": "${data.is_ng}",
+                "helper-text": "Required for Nigerian accounts"
+              },
+              {
+                "type": "Footer",
+                "label": "Complete Setup",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "first_name": "${data.first_name}",
+                    "last_name": "${data.last_name}",
+                    "dob": "${data.dob}",
+                    "pin": "${form.pin}",
+                    "confirm_pin": "${form.confirm_pin}",
+                    "bvn": "${form.bvn}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUCCESSFUL",
+      "title": "Account Created",
+      "terminal": true,
+      "success": true,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Welcome to Chainpaye!"
+          },
+          {
+            "type": "TextBody",
+            "text": "Your account has been successfully created. You can now close this window and start using Chainpaye."
+          },
+          {
+            "type": "Footer",
+            "label": "Done",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {}
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
