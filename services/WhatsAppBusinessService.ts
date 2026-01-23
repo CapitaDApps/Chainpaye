@@ -292,7 +292,7 @@ What can I do for you?
   }
 
   async sendTopUpFlowById(to: string) {
-    const topUpFlowId = "1513776869736922";
+    const topUpFlowId = "1228982802532634";
     const topUpScreenInitId = "TOPUP_WALLET";
     await this.sendTextOnlyFlowById(to, topUpFlowId, topUpScreenInitId, {
       header: "Top up Wallet",
@@ -302,7 +302,7 @@ What can I do for you?
   }
 
   async sendTransferFlowById(to: string) {
-    const transferFlowId = "1882173995991922";
+    const transferFlowId = "647986641709614";
     const transferScreenInitId = "TRANSFER";
     await this.sendTextOnlyFlowById(to, transferFlowId, transferScreenInitId, {
       header: "Transfer Money",
@@ -370,7 +370,7 @@ What would you like to sell?`;
     // );
 
     // Start the flow
-    const cryptoTopUpFlowId = "1672205394189200";
+    const cryptoTopUpFlowId = "2120763772043676";
     const cryptoTopUpScreenId = "OFFRAMP_INPUT";
     await this.sendTextOnlyFlowById(
       to,

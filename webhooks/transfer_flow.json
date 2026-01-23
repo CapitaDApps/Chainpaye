@@ -1,0 +1,270 @@
+{
+  "version": "7.2",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "TRANSFER": ["TRANSFER_CONFIRMATION"],
+    "TRANSFER_CONFIRMATION": ["PIN"],
+    "PIN": ["PROCESSING"],
+    "PROCESSING": []
+  },
+  "screens": [
+    {
+      "id": "TRANSFER",
+      "title": "Transfer Money",
+      "data": {
+        "currency": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            }
+          },
+          "__example__": [
+            {
+              "id": "1",
+              "title": "USD"
+            },
+            {
+              "id": "2",
+              "title": "NGN"
+            }
+          ]
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": "User not found"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "transfer_form",
+            "children": [
+              {
+                "type": "TextBody",
+                "text": "${data.error_message}",
+                "visible": "${data.error_message != null}",
+                "style": {
+                  "color": "#EF4444"
+                }
+              },
+              {
+                "type": "TextInput",
+                "label": "Account Number",
+                "name": "accountNumber",
+                "required": true,
+                "input-type": "text",
+                "helper-text": "Enter recipient's phone number"
+              },
+              {
+                "type": "TextInput",
+                "label": "Amount",
+                "name": "amount",
+                "required": true,
+                "input-type": "number"
+              },
+              {
+                "type": "Dropdown",
+                "label": "Currency",
+                "name": "currency",
+                "required": true,
+                "data-source": "${data.currency}"
+              },
+              {
+                "type": "Footer",
+                "label": "Next",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "accountNumber": "${form.accountNumber}",
+                    "amount": "${form.amount}",
+                    "currency": "${form.currency}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "TRANSFER_CONFIRMATION",
+      "title": "Confirm Transfer",
+      "data": {
+        "accountNumber": {
+          "type": "string",
+          "__example__": "+1234567890"
+        },
+        "amount": {
+          "type": "string",
+          "__example__": "100"
+        },
+        "currency": {
+          "type": "string",
+          "__example__": "USD"
+        },
+        "recipientName": {
+          "type": "string",
+          "__example__": "John Doe"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Review Transfer"
+          },
+          {
+            "type": "TextSubheading",
+            "text": "Recipient"
+          },
+          {
+            "type": "TextBody",
+            "text": "${data.recipientName}"
+          },
+          {
+            "type": "TextSubheading",
+            "text": "Account Number"
+          },
+          {
+            "type": "TextBody",
+            "text": "${data.accountNumber}"
+          },
+          {
+            "type": "TextSubheading",
+            "text": "Amount"
+          },
+          {
+            "type": "TextBody",
+            "text": "${data.amount} ${data.currency}"
+          },
+          {
+            "type": "Footer",
+            "label": "Confirm & Pay",
+            "on-click-action": {
+              "name": "navigate",
+              "next": {
+                "type": "screen",
+                "name": "PIN"
+              },
+              "payload": {
+                "accountNumber": "${data.accountNumber}",
+                "amount": "${data.amount}",
+                "currency": "${data.currency}",
+                "recipientName": "${data.recipientName}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "PIN",
+      "title": "Enter PIN",
+      "data": {
+        "accountNumber": {
+          "type": "string",
+          "__example__": "+1234567890"
+        },
+        "amount": {
+          "type": "string",
+          "__example__": "100"
+        },
+        "currency": {
+          "type": "string",
+          "__example__": "USD"
+        },
+        "recipientName": {
+          "type": "string",
+          "__example__": "John Doe"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": "Invalid PIN"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "pin_form",
+            "children": [
+              {
+                "type": "TextBody",
+                "text": "${data.error_message}",
+                "visible": "${data.error_message != null}",
+                "style": {
+                  "color": "#EF4444"
+                }
+              },
+              {
+                "type": "TextBody",
+                "text": "Enter your 4-6 digit PIN to confirm transfer of ${data.amount} ${data.currency} to ${data.recipientName}."
+              },
+              {
+                "type": "TextInput",
+                "label": "PIN",
+                "name": "pin",
+                "required": true,
+                "input-type": "password",
+                "helper-text": "Security PIN"
+              },
+              {
+                "type": "Footer",
+                "label": "Pay Now",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "pin": "${form.pin}",
+                    "accountNumber": "${data.accountNumber}",
+                    "amount": "${data.amount}",
+                    "currency": "${data.currency}",
+                    "recipientName": "${data.recipientName}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "PROCESSING",
+      "title": "Processing",
+      "terminal": true,
+      "success": true,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Transfer Processing"
+          },
+          {
+            "type": "TextBody",
+            "text": "Your transfer is being processed. You will receive a confirmation message shortly."
+          },
+          {
+            "type": "Footer",
+            "label": "Done",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {}
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
