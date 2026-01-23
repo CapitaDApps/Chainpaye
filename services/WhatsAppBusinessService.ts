@@ -322,7 +322,7 @@ What can I do for you?
   }
 
   async sendConvertFiatFlowById(to: string) {
-    const convertFlowId = "773377672429898";
+    const convertFlowId = "2075686363268728";
     const convertFlowScreen = "CONVERT_ENTRY";
     await this.sendTextOnlyFlowById(to, convertFlowId, convertFlowScreen, {
       header: "Convert Fiat",
