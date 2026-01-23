@@ -312,7 +312,7 @@ What can I do for you?
   }
 
   async sendWithdrawalFlowById(to: string) {
-    const withdrawFlowId = "1654062222645036";
+    const withdrawFlowId = "1373120947345936";
     const screenId = "WITHDRAWAL_CURRENCY";
     await this.sendTextOnlyFlowById(to, withdrawFlowId, screenId, {
       header: "Withdraw to Bank",

@@ -1,0 +1,157 @@
+{
+  "version": "7.2",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "OFFRAMP_INPUT": ["OFFRAMP_DETAILS"],
+    "OFFRAMP_DETAILS": ["PROCESSING"],
+    "PROCESSING": []
+  },
+  "screens": [
+    {
+      "id": "OFFRAMP_INPUT",
+      "title": "Enter Amount",
+      "data": {
+        "error_message": {
+          "type": "string",
+          "__example__": "Error"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "amount_form",
+            "children": [
+              {
+                "type": "TextBody",
+                "text": "${data.error_message}",
+                "visible": "${data.error_message != null}",
+                "style": {
+                  "color": "#EF4444"
+                }
+              },
+              {
+                "type": "TextBody",
+                "text": "Please enter the exact amount of crypto you sent."
+              },
+              {
+                "type": "TextInput",
+                "label": "Amount Sent",
+                "name": "amount",
+                "required": true,
+                "input-type": "number"
+              },
+              {
+                "type": "Footer",
+                "label": "Calculate",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "amount": "${form.amount}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "OFFRAMP_DETAILS",
+      "title": "Confirm Deposit",
+      "data": {
+        "sent_amount": {
+          "type": "string",
+          "__example__": "100"
+        },
+        "fee": {
+          "type": "string",
+          "__example__": "2.00"
+        },
+        "receive_amount": {
+          "type": "string",
+          "__example__": "98.00"
+        },
+        "network": {
+          "type": "string",
+          "__example__": "Polygon"
+        },
+        "asset": {
+          "type": "string",
+          "__example__": "USDC"
+        },
+        "transactionId": {
+          "type": "string",
+          "__example__": "tx_123"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Deposit Summary"
+          },
+          {
+            "type": "TextBody",
+            "text": "You Sent: ${data.sent_amount} ${data.asset}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Network: ${data.network}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Estimated Fee: ${data.fee} ${data.asset}"
+          },
+          {
+            "type": "TextBody",
+            "text": "You Receive: ${data.receive_amount} ${data.asset}",
+            "style": {
+              "fontWeight": "bold"
+            }
+          },
+          {
+            "type": "Footer",
+            "label": "Confirm Deposit",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "transactionId": "${data.transactionId}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "PROCESSING",
+      "title": "Processing",
+      "terminal": true,
+      "success": true,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Deposit Submitted"
+          },
+          {
+            "type": "TextBody",
+            "text": "We are verifying your deposit on the blockchain. You will be notified once the funds are credited to your wallet."
+          },
+          {
+            "type": "Footer",
+            "label": "Done",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {}
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
