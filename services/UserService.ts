@@ -1,13 +1,14 @@
 import argon2 from "argon2";
 import mongoose from "mongoose";
 import { nanoid } from "nanoid";
+import { walletService } from ".";
 import { User } from "../models/User";
 import { Wallet } from "../models/Wallet";
 import { getCountryCodeFromPhoneNumber } from "../utils/countryCodeMapping";
-import { walletService } from ".";
 
 type CreateUserType = {
   whatsappNumber: string;
+  pin: string;
 };
 
 type UpdateUserAfterBvnVerified = {
@@ -21,7 +22,7 @@ export class UserService {
   async getUser(phoneNumber: string, includePin = false) {
     phoneNumber = phoneNumber.startsWith("+") ? phoneNumber : `+${phoneNumber}`;
     const user = await User.findOne({ whatsappNumber: phoneNumber }).select(
-      `${includePin ? "+pin" : ""}`
+      `${includePin ? "+pin" : ""}`,
     );
     return user;
   }
@@ -29,7 +30,7 @@ export class UserService {
   async getUserToroWallet(
     phoneNumber: string,
     includePassword = false,
-    includePin = false
+    includePin = false,
   ) {
     const user = await this.getUser(phoneNumber, includePin);
     if (!user)
@@ -38,7 +39,7 @@ export class UserService {
     const userId = user.userId;
 
     const wallet = await Wallet.findOne({ userId }).select(
-      `${includePassword ? "+password" : ""}`
+      `${includePassword ? "+password" : ""}`,
     );
 
     if (!wallet)
@@ -55,29 +56,30 @@ export class UserService {
 
       // Extract country from phone number if not provided
       const extractedCountry = getCountryCodeFromPhoneNumber(
-        data.whatsappNumber
+        data.whatsappNumber,
       );
 
       if (!extractedCountry) {
         throw new Error(
-          `Could not determine country for phone number: ${data.whatsappNumber}`
+          `Could not determine country for phone number: ${data.whatsappNumber}`,
         );
       }
 
       const session = await mongoose.startSession();
       try {
         await session.withTransaction(async () => {
+          const pin = await argon2.hash(data.pin);
           await User.create(
             [
               {
                 whatsappNumber: data.whatsappNumber,
 
                 country: extractedCountry,
-
+                pin,
                 userId,
               },
             ],
-            { session }
+            { session },
           );
 
           await walletService.addWallet(
@@ -85,7 +87,7 @@ export class UserService {
               userId,
               country: extractedCountry,
             },
-            session
+            session,
           );
         });
       } catch (error) {
@@ -99,12 +101,12 @@ export class UserService {
 
   async updateUserAferBvnVerified(
     phoneNumber: string,
-    data: UpdateUserAfterBvnVerified
+    data: UpdateUserAfterBvnVerified,
   ) {
     const pin = await argon2.hash(data.pin);
     const u = await User.findOneAndUpdate(
       { whatsappNumber: phoneNumber },
-      { ...data, pin }
+      { ...data, pin },
     );
     return u;
   }

@@ -53,9 +53,15 @@ jobs:
           key: ${{ secrets.STAGEKEY }}
           script: |
             mkdir -p app
-            cat << 'EOF' > app/.env
-            ${{ secrets.DOT_ENV }}
-            EOF
+            # Only write .env if it does NOT exist
+            if [ ! -f app/.env ]; then
+              echo "Creating .env file..."
+              cat << 'EOF' > app/.env
+              ${{ secrets.DOT_ENV }}
+              EOF
+            else
+              echo ".env file already exists. Skipping..."
+            fi
 
       - name: Start up application with pm2
         uses: appleboy/ssh-action@v1.0.0

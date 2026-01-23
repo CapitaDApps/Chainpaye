@@ -149,6 +149,7 @@ export const userSetupScreen = async (decryptedBody: {
           if (!user) {
             await userService.createUser({
               whatsappNumber: phone,
+              pin: data.pin,
             });
           }
 
