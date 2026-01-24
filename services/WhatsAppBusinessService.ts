@@ -274,13 +274,13 @@ export class WhatsAppBusinessService {
 
 What can I do for you?
 
-💰 Deposit — Top up instantly! ⚡
+💰 Deposit — Top up instantly!
 
 💳 Offramp — Spend crypto anywhere.
  
-🌍 💸 Send — Pay friends in a flash using Whatsapp NO. 💨
+🌍 Send — Pay friends in a flash using Whatsapp NO.
 
-🏦 Withdraw — Cash out to your bank. 🏧`,
+🏦 Withdraw — Cash out to your bank.`,
       to,
     );
   }
