@@ -1,13 +1,13 @@
 import express, { Router } from "express";
-import { transferFlowController } from "../controllers/transferFlow.controller";
-import { setupPinFlow } from "../controllers/setupPinFlow.controller";
-import { topupFlow } from "../controllers/topUpFlow.controller";
-import { invoiceController } from "../controllers/invoice.controller";
-import { userSetup } from "../controllers/userSetup.controller";
-import { withdrawalFlow } from "../controllers/withdrawalFlow.controller";
-import { generateLinkFlow } from "../controllers/grl.controller";
 import { conversionFlow } from "../controllers/conversion.controller";
 import { cryptoTopupFlow } from "../controllers/cryptoTopUp.controller";
+import { generateLinkFlow } from "../controllers/grl.controller";
+import { invoiceController } from "../controllers/invoice.controller";
+import { setupPinFlow } from "../controllers/setupPinFlow.controller";
+import { topupFlow } from "../controllers/topUpFlow.controller";
+import { transferFlowController } from "../controllers/transferFlow.controller";
+import { userSetup } from "../controllers/userSetup.controller";
+import { withdrawalFlow } from "../controllers/withdrawalFlow.controller";
 
 const router: Router = express.Router();
 

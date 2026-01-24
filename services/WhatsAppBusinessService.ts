@@ -364,8 +364,8 @@ What would you like to sell?`;
     // );
 
     // Start the flow
-    const cryptoTopUpFlowId = "2120763772043676";
-    const cryptoTopUpScreenId = "OFFRAMP_INPUT";
+    const cryptoTopUpFlowId = "1372714300817702";
+    const cryptoTopUpScreenId = "OFFRAMP_DETAILS";
     await this.sendTextOnlyFlowById(
       to,
       cryptoTopUpFlowId,

@@ -1,5 +1,12 @@
 {
   "version": "6.0",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "OFFRAMP_DETAILS": ["OFFRAMP_FIAT_REVIEW"],
+    "OFFRAMP_FIAT_REVIEW": ["OFFRAMP_CRYPTO_REVIEW"],
+    "OFFRAMP_CRYPTO_REVIEW": ["OFFRAMP_SUCCESS"],
+    "OFFRAMP_SUCCESS": []
+  },
   "screens": [
     {
       "id": "OFFRAMP_DETAILS",
