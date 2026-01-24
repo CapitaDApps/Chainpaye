@@ -80,21 +80,24 @@ export const getTopUpScreen = async (decryptedBody: {
           };
         }
 
+        // Normalize currency to uppercase to match Transaction model enum
+        const currency = data.currency?.toUpperCase();
+
         const result = await walletService.deposit(
           phone,
           data.amount,
-          data.currency
+          currency,
         );
 
-        const is_usd = data.currency == "USD";
+        const is_usd = currency === "USD";
 
-        switch (data.currency) {
+        switch (currency) {
           case "USD":
             return {
               screen: "BANK_DETAILS",
               data: {
                 amount: Number(data.amount).toLocaleString(),
-                currency: data.currency,
+                currency: currency,
                 accountName: result.accountName,
                 bankName: result.bankName,
                 accountNumber: `${result.accountNumber}`,
@@ -108,7 +111,7 @@ export const getTopUpScreen = async (decryptedBody: {
               screen: "BANK_DETAILS",
               data: {
                 amount: Number(result.amount).toLocaleString(),
-                currency: data.currency,
+                currency: currency,
                 accountName: result.accountName,
                 bankName: result.bankName,
                 accountNumber: `${result.accountNumber}`,
@@ -146,6 +149,6 @@ export const getTopUpScreen = async (decryptedBody: {
 
   console.error("Unhandled request body:", decryptedBody);
   throw new Error(
-    "Unhandled endpoint request. Make sure you handle the request action & screen logged above."
+    "Unhandled endpoint request. Make sure you handle the request action & screen logged above.",
   );
 };
