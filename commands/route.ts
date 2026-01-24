@@ -3,17 +3,18 @@ import { COMMANDS, TriggerPhrase } from "./config";
 import {
   handleAccountInfo,
   handleConversion,
+  handleCryptoSellResponse,
+  handleOfframp,
+  handleSupport,
   handleTopUp,
   handleTransactionHistory,
-  handleWithdrawal,
   handleTransfer,
-  handleOfframp,
-  handleCryptoSellResponse,
-  handleSupport,
+  handleWithdrawal,
 } from "./handlers";
 
 /**
  * Checks if a message is a crypto sell request (e.g., "usdc solana", "usdt on ethereum")
+ * This has highest priority and is checked before other commands
  */
 function isCryptoSellRequest(message: string): boolean {
   const normalizedMessage = message.toLowerCase().trim();
@@ -22,12 +23,12 @@ function isCryptoSellRequest(message: string): boolean {
   const hasToken = /\b(usdc|usdt)\b/i.test(normalizedMessage);
   const hasNetwork =
     /\b(bsc|sol(ana)?|eth(ereum)?|poly(gon)?|tron?|base)\b/i.test(
-      normalizedMessage
+      normalizedMessage,
     );
 
   // Check if it has words like "sell", "cash out", "convert", "withdraw" or just token+network
   const hasActionWord = /^(sell|cash out|convert|withdraw)\s+/i.test(
-    normalizedMessage
+    normalizedMessage,
   );
 
   return (
@@ -38,43 +39,109 @@ function isCryptoSellRequest(message: string): boolean {
 }
 
 /**
- * Checks if a message matches any trigger phrase
- * @param message - The user's message (lowercased)
- * @param triggers - Array of trigger phrases (strings or regex)
- * @returns true if the message matches any trigger
+ * Calculates a match score for how well a message matches a trigger
+ * Higher score = better match
+ *
+ * Scoring:
+ * - 100: Exact match (message equals trigger exactly)
+ * - 80: Message starts with trigger (for slash commands)
+ * - 60: Message contains trigger as complete word(s)
+ * - 0: No match
+ *
+ * @param message - The user's message (lowercased and trimmed)
+ * @param trigger - The trigger phrase to match against
+ * @returns Match score (0-100)
  */
-function matchesTrigger(message: string, triggers: TriggerPhrase[]): boolean {
-  const normalizedMessage = message.toLowerCase().trim();
+function getMatchScore(message: string, trigger: TriggerPhrase): number {
+  if (trigger instanceof RegExp) {
+    return trigger.test(message) ? 60 : 0;
+  }
 
-  return triggers.some((trigger) => {
-    if (trigger instanceof RegExp) {
-      return trigger.test(normalizedMessage);
-    }
-    // For string triggers, check if the message contains the phrase
-    // This handles both exact matches like "/balance" and natural phrases like "check my balance"
-    return (
-      normalizedMessage.includes(trigger.toLowerCase()) ||
-      trigger.toLowerCase().includes(normalizedMessage)
-    );
-  });
+  const triggerLower = trigger.toLowerCase();
+
+  // Exact match - highest priority
+  if (message === triggerLower) {
+    return 100;
+  }
+
+  // Slash command match - message starts with the command
+  if (triggerLower.startsWith("/") && message.startsWith(triggerLower)) {
+    return 80;
+  }
+
+  // Word boundary match - trigger appears as complete word(s) in message
+  // This prevents "hi" matching "history" or "transaction" matching "transactionhistory"
+  const escapedTrigger = triggerLower.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const wordBoundaryRegex = new RegExp(`(^|\\s)${escapedTrigger}(\\s|$)`, "i");
+
+  if (wordBoundaryRegex.test(message)) {
+    return 60;
+  }
+
+  // Message is a substring of trigger (e.g., "balance" should match for "balance" trigger)
+  // Only if the message is at least 3 characters to avoid too short matches
+  if (message.length >= 3 && triggerLower.startsWith(message)) {
+    return 50;
+  }
+
+  // No match
+  return 0;
 }
 
 /**
- * Finds the matching command based on the user's message
+ * Finds the best matching command based on the user's message
+ * Uses priority and match scores to determine the best match
+ *
  * @param message - The user's message
  * @returns The command key or null if no match
  */
 function findMatchingCommand(message: string): string | null {
+  const normalizedMessage = message.toLowerCase().trim();
+
+  // Store all matches with their scores
+  const matches: Array<{
+    commandKey: string;
+    priority: number;
+    maxScore: number;
+  }> = [];
+
   for (const [commandKey, config] of Object.entries(COMMANDS)) {
-    if (matchesTrigger(message, config.triggers)) {
-      return commandKey;
+    let maxScore = 0;
+
+    // Find the best matching trigger for this command
+    for (const trigger of config.triggers) {
+      const score = getMatchScore(normalizedMessage, trigger);
+      if (score > maxScore) {
+        maxScore = score;
+      }
+    }
+
+    if (maxScore > 0) {
+      matches.push({
+        commandKey,
+        priority: config.priority ?? 0,
+        maxScore,
+      });
     }
   }
-  return null;
+
+  if (matches.length === 0) {
+    return null;
+  }
+
+  // Sort by: 1) match score (higher first), 2) priority (higher first)
+  matches.sort((a, b) => {
+    if (b.maxScore !== a.maxScore) {
+      return b.maxScore - a.maxScore;
+    }
+    return b.priority - a.priority;
+  });
+
+  return matches[0]?.commandKey ?? "menu";
 }
 
 export async function commandRouteHandler(from: string, message: string) {
-  // Check if this is a crypto sell request first (before checking commands)
+  // Check if this is a crypto sell request first (highest priority)
   if (isCryptoSellRequest(message)) {
     await handleCryptoSellResponse(from, message);
     return;
@@ -82,31 +149,62 @@ export async function commandRouteHandler(from: string, message: string) {
 
   const matchingCommand = findMatchingCommand(message);
 
-  // routing logic here
-  if (matchingCommand === "myAccount") {
-    await handleAccountInfo(from);
-  } else if (matchingCommand === "withdraw") {
-    await handleWithdrawal(from);
-  } else if (matchingCommand === "convert") {
-    await handleConversion(from);
-  } else if (matchingCommand === "transactionHistory") {
-    await handleTransactionHistory(from);
-  } else if (matchingCommand === "deposit") {
-    await handleTopUp(from);
-  } else if (matchingCommand === "transfer") {
-    await handleTransfer(from);
-  } else if (matchingCommand === "offramp") {
-    await handleOfframp(from);
-  } else if (matchingCommand === "support") {
-    await handleSupport(from);
-  } else {
-    try {
-      await whatsappBusinessService.sendMenuMessageMyFlowId(from);
-    } catch (err) {
-      console.log(
-        "Error sending intro flow",
-        (err as { response: any }).response.data
-      );
-    }
+  // Route to the appropriate handler
+  switch (matchingCommand) {
+    case "menu":
+      // Greetings and navigation - show main menu
+      try {
+        await whatsappBusinessService.sendMenuMessageMyFlowId(from);
+      } catch (err) {
+        console.log(
+          "Error sending menu flow",
+          (err as { response: any }).response?.data,
+        );
+      }
+      break;
+
+    case "myAccount":
+      await handleAccountInfo(from);
+      break;
+
+    case "withdraw":
+      await handleWithdrawal(from);
+      break;
+
+    case "convert":
+      await handleConversion(from);
+      break;
+
+    case "transactionHistory":
+      await handleTransactionHistory(from);
+      break;
+
+    case "deposit":
+      await handleTopUp(from);
+      break;
+
+    case "transfer":
+      await handleTransfer(from);
+      break;
+
+    case "offramp":
+      await handleOfframp(from);
+      break;
+
+    case "support":
+      await handleSupport(from);
+      break;
+
+    default:
+      // No command matched - show the main menu
+      try {
+        await whatsappBusinessService.sendMenuMessageMyFlowId(from);
+      } catch (err) {
+        console.log(
+          "Error sending intro flow",
+          (err as { response: any }).response?.data,
+        );
+      }
+      break;
   }
 }
