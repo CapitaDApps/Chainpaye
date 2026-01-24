@@ -119,30 +119,19 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
         if (wa_id) {
           const user = await userService.getUser(`+${wa_id}`);
 
-          if (!user || !user.firstName || !user.lastName || !user.isVerified) {
+          // Check if user needs to complete registration (no profile info)
+          if (!user || !user.firstName || !user.lastName) {
             await replyingMessage(message.id);
-            // send welcome mesage
-            //             whatsappBusinessService.sendNormalMessage(
-            //               `Chainpaye💳 allows
-
-            // - Send & Receive money in 🇺🇸 USD, 🇪🇺 EUR, 🇬🇧 GBP 💸
-            //   ———————————————————
-            // - Generate payment links in 🇺🇸 USD, 🇪🇺 EUR, 🇬🇧 GBP, 🇳🇬NGN🔗-get paid faster 🤑
-            //   ———————————————————
-            // - Off-ramp crypto to fiat 🔄️ in under 50 seconds ⏱️
-            //   All within WhatsApp 📱 - simple & secure!`,
-            //               message.from,
-            //             );
+            // New user or incomplete profile - send registration flow
             whatsappBusinessService.sendIntroMessageByFlowId(message.from);
           } else {
-            // send other messages
+            // User has completed registration
+            // Handle text messages
             if (message.type == "text" && message.text.body) {
               await replyingMessage(message.id);
-              if (user.country == "NG" && !user.isVerified) {
-                whatsappBusinessService.sendIntroMessageByFlowId(message.from);
-                res.sendStatus(200);
-                return;
-              }
+
+              // Nigerian user without KYC - prompt for verification but still allow basic access
+              // They can still use the app, but some features may be limited
               const phone = message.from.startsWith("+")
                 ? message.from
                 : `+${message.from}`;
@@ -167,6 +156,7 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
                 );
                 console.log({ responseJson });
 
+                // Handle new account registration completion
                 if (responseJson.type == "new-account") {
                   await replyingMessage(message.id);
                   const userAccount = await redisClient.get(
@@ -176,10 +166,33 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
                   if (userAccount) {
                     account = JSON.parse(userAccount);
                   }
+
+                  // Send welcome message
                   await whatsappBusinessService.sendNormalMessage(
                     `Hello *${
-                      account.fullName || profile.name
-                    }*, welcome to Chainpaye.`,
+                      account?.fullName || profile.name
+                    }*, welcome to Chainpaye! 🎉`,
+                    message.from,
+                  );
+
+                  // If Nigerian user, prompt for KYC
+                  if (account?.needsKyc) {
+                    await whatsappBusinessService.sendNormalMessage(
+                      "To unlock all features (including bank withdrawals), please complete your BVN verification. Type 'verify' or 'kyc' to start.",
+                      message.from,
+                    );
+                  }
+
+                  await whatsappBusinessService.sendMenuMessageMyFlowId(
+                    message.from,
+                  );
+                }
+
+                // Handle KYC verification completion
+                if (responseJson.type == "kyc-complete") {
+                  await replyingMessage(message.id);
+                  await whatsappBusinessService.sendNormalMessage(
+                    "Your account has been fully verified! 🎉 You now have access to all Chainpaye features.",
                     message.from,
                   );
                   await whatsappBusinessService.sendMenuMessageMyFlowId(

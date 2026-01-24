@@ -325,6 +325,21 @@ What can I do for you?
     });
   }
 
+  /**
+   * Send KYC verification flow to Nigerian users
+   * This allows them to complete BVN verification
+   */
+  async sendKycFlowById(to: string) {
+    // TODO: Replace with actual KYC flow ID after uploading to Meta Business Suite
+    const kycFlowId = "1615914016243315";
+    const kycScreenId = "COUNTRY_SELECT";
+    await this.sendTextOnlyFlowById(to, kycFlowId, kycScreenId, {
+      header: "Verify Your Identity",
+      body: "Complete your BVN verification to unlock all Chainpaye features including bank withdrawals.",
+      cta: "Start Verification",
+    });
+  }
+
   async sendOfframpInstructions(to: string) {
     const message = `🪙 Sell Crypto for Fiat
 

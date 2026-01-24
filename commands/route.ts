@@ -191,6 +191,23 @@ export async function commandRouteHandler(from: string, message: string) {
       await handleOfframp(from);
       break;
 
+    case "kyc":
+      // KYC verification flow for Nigerian users
+      try {
+        await whatsappBusinessService.sendKycFlowById(from);
+      } catch (err) {
+        console.log(
+          "Error sending KYC flow",
+          (err as { response: any }).response?.data,
+        );
+        // Fallback message if flow fails
+        await whatsappBusinessService.sendNormalMessage(
+          "To complete your verification, please contact our support team.",
+          from,
+        );
+      }
+      break;
+
     case "support":
       await handleSupport(from);
       break;

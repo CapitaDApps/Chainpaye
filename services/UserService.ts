@@ -111,6 +111,40 @@ export class UserService {
     return u;
   }
 
+  /**
+   * Update user profile information (name, DOB) without PIN change
+   * Used during registration to save profile after user creation
+   */
+  async updateUserProfile(
+    phoneNumber: string,
+    data: { firstName: string; lastName: string; dob: string },
+  ) {
+    phoneNumber = phoneNumber.startsWith("+") ? phoneNumber : `+${phoneNumber}`;
+    const user = await User.findOneAndUpdate(
+      { whatsappNumber: phoneNumber },
+      {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        dob: data.dob,
+      },
+      { new: true },
+    );
+    return user;
+  }
+
+  /**
+   * Mark user as verified after successful KYC (BVN verification)
+   */
+  async markUserVerified(phoneNumber: string) {
+    phoneNumber = phoneNumber.startsWith("+") ? phoneNumber : `+${phoneNumber}`;
+    const user = await User.findOneAndUpdate(
+      { whatsappNumber: phoneNumber },
+      { isVerified: true },
+      { new: true },
+    );
+    return user;
+  }
+
   private generateUserId(): string {
     return nanoid();
   }

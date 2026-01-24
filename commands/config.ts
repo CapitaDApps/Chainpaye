@@ -537,6 +537,57 @@ const COMMANDS: Record<string, CommandConfig> = {
     description: "Get support contact information",
     priority: 2,
   },
+
+  // ============================================================
+  // KYC / VERIFICATION
+  // User wants to complete identity verification (BVN for Nigeria)
+  // ============================================================
+  kyc: {
+    triggers: [
+      // Slash commands
+      "/kyc",
+      "/verify",
+      "/verification",
+      "/bvn",
+
+      // KYC terms
+      "kyc",
+      "complete kyc",
+      "start kyc",
+      "do kyc",
+      "kyc verification",
+
+      // Verification terms
+      "verify",
+      "verify me",
+      "verify account",
+      "verify my account",
+      "verification",
+      "complete verification",
+      "start verification",
+      "identity verification",
+      "get verified",
+
+      // BVN specific
+      "bvn",
+      "enter bvn",
+      "add bvn",
+      "submit bvn",
+      "bvn verification",
+      "bank verification",
+      "bank verification number",
+
+      // Natural language
+      "i want to verify",
+      "how do i verify",
+      "unlock features",
+      "unlock all features",
+      "enable withdrawals",
+      "enable bank withdrawal",
+    ],
+    description: "Complete KYC/BVN verification to unlock all features",
+    priority: 5,
+  },
 };
 
 export { COMMANDS };

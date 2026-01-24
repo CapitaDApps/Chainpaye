@@ -1,10 +1,13 @@
-import { Wallet } from "../../models/Wallet";
 import { redisClient } from "../../services/redis";
-import { ToronetService } from "../../services/ToronetService";
 import { UserService } from "../../services/UserService";
 import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService";
 import { getCountryCodeFromPhoneNumber } from "../../utils/countryCodeMapping";
-import { formatDate } from "../utils/formatDate";
+
+// ============================================================
+// ACCOUNT SETUP FLOW SERVICE
+// Handles user registration without BVN (KYC done separately)
+// Flow: PERSONAL_INFO → COUNTRY_SELECT → SECURITY_INFO → SUCCESSFUL
+// ============================================================
 
 const countries = [
   { id: "NG", title: "Nigeria" },
@@ -30,10 +33,11 @@ export const userSetupScreen = async (decryptedBody: {
     flow_token,
     data,
   });
+
   const userService = new UserService();
   const whatsappBusinessService = new WhatsAppBusinessService();
-  const toronetService = new ToronetService();
-  // handle health check request
+
+  // Handle health check request
   if (action === "ping") {
     return {
       data: {
@@ -42,7 +46,7 @@ export const userSetupScreen = async (decryptedBody: {
     };
   }
 
-  // handle error notification
+  // Handle error notification
   if (data?.error) {
     console.warn("Received client error:", data);
     return {
@@ -53,24 +57,118 @@ export const userSetupScreen = async (decryptedBody: {
     };
   }
 
-  //   Get user phone number from Redis using flow_token
-  // const userPhone = "+2348110236998";
+  // Get user phone number from Redis using flow_token
   const userPhone = await redisClient.get(flow_token);
   console.log("DEBUG: Redis get userPhone:", userPhone);
   const phone = userPhone?.startsWith("+") ? userPhone : `+${userPhone}`;
-  // handle initial request when opening the flow
+
+  // Handle initial request when opening the flow
   if (action === "INIT") {
+    // Detect country from phone number
+    const detectedCountry = getCountryCodeFromPhoneNumber(phone);
     return {
       screen: "PERSONAL_INFO",
       data: {
-        is_ng: getCountryCodeFromPhoneNumber(phone) === "NG",
+        countries: countries,
+        default_country: detectedCountry || "NG",
       },
     };
   }
 
   if (action === "data_exchange") {
-    // handle the request based on the current screen
+    // Handle the request based on the current screen
     switch (screen) {
+      // --------------------------------------------------------
+      // PERSONAL_INFO → COUNTRY_SELECT
+      // User submits name and DOB
+      // --------------------------------------------------------
+      case "PERSONAL_INFO":
+        console.log("DEBUG: Case PERSONAL_INFO");
+        try {
+          const firstName = data.first_name?.trim();
+          const lastName = data.last_name?.trim();
+          const dob = data.dob;
+
+          // Validate required fields
+          if (!firstName || firstName.length < 2) {
+            return {
+              screen: "PERSONAL_INFO",
+              data: {
+                countries: countries,
+                default_country: data.country || "NG",
+                error_message: "Please enter a valid first name",
+              },
+            };
+          }
+
+          if (!lastName || lastName.length < 2) {
+            return {
+              screen: "PERSONAL_INFO",
+              data: {
+                countries: countries,
+                default_country: data.country || "NG",
+                error_message: "Please enter a valid last name",
+              },
+            };
+          }
+
+          // Age validation - must be 18+
+          const currentYear = new Date().getFullYear();
+          const birthYear = Number(dob.split("-")[0]);
+          if (currentYear - birthYear < 18) {
+            return {
+              screen: "PERSONAL_INFO",
+              data: {
+                countries: countries,
+                default_country: data.country || "NG",
+                error_message: "You must be 18 and above to use Chainpaye",
+              },
+            };
+          }
+
+          // Proceed to country selection
+          return {
+            screen: "COUNTRY_SELECT",
+            data: {
+              first_name: firstName,
+              last_name: lastName,
+              dob: dob,
+              countries: countries,
+              default_country: getCountryCodeFromPhoneNumber(phone) || "NG",
+            },
+          };
+        } catch (error) {
+          console.error("Error in PERSONAL_INFO screen:", error);
+          return {
+            screen: "PERSONAL_INFO",
+            data: {
+              countries: countries,
+              default_country: "NG",
+              error_message: "Something went wrong. Please try again.",
+            },
+          };
+        }
+
+      // --------------------------------------------------------
+      // COUNTRY_SELECT → SECURITY_INFO
+      // User confirms country
+      // --------------------------------------------------------
+      case "COUNTRY_SELECT":
+        console.log("DEBUG: Case COUNTRY_SELECT");
+        return {
+          screen: "SECURITY_INFO",
+          data: {
+            first_name: data.first_name,
+            last_name: data.last_name,
+            dob: data.dob,
+            country: data.country || "NG",
+          },
+        };
+
+      // --------------------------------------------------------
+      // SECURITY_INFO → SUCCESSFUL
+      // User creates PIN and account is created
+      // --------------------------------------------------------
       case "SECURITY_INFO":
         console.log("DEBUG: Case SECURITY_INFO");
         try {
@@ -78,140 +176,86 @@ export const userSetupScreen = async (decryptedBody: {
             return {
               screen: "SECURITY_INFO",
               data: {
-                error_message: "Session expired. Restart flow a new message",
+                first_name: data.first_name,
+                last_name: data.last_name,
+                dob: data.dob,
+                country: data.country,
+                error_message: "Session expired. Please restart the flow.",
               },
             };
           }
-          // validate pin
-          const pin = data.pin.trim();
-          const confirm_pin = data.confirm_pin.trim();
 
           // Validate PIN input
-          if (!pin || pin.length < 4 || pin.length > 6) {
-            console.log("DEBUG: PIN validation failed (length)");
+          const pin = data.pin?.trim();
+          const confirmPin = data.confirm_pin?.trim();
+
+          if (!pin || pin.length !== 4) {
             return {
               screen: "SECURITY_INFO",
               data: {
-                error_message: "PIN must be 4-6 digits long",
+                first_name: data.first_name,
+                last_name: data.last_name,
+                dob: data.dob,
+                country: data.country,
+                error_message: "PIN must be exactly 4 digits",
               },
             };
           }
 
-          if (isNaN(Number(pin)) || isNaN(Number(confirm_pin))) {
+          if (isNaN(Number(pin))) {
             return {
               screen: "SECURITY_INFO",
               data: {
-                error_message: "Invalid number pin passed. Please numbers only",
+                first_name: data.first_name,
+                last_name: data.last_name,
+                dob: data.dob,
+                country: data.country,
+                error_message: "PIN must contain numbers only",
               },
             };
           }
 
-          if (pin !== confirm_pin) {
-            console.log("DEBUG: PIN mismatch");
+          if (pin !== confirmPin) {
             return {
               screen: "SECURITY_INFO",
               data: {
+                first_name: data.first_name,
+                last_name: data.last_name,
+                dob: data.dob,
+                country: data.country,
                 error_message: "PINs do not match. Please try again.",
               },
             };
           }
 
-          const currentYear = new Date().getFullYear();
-          const yr = Number(data.dob.split("-")[0]);
-          if (currentYear - yr < 18) {
-            console.log("DEBUG: Age validation failed", { currentYear, yr });
-            return {
-              screen: "SECURITY_INFO",
-              data: {
-                error_message: "You must be 18 and above to use chainpaye",
-              },
-            };
-          }
+          // Check if user already exists
+          const existingUser = await userService.getUser(phone);
+          console.log("DEBUG: Existing user found?", !!existingUser);
 
-          const userCountry = getCountryCodeFromPhoneNumber(phone);
-          console.log("DEBUG: userCountry", userCountry);
-
-          if (userCountry == "NG") {
-            if (!data.bvn) {
-              return {
-                screen: "SECURITY_INFO",
-                data: {
-                  error_message: "Please enter your bvn",
-                },
-              };
-            }
-          }
-
-          console.log("DEBUG: checking userService.getUser");
-          const user = await userService.getUser(phone);
-          console.log("DEBUG: user found?", !!user);
-
-          if (!user) {
+          if (!existingUser) {
+            // Create new user WITHOUT KYC verification
             await userService.createUser({
               whatsappNumber: phone,
-              pin: data.pin,
+              pin: pin,
             });
+            console.log("DEBUG: User created successfully");
           }
 
-          const { wallet: userToroWallet } =
-            await userService.getUserToroWallet(phone);
+          // Update user with profile information
+          await userService.updateUserProfile(phone, {
+            firstName: data.first_name,
+            lastName: data.last_name,
+            dob: data.dob,
+          });
+          console.log("DEBUG: User profile updated");
 
-          if (data.bvn) {
-            console.log("DEBUG: Performing KYC with BVN");
-            const kycResult = await toronetService.performKYC({
-              firstName: data.first_name.trim(),
-              lastName: data.last_name.trim(),
-              bvn: data.bvn,
-              dob: formatDate(data.dob),
-              address: userToroWallet.publicKey,
-              phoneNumber: phone,
-            });
-
-            console.log("DEBUG: KYC Result", kycResult);
-            if (!kycResult.success) {
-              console.warn("DEBUG: KYC Failed");
-              return {
-                screen: "SECURITY_INFO",
-                data: {
-                  error_message: kycResult.message,
-                },
-              };
-            }
-
-            if (kycResult.success) {
-              // update user
-              userService
-                .updateUserAferBvnVerified(phone, {
-                  firstName: data.first_name,
-                  lastName: data.last_name,
-                  pin: data.pin,
-                  dob: formatDate(data.dob),
-                })
-                .then(async (user) => {
-                  if (!user) {
-                    throw new Error(
-                      `user with phone number - [${phone}] does not exist`,
-                    );
-                  }
-                  // create virtual wallet
-                  const userId = user.userId;
-                  const wallet = await Wallet.findOne({ userId });
-                  if (!wallet)
-                    throw new Error(
-                      `User with phone number - [${phone}] does not have a wallet`,
-                    );
-                  await toronetService.createVirtualWalletNGN({
-                    address: wallet.publicKey,
-                    fullName: `${data.first_name} ${data.last_name}`,
-                  });
-                });
-            }
-          }
-
-          redisClient.set(
+          // Store account creation info in Redis for welcome message
+          await redisClient.set(
             `${flow_token}_accountCreation`,
             JSON.stringify({
               fullName: `${data.first_name} ${data.last_name}`,
+              country: data.country,
+              needsKyc: data.country === "NG",
             }),
             "EX",
             3600,
@@ -219,14 +263,27 @@ export const userSetupScreen = async (decryptedBody: {
 
           return {
             screen: "SUCCESSFUL",
-            data: {},
+            data: {
+              first_name: data.first_name,
+              needs_kyc: data.country === "NG",
+            },
           };
         } catch (error) {
-          console.log("Error sending user creation request", error);
-          throw error;
+          console.error("Error in SECURITY_INFO screen:", error);
+          return {
+            screen: "SECURITY_INFO",
+            data: {
+              first_name: data.first_name,
+              last_name: data.last_name,
+              dob: data.dob,
+              country: data.country,
+              error_message: "Failed to create account. Please try again.",
+            },
+          };
         }
 
       default:
+        console.warn("Unhandled screen:", screen);
         return;
     }
   }
