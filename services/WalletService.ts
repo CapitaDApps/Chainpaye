@@ -240,6 +240,12 @@ export class WalletService {
     }
   }
 
+ async getUserWalletByUserId(userId: string) {
+  if (!userId) return null;
+  const wallet = await Wallet.findOne({ userId }).select("+password");
+  return wallet;
+}
+
   // TODO update wallet PIN
   async updatePin() {
     //  1. old and new pin. Old pin must be valid
@@ -253,4 +259,152 @@ export class WalletService {
   }
 
   // TODO Get Wallet INFO
+
+  /**
+   * Execute offramp transaction
+   * Transfers funds from user's wallet to custodial wallet, then to Dexpay wallet
+   */
+  async executeOfframp(
+    phoneNumber: string,
+    custodialWalletAddress: string,
+    amount: number,
+    quoteId: string,
+    blockchain: "SOL" | "BSC"
+  ) {
+    try {
+      const phone = phoneNumber.startsWith("+") ? phoneNumber : `+${phoneNumber}`;
+      const user = await User.findOne({ whatsappNumber: phone });
+      if (!user) {
+        return {
+          success: false,
+          message: `User with phone number - [${phone}] not found`,
+        };
+      }
+
+      const userWallet = await Wallet.findOne({ userId: user.userId }).select(
+        "+password"
+      );
+
+      if (!userWallet) {
+        return {
+          success: false,
+          message: `User with phone number - [${phone}] does not have a wallet`,
+        };
+      }
+
+      // Check balance before proceeding
+      const balanceResp = await this.toronetService.getBalanceUSD(
+        userWallet.publicKey
+      );
+
+      if (!balanceResp.result) {
+        return {
+          success: false,
+          message: "Error checking balance. Please try again.",
+        };
+      }
+
+      if (balanceResp.balance < amount) {
+        return {
+          success: false,
+          message: `Insufficient balance. Your balance is ${balanceResp.balance} USD.`,
+        };
+      }
+
+      // Step 1: Transfer funds from user's wallet to custodial wallet (USD)
+      const transferResult = await this.toronetService.transferUSD(
+        userWallet.publicKey,
+        custodialWalletAddress,
+        amount.toString(),
+        userWallet.password
+      );
+
+      if (!transferResult.result) {
+        return {
+          success: false,
+          message: `Failed to transfer funds to custodial wallet: ${transferResult.message || "Unknown error"}`,
+        };
+      }
+
+      // Step 2: Get Dexpay's wallet address
+      const { DexpayService } = await import("./DexpayService");
+      const dexpayService = new DexpayService();
+      const dexpayWalletAddress = dexpayService.getDexpayWalletAddress(blockchain);
+
+      // Step 3: Execute quote via Dexpay
+      // Note: In a real scenario, you might need to transfer from custodial wallet to Dexpay
+      // This would depend on how Crossmint handles transfers and how Dexpay expects the transaction
+      // For now, we're calling the executeQuote endpoint
+      const executeResult = await dexpayService.executeQuote(
+        quoteId,
+        custodialWalletAddress, // Source wallet (custodial wallet)
+        dexpayWalletAddress // Destination wallet (Dexpay's wallet)
+      );
+
+      if (!executeResult.success) {
+        return {
+          success: false,
+          message: executeResult.message || "Failed to execute quote with Dexpay",
+        };
+      }
+
+      return {
+        success: true,
+        message: `Offramp transaction completed successfully. Transaction ID: ${executeResult.transactionId || "N/A"}`,
+        transactionId: executeResult.transactionId,
+      };
+    } catch (error: any) {
+      console.error("Error executing offramp:", error);
+      return {
+        success: false,
+        message: error.message || "An error occurred processing offramp",
+      };
+    }
+  }
+
+  /**
+ * Attempt to locate a custodial wallet for a user for a specific blockchain.
+ * Tries multiple likely locations (Wallet collection, User.toronetWallet) and
+ * returns an object { address } or null if none found.
+ *
+ * This is intentionally defensive because different installations may store
+ * custodial wallet info in different shapes.
+ */
+ async findCustodialWalletForUser(userId: string, blockchain: "SOL" | "BSC") {
+  if (!userId) return null;
+
+  // 1) Try Wallet collection (common)
+  try {
+    const wallet = await Wallet.findOne({ userId }).select("+password");
+    if (wallet) {
+      // try several common field names for address
+      const address = (wallet as any).publicKey || (wallet as any).address || (wallet as any).walletAddress;
+      if (address) return { address };
+    }
+  } catch (err) {
+    // ignore and continue to next option
+  }
+
+  // 2) Try User record (some code stores toronetWallet on User)
+  try {
+    const user = await User.findOne({ userId }).lean();
+    if (user) {
+      const toronet = (user as any).toronetWallet;
+      if (toronet) {
+        const address = toronet.publicKey || toronet.address || toronet.walletAddress || toronet;
+        if (address) return { address };
+      }
+      // Also check custodialWallets map if present
+      const custodials = (user as any).custodialWallets;
+      if (custodials && custodials[blockchain]) {
+        const a = custodials[blockchain].address || custodials[blockchain].publicKey;
+        if (a) return { address: a };
+      }
+    }
+  } catch (err) {
+    // ignore
+  }
+
+  return null;
+}
 }

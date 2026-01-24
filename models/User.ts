@@ -21,6 +21,10 @@ export interface IUser extends Document {
   verificationCode?: string;
   verificationCodeExpires?: Date;
   pin: string;
+  custodialWallets?: {
+    sol?: string; // Solana custodial wallet address
+    bsc?: string; // BSC custodial wallet address
+  };
   createdAt: Date;
   updatedAt: Date;
   comparePin(candidatePin: string): Promise<boolean>;
@@ -91,6 +95,16 @@ const UserSchema: Schema = new Schema(
       required: true,
       select: false, // Don't include in queries by default
     },
+    custodialWallets: {
+      sol: {
+        type: String,
+        trim: true,
+      },
+      bsc: {
+        type: String,
+        trim: true,
+      },
+    },
   },
   {
     timestamps: true, // Automatically add createdAt and updatedAt
@@ -100,8 +114,8 @@ const UserSchema: Schema = new Schema(
 /**
  * Index for efficient queries
  */
-UserSchema.index({ whatsappNumber: 1 });
-UserSchema.index({ email: 1 });
+// UserSchema.index({ whatsappNumber: 1 });
+// UserSchema.index({ email: 1 });
 
 /**
  * Pre-save middleware to hash PIN
