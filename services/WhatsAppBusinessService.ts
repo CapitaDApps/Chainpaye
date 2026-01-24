@@ -274,19 +274,13 @@ export class WhatsAppBusinessService {
 
 What can I do for you?
 
-🏦 /banktransfer — Transfer from chainpaye wallet to bank accounts
+💰 Deposit — Top up instantly! ⚡
 
-💱 /convert — Convert between fiat currencies
+️ 💳 Offramp — Spend crypto anywhere.
+ 
+🌍 💸 Send — Pay friends in a flash using Whatsapp no. 💨
 
-💰 /deposit — Top up your Chainpaye wallet
-
-👤 /myaccount — View account details and balance
-
-🪙 /offramp — Crypto to fiat directly to your wallet
-
-💸 /sendmoney — Instant transfer to other chainpaye users
-
-📜 /transactionhistory — View your past transactions`,
+ 🏦 Withdraw — Cash out to your bank. 🏧`,
       to,
     );
   }
