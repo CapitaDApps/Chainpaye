@@ -7,7 +7,6 @@ import { DexpayService, BlockchainType as DexpayBlockchainType } from "../../ser
 import { computeOfframpCosts } from "../../utils/offrampMath"; 
 import { acquireQuoteLock, releaseQuoteLock } from "../../services/redisLock";
 import { OfframpExecutionService } from "../../services/OfframpExecutionService"; 
-import { OfframpExecution } from "../../models/OfframpExecution";
 
 export const getOfframpScreen = async (decryptedBody: {
   screen: string;
@@ -290,10 +289,11 @@ export const getOfframpScreen = async (decryptedBody: {
             data: {
               ngnAmount: Number(ngnAmountStr),
               quoteRate,
-              usd: costs.usd,
-              platformFee: costs.platformFee,
-              dexpayFee: costs.dexpayFee,
+              usd: costs.totalUsd,
+              platformFee: costs.platformFeeNgn,
+              dexpayFee: costs.dexpayFeeNgn,
               totalUsd: costs.totalUsd,
+              totalNgn: costs.totalNgn,
               message: "Confirm to proceed. You will be asked to enter your 4-digit PIN.",
             },
           };

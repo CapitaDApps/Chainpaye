@@ -1,12 +1,11 @@
 import { v4 as uuidv4 } from "uuid";
 import Decimal from "decimal.js";
-import OfframpExecution, { IOfframpExecution } from "../models/OfframpExecution";
 import { acquireQuoteLock, releaseQuoteLock } from "./redisLock";
 import { WalletService } from "./WalletService";
 import { DexpayService } from "./DexpayService";
 import { ToronetService } from "./ToronetService";
 import { WhatsAppBusinessService } from "./WhatsAppBusinessService";
-
+import { OfframpExecution } from "../models/OfframpExecution";
 /**
  * Orchestrates the off-ramp:
  * - idempotency check

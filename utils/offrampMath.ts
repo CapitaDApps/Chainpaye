@@ -11,6 +11,7 @@ import Decimal from "decimal.js";
  *
  * Returns values as decimal strings to preserve precision.
  */
+
 export function computeOfframpCosts(ngnAmount: number | string, quoteRate: number | string) {
   const ngn = new Decimal(ngnAmount);
   const rate = new Decimal(quoteRate);
@@ -19,15 +20,31 @@ export function computeOfframpCosts(ngnAmount: number | string, quoteRate: numbe
     throw new Error("Invalid quote rate");
   }
 
-  const usd = ngn.div(rate);
-  const platformFee = usd.mul(new Decimal(0.015)); // 1.5%
-  const dexpayFee = new Decimal(0.2);
-  const totalUsd = usd.plus(platformFee).plus(dexpayFee);
+  // 1. Calculate Base USD
+  const baseUsd = ngn.div(rate);
+
+  // 2. Fees in NGN (1.5%)
+  let platformFeeNgn = ngn.mul(0.015);
+  
+  // Example Cap: If fee > $10 USD (converted to NGN), cap it at $10 worth of NGN
+  const capNgn = rate.mul(10);
+  if (platformFeeNgn.gt(capNgn)) {
+    platformFeeNgn = capNgn;
+  }
+
+  // 3. Flat Fee ($0.20 converted to NGN)
+  const dexpayFeeNgn = rate.mul(0.2);
+
+  // 4. Totals
+  const totalNgn = ngn.plus(platformFeeNgn).plus(dexpayFeeNgn);
+  const totalUsd = totalNgn.div(rate);
 
   return {
-    usd: usd.toFixed(8),
-    platformFee: platformFee.gt(10) ? "10.00000000" : platformFee.toFixed(8),
-    dexpayFee: dexpayFee.toFixed(8),
+    ngnAmount: ngn.toFixed(2),
+    usdEquivalent: baseUsd.toFixed(8),
+    platformFeeNgn: platformFeeNgn.toFixed(2),
+    dexpayFeeNgn: dexpayFeeNgn.toFixed(2),
+    totalNgn: totalNgn.toFixed(2),
     totalUsd: totalUsd.toFixed(8),
   };
 }
