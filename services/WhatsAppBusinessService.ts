@@ -278,7 +278,7 @@ What can I do for you?
 
 ️ 💳 Offramp — Spend crypto anywhere.
  
-🌍 💸 Send — Pay friends in a flash using Whatsapp no. 💨
+🌍 💸 Send — Pay friends in a flash using Whatsapp NO. 💨
 
  🏦 Withdraw — Cash out to your bank. 🏧`,
       to,
