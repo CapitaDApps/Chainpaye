@@ -1,89 +1,149 @@
 {
-  "version": "7.2",
-  "data_api_version": "3.0",
-  "routing_model": {
-    "OFFRAMP_INPUT": ["OFFRAMP_DETAILS"],
-    "OFFRAMP_DETAILS": ["PROCESSING"],
-    "PROCESSING": []
-  },
+  "version": "6.0",
   "screens": [
     {
-      "id": "OFFRAMP_INPUT",
-      "title": "Enter Amount",
-      "data": {
-        "error_message": {
-          "type": "string",
-          "__example__": "Error"
-        }
-      },
+      "id": "OFFRAMP_DETAILS",
+      "title": "Off-Ramp (Sell Crypto)",
+      "data": {},
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
           {
-            "type": "Form",
-            "name": "amount_form",
-            "children": [
+            "type": "TextHeading",
+            "text": "Withdraw to Bank"
+          },
+          {
+            "type": "Dropdown",
+            "name": "currency",
+            "label": "Asset to Sell",
+            "required": true,
+            "data-source": [
               {
-                "type": "TextBody",
-                "text": "${data.error_message}",
-                "visible": "${data.error_message != null}",
-                "style": {
-                  "color": "#EF4444"
-                }
+                "id": "USDT",
+                "title": "Tether (USDT)"
               },
               {
-                "type": "TextBody",
-                "text": "Please enter the exact amount of crypto you sent."
-              },
-              {
-                "type": "TextInput",
-                "label": "Amount Sent",
-                "name": "amount",
-                "required": true,
-                "input-type": "number"
-              },
-              {
-                "type": "Footer",
-                "label": "Calculate",
-                "on-click-action": {
-                  "name": "data_exchange",
-                  "payload": {
-                    "amount": "${form.amount}"
-                  }
-                }
+                "id": "USDC",
+                "title": "USD Coin (USDC)"
               }
             ]
+          },
+          {
+            "type": "Dropdown",
+            "name": "network",
+            "label": "Select Network",
+            "required": true,
+            "data-source": [
+              {
+                "id": "TRC20",
+                "title": "Tron (TRC20)"
+              },
+              {
+                "id": "BEP20",
+                "title": "BNB Smart Chain (BEP20)"
+              },
+              {
+                "id": "SOL",
+                "title": "Solana (SOL)"
+              },
+              {
+                "id": "ERC20",
+                "title": "Ethereum (ERC20)"
+              },
+              {
+                "id": "BASE",
+                "title": "Base Network"
+              }
+            ]
+          },
+          {
+            "type": "Dropdown",
+            "name": "bank_name",
+            "label": "Select Bank",
+            "required": true,
+            "data-source": [
+              {
+                "id": "ACCESS",
+                "title": "Access Bank"
+              },
+              {
+                "id": "GTB",
+                "title": "GTBank"
+              },
+              {
+                "id": "ZENITH",
+                "title": "Zenith Bank"
+              },
+              {
+                "id": "OPAY",
+                "title": "Opay"
+              },
+              {
+                "id": "KUDA",
+                "title": "Kuda Bank"
+              }
+            ]
+          },
+          {
+            "type": "TextInput",
+            "name": "account_number",
+            "label": "Account Number",
+            "required": true,
+            "input-type": "text",
+            "helper-text": "Enter 10-digit account number"
+          },
+          {
+            "type": "TextInput",
+            "name": "sell_amount",
+            "label": "Amount",
+            "required": true,
+            "input-type": "text",
+            "helper-text": "Enter amount in NGN"
+          },
+          {
+            "type": "Footer",
+            "label": "Preview Withdrawal",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "currency": "${form.currency}",
+                "network": "${form.network}",
+                "sell_amount": "${form.sell_amount}",
+                "bank_name": "${form.bank_name}",
+                "account_number": "${form.account_number}"
+              }
+            }
           }
         ]
       }
     },
     {
-      "id": "OFFRAMP_DETAILS",
-      "title": "Confirm Deposit",
+      "id": "OFFRAMP_FIAT_REVIEW",
+      "title": "Recipient Overview",
       "data": {
-        "sent_amount": {
+        "currency": {
           "type": "string",
-          "__example__": "100"
-        },
-        "fee": {
-          "type": "string",
-          "__example__": "2.00"
-        },
-        "receive_amount": {
-          "type": "string",
-          "__example__": "98.00"
+          "__example__": "USDT"
         },
         "network": {
           "type": "string",
-          "__example__": "Polygon"
+          "__example__": "TRC20"
         },
-        "asset": {
+        "sell_amount": {
           "type": "string",
-          "__example__": "USDC"
+          "__example__": "100"
         },
-        "transactionId": {
+        "bank_name": {
           "type": "string",
-          "__example__": "tx_123"
+          "__example__": "GTBank"
+        },
+        "account_number": {
+          "type": "string",
+          "__example__": "0123456789"
+        },
+        "recipient_name": {
+          "type": "string",
+          "__example__": "Alice Smith"
         }
       },
       "layout": {
@@ -91,11 +151,23 @@
         "children": [
           {
             "type": "TextHeading",
-            "text": "Deposit Summary"
+            "text": "Review Details"
           },
           {
             "type": "TextBody",
-            "text": "You Sent: ${data.sent_amount} ${data.asset}"
+            "text": "Recipient: ${data.recipient_name}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Bank: ${data.bank_name}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Account: ${data.account_number}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Selling: ${data.sell_amount} ${data.currency}"
           },
           {
             "type": "TextBody",
@@ -103,22 +175,19 @@
           },
           {
             "type": "TextBody",
-            "text": "Estimated Fee: ${data.fee} ${data.asset}"
-          },
-          {
-            "type": "TextBody",
-            "text": "You Receive: ${data.receive_amount} ${data.asset}",
-            "style": {
-              "fontWeight": "bold"
-            }
+            "text": "Rate: 1 ${data.currency} = ₦1,650"
           },
           {
             "type": "Footer",
-            "label": "Confirm Deposit",
+            "label": "Proceed to Payment",
             "on-click-action": {
               "name": "data_exchange",
               "payload": {
-                "transactionId": "${data.transactionId}"
+                "sell_amount": "${data.sell_amount}",
+                "currency": "${data.currency}",
+                "network": "${data.network}",
+                "bank_name": "${data.bank_name}",
+                "account_number": "${data.account_number}"
               }
             }
           }
@@ -126,7 +195,94 @@
       }
     },
     {
-      "id": "PROCESSING",
+      "id": "OFFRAMP_CRYPTO_REVIEW",
+      "title": "Payment Authorization",
+      "data": {
+        "currency": {
+          "type": "string",
+          "__example__": "USDT"
+        },
+        "network": {
+          "type": "string",
+          "__example__": "TRC20"
+        },
+        "sell_amount": {
+          "type": "string",
+          "__example__": "100"
+        },
+        "bank_name": {
+          "type": "string",
+          "__example__": "GTBank"
+        },
+        "account_number": {
+          "type": "string",
+          "__example__": "0123456789"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": "Invalid PIN"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Authorize"
+          },
+          {
+            "type": "TextBody",
+            "text": "${data.error_message}",
+            "visible": "${data.error_message != null}",
+            "style": {
+              "color": "#EF4444"
+            }
+          },
+          {
+            "type": "TextBody",
+            "text": "Selling: ${data.sell_amount} ${data.currency}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Network: ${data.network}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Fee: 1.00 ${data.currency}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Enter PIN to Confirm"
+          },
+          {
+            "type": "TextInput",
+            "name": "pin",
+            "label": "4 Digit PIN",
+            "required": true,
+            "input-type": "password",
+            "min-chars": 4,
+            "max-chars": 4
+          },
+          {
+            "type": "Footer",
+            "label": "Sell & Withdraw",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "pin": "${form.pin}",
+                "sell_amount": "${data.sell_amount}",
+                "currency": "${data.currency}",
+                "network": "${data.network}",
+                "bank_name": "${data.bank_name}",
+                "account_number": "${data.account_number}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "OFFRAMP_SUCCESS",
       "title": "Processing",
       "terminal": true,
       "success": true,
@@ -136,18 +292,21 @@
         "children": [
           {
             "type": "TextHeading",
-            "text": "Deposit Submitted"
+            "text": "Funds are underway! 🚀"
           },
           {
             "type": "TextBody",
-            "text": "We are verifying your deposit on the blockchain. You will be notified once the funds are credited to your wallet."
+            "text": "Your withdrawal has been initiated. The funds usually hit the bank account in under 50 seconds."
           },
           {
             "type": "Footer",
             "label": "Done",
             "on-click-action": {
               "name": "complete",
-              "payload": {}
+              "payload": {
+                "status": "offramp_initiated",
+                "result": "success"
+              }
             }
           }
         ]
