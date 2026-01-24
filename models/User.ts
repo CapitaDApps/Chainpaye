@@ -13,21 +13,20 @@ import { IWallet } from "./Wallet";
 export interface IUser extends Document {
   whatsappNumber: string;
   userId: string;
-  fullName: string;
+  firstName?: string;
+  lastName?: string;
   email?: string;
   country: string;
   currency: "USD" | "NGN";
   isVerified: boolean;
   verificationCode?: string;
   verificationCodeExpires?: Date;
-  pin: string;
-  custodialWallets?: {
-    sol?: string; // Solana custodial wallet address
-    bsc?: string; // BSC custodial wallet address
-  };
+  pin?: string;
+  dob?: string;
   createdAt: Date;
   updatedAt: Date;
   comparePin(candidatePin: string): Promise<boolean>;
+  markVerified(): Promise<void>;
 }
 
 /**
@@ -47,9 +46,15 @@ const UserSchema: Schema = new Schema(
       required: true,
       unique: true,
     },
-    fullName: {
+
+    firstName: {
       type: String,
-      required: true,
+      trim: true,
+      maxlength: 150,
+    },
+
+    lastName: {
+      type: String,
       trim: true,
       maxlength: 150,
     },
@@ -95,15 +100,8 @@ const UserSchema: Schema = new Schema(
       required: true,
       select: false, // Don't include in queries by default
     },
-    custodialWallets: {
-      sol: {
-        type: String,
-        trim: true,
-      },
-      bsc: {
-        type: String,
-        trim: true,
-      },
+    dob: {
+      type: String,
     },
   },
   {
@@ -114,23 +112,24 @@ const UserSchema: Schema = new Schema(
 /**
  * Index for efficient queries
  */
-// UserSchema.index({ whatsappNumber: 1 });
-// UserSchema.index({ email: 1 });
-
+UserSchema.index({ whatsappNumber: 1 });
+UserSchema.index({ email: 1 });
 /**
  * Pre-save middleware to hash PIN
  */
-UserSchema.pre<IUser>("save", async function (next) {
-  // Only hash the PIN if it has been modified (or is new)
-  if (!this.isModified("pin")) return next();
+// UserSchema.pre<IUser>("save", async function (next) {
+//   // Only hash the PIN if it has been modified (or is new)
+//   if (!this.isModified("pin")) return next();
 
-  try {
-    this.pin = await argon2.hash(this.pin);
-    next();
-  } catch (error) {
-    next(error as Error);
-  }
-});
+//   try {
+//   if(this.pin){
+//       this.pin = await argon2.hash(this.pin);
+//   }
+//     next();
+//   } catch (error) {
+//     next(error as Error);
+//   }
+// });
 
 /**
  * Method to compare PIN for authentication
@@ -143,6 +142,10 @@ UserSchema.methods.comparePin = async function (
   } catch (error) {
     return false;
   }
+};
+
+UserSchema.methods.markVerified = async function () {
+  this.isVerified = true;
 };
 
 /**

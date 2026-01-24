@@ -1,51 +1,51 @@
-import { IUser, User } from "../models/User";
-import { ToronetService } from "./ToronetService";
-import mongoose, { Types } from "mongoose";
-import { WalletService } from "./WalletService";
-import { CurrencyType } from "../types/toronetService.types";
-import { Wallet } from "../models/Wallet";
-import { WhatsAppBusinessService } from "./WhatsAppBusinessService";
+import argon2 from "argon2";
+import mongoose from "mongoose";
 import { nanoid } from "nanoid";
+import { walletService } from ".";
+import { User } from "../models/User";
+import { Wallet } from "../models/Wallet";
+import { getCountryCodeFromPhoneNumber } from "../utils/countryCodeMapping";
 
 type CreateUserType = {
   whatsappNumber: string;
-  fullName: string;
-  countryCode: string;
   pin: string;
 };
 
+type UpdateUserAfterBvnVerified = {
+  pin: string;
+  firstName: string;
+  lastName: string;
+  dob: string;
+};
+
 export class UserService {
-  private toronetService: ToronetService;
-  private walletService: WalletService;
-  private whatsappBusinessService: WhatsAppBusinessService;
-
-  constructor() {
-    this.toronetService = new ToronetService();
-    this.walletService = new WalletService();
-    this.whatsappBusinessService = new WhatsAppBusinessService();
-  }
-
   async getUser(phoneNumber: string, includePin = false) {
     phoneNumber = phoneNumber.startsWith("+") ? phoneNumber : `+${phoneNumber}`;
     const user = await User.findOne({ whatsappNumber: phoneNumber }).select(
-      `${includePin ? "+pin" : ""}`
+      `${includePin ? "+pin" : ""}`,
     );
     return user;
   }
 
-  async getUserToroWallet(phoneNumber: string) {
-    const user = await this.getUser(phoneNumber);
+  async getUserToroWallet(
+    phoneNumber: string,
+    includePassword = false,
+    includePin = false,
+  ) {
+    const user = await this.getUser(phoneNumber, includePin);
     if (!user)
       throw new Error(`User with phone number - ${phoneNumber} not found`);
 
     const userId = user.userId;
 
-    const wallet = await Wallet.findOne({ userId });
+    const wallet = await Wallet.findOne({ userId }).select(
+      `${includePassword ? "+password" : ""}`,
+    );
 
     if (!wallet)
       throw new Error(`Wallet for user - ${phoneNumber} was not found`);
 
-    return wallet;
+    return { wallet, user };
   }
 
   async createUser(data: CreateUserType) {
@@ -53,25 +53,41 @@ export class UserService {
 
     if (!user) {
       const userId = this.generateUserId();
+
+      // Extract country from phone number if not provided
+      const extractedCountry = getCountryCodeFromPhoneNumber(
+        data.whatsappNumber,
+      );
+
+      if (!extractedCountry) {
+        throw new Error(
+          `Could not determine country for phone number: ${data.whatsappNumber}`,
+        );
+      }
+
       const session = await mongoose.startSession();
       try {
         await session.withTransaction(async () => {
+          const pin = await argon2.hash(data.pin);
           await User.create(
             [
               {
                 whatsappNumber: data.whatsappNumber,
-                fullName: data.fullName,
-                country: data.countryCode,
-                pin: data.pin,
+
+                country: extractedCountry,
+                pin,
                 userId,
               },
             ],
-            { session }
+            { session },
           );
 
-          await this.walletService.addWallet(
-            { userId, fullName: data.fullName },
-            session
+          await walletService.addWallet(
+            {
+              userId,
+              country: extractedCountry,
+            },
+            session,
           );
         });
       } catch (error) {
@@ -81,6 +97,52 @@ export class UserService {
         await session.endSession();
       }
     }
+  }
+
+  async updateUserAferBvnVerified(
+    phoneNumber: string,
+    data: UpdateUserAfterBvnVerified,
+  ) {
+    const pin = await argon2.hash(data.pin);
+    const u = await User.findOneAndUpdate(
+      { whatsappNumber: phoneNumber },
+      { ...data, pin },
+    );
+    return u;
+  }
+
+  /**
+   * Update user profile information (name, DOB) without PIN change
+   * Used during registration to save profile after user creation
+   */
+  async updateUserProfile(
+    phoneNumber: string,
+    data: { firstName: string; lastName: string; dob: string },
+  ) {
+    phoneNumber = phoneNumber.startsWith("+") ? phoneNumber : `+${phoneNumber}`;
+    const user = await User.findOneAndUpdate(
+      { whatsappNumber: phoneNumber },
+      {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        dob: data.dob,
+      },
+      { new: true },
+    );
+    return user;
+  }
+
+  /**
+   * Mark user as verified after successful KYC (BVN verification)
+   */
+  async markUserVerified(phoneNumber: string) {
+    phoneNumber = phoneNumber.startsWith("+") ? phoneNumber : `+${phoneNumber}`;
+    const user = await User.findOneAndUpdate(
+      { whatsappNumber: phoneNumber },
+      { isVerified: true },
+      { new: true },
+    );
+    return user;
   }
 
   private generateUserId(): string {

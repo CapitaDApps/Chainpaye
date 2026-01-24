@@ -1,0 +1,270 @@
+{
+  "version": "7.2",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "CONVERT_ENTRY": ["CONVERT_QUOTE"],
+    "CONVERT_QUOTE": ["PIN"],
+    "PIN": ["PROCESSING"],
+    "PROCESSING": []
+  },
+  "screens": [
+    {
+      "id": "CONVERT_ENTRY",
+      "title": "Convert Currency",
+      "data": {
+        "error_message": {
+          "type": "string",
+          "__example__": "Error"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "conversion_form",
+            "children": [
+              {
+                "type": "TextBody",
+                "text": "${data.error_message}",
+                "visible": "${data.error_message != null}",
+                "style": {
+                  "color": "#EF4444"
+                }
+              },
+              {
+                "type": "Dropdown",
+                "label": "From Currency",
+                "name": "fromCurrency",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "USD",
+                    "title": "USD"
+                  },
+                  {
+                    "id": "NGN",
+                    "title": "NGN"
+                  }
+                ]
+              },
+              {
+                "type": "Dropdown",
+                "label": "To Currency",
+                "name": "toCurrency",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "USD",
+                    "title": "USD"
+                  },
+                  {
+                    "id": "NGN",
+                    "title": "NGN"
+                  }
+                ]
+              },
+              {
+                "type": "TextInput",
+                "label": "Amount",
+                "name": "amount",
+                "required": true,
+                "input-type": "number",
+                "helper-text": "Enter amount to convert"
+              },
+              {
+                "type": "Footer",
+                "label": "Get Quote",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "fromCurrency": "${form.fromCurrency}",
+                    "toCurrency": "${form.toCurrency}",
+                    "amount": "${form.amount}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "CONVERT_QUOTE",
+      "title": "Conversion Quote",
+      "data": {
+        "fromCurrency": {
+          "type": "string",
+          "__example__": "USD"
+        },
+        "toCurrency": {
+          "type": "string",
+          "__example__": "NGN"
+        },
+        "amountToPay": {
+          "type": "string",
+          "__example__": "100"
+        },
+        "amountToReceive": {
+          "type": "string",
+          "__example__": "150000"
+        },
+        "exchangeRate": {
+          "type": "string",
+          "__example__": "1500"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Quote Details"
+          },
+          {
+            "type": "TextSubheading",
+            "text": "You Pay"
+          },
+          {
+            "type": "TextBody",
+            "text": "${data.amountToPay} ${data.fromCurrency}"
+          },
+          {
+            "type": "TextSubheading",
+            "text": "Exchange Rate"
+          },
+          {
+            "type": "TextBody",
+            "text": "1 ${data.fromCurrency} = ${data.exchangeRate} ${data.toCurrency}"
+          },
+          {
+            "type": "TextSubheading",
+            "text": "You Receive"
+          },
+          {
+            "type": "TextBody",
+            "text": "${data.amountToReceive} ${data.toCurrency}",
+            "style": {
+              "fontWeight": "bold"
+            }
+          },
+          {
+            "type": "Footer",
+            "label": "Confirm Conversion",
+            "on-click-action": {
+              "name": "navigate",
+              "next": {
+                "type": "screen",
+                "name": "PIN"
+              },
+              "payload": {
+                "fromCurrency": "${data.fromCurrency}",
+                "toCurrency": "${data.toCurrency}",
+                "amountToPay": "${data.amountToPay}",
+                "amountToReceive": "${data.amountToReceive}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "PIN",
+      "title": "Enter PIN",
+      "data": {
+        "fromCurrency": {
+          "type": "string",
+          "__example__": "USD"
+        },
+        "toCurrency": {
+          "type": "string",
+          "__example__": "NGN"
+        },
+        "amountToPay": {
+          "type": "string",
+          "__example__": "100"
+        },
+        "amountToReceive": {
+          "type": "string",
+          "__example__": "150000"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": "Invalid PIN"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "pin_form",
+            "children": [
+              {
+                "type": "TextBody",
+                "text": "${data.error_message}",
+                "visible": "${data.error_message != null}",
+                "style": {
+                  "color": "#EF4444"
+                }
+              },
+              {
+                "type": "TextBody",
+                "text": "Enter your PIN to confirm conversion of ${data.amountToPay} ${data.fromCurrency}."
+              },
+              {
+                "type": "TextInput",
+                "label": "PIN",
+                "name": "pin",
+                "required": true,
+                "input-type": "password"
+              },
+              {
+                "type": "Footer",
+                "label": "Convert",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "pin": "${form.pin}",
+                    "fromCurrency": "${data.fromCurrency}",
+                    "toCurrency": "${data.toCurrency}",
+                    "amountToPay": "${data.amountToPay}",
+                    "amountToReceive": "${data.amountToReceive}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "PROCESSING",
+      "title": "Processing",
+      "terminal": true,
+      "success": true,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Conversion Successful"
+          },
+          {
+            "type": "TextBody",
+            "text": "Your conversion has been processed successfully. Your account balance has been updated."
+          },
+          {
+            "type": "Footer",
+            "label": "Done",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {}
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

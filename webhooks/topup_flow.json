@@ -1,0 +1,207 @@
+{
+  "version": "7.2",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "TOPUP_WALLET": ["BANK_DETAILS"],
+    "BANK_DETAILS": ["PROCESSING"],
+    "PROCESSING": []
+  },
+  "screens": [
+    {
+      "id": "TOPUP_WALLET",
+      "title": "Top Up Wallet",
+      "data": {
+        "currencies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            }
+          },
+          "__example__": [
+            {
+              "id": "USD",
+              "title": "USD"
+            },
+            {
+              "id": "NGN",
+              "title": "NGN"
+            }
+          ]
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "topup_form",
+            "children": [
+              {
+                "type": "Dropdown",
+                "label": "Currency",
+                "name": "currency",
+                "required": true,
+                "data-source": "${data.currencies}"
+              },
+              {
+                "type": "TextInput",
+                "label": "Amount",
+                "name": "amount",
+                "required": true,
+                "input-type": "number",
+                "helper-text": "Enter amount (e.g. 100.00)"
+              },
+              {
+                "type": "Footer",
+                "label": "Next",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "currency": "${form.currency}",
+                    "amount": "${form.amount}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "BANK_DETAILS",
+      "title": "Make Transfer",
+      "data": {
+        "amount": {
+          "type": "string",
+          "__example__": "100.00"
+        },
+        "currency": {
+          "type": "string",
+          "__example__": "USD"
+        },
+        "accountName": {
+          "type": "string",
+          "__example__": "Chainpaye Ltd"
+        },
+        "bankName": {
+          "type": "string",
+          "__example__": "Chase Bank"
+        },
+        "accountNumber": {
+          "type": "string",
+          "__example__": "1234567890"
+        },
+        "routingNO": {
+          "type": "string",
+          "__example__": "021000021"
+        },
+        "is_usd": {
+          "type": "boolean",
+          "__example__": true
+        },
+        "transactionId": {
+          "type": "string",
+          "__example__": "tx_123"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Please transfer exactly"
+          },
+          {
+            "type": "TextSubheading",
+            "text": "${data.amount} ${data.currency}"
+          },
+          {
+            "type": "TextHeading",
+            "text": "To the account below:"
+          },
+          {
+            "type": "TextBody",
+            "text": "Bank Name"
+          },
+          {
+            "type": "TextSubheading",
+            "text": "${data.bankName}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Account Name"
+          },
+          {
+            "type": "TextSubheading",
+            "text": "${data.accountName}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Account Number"
+          },
+          {
+            "type": "TextSubheading",
+            "text": "${data.accountNumber}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Routing Number",
+            "visible": "${data.is_usd}"
+          },
+          {
+            "type": "TextSubheading",
+            "text": "${data.routingNO}",
+            "visible": "${data.is_usd}"
+          },
+          {
+            "type": "Footer",
+            "label": "I have transferred",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "transactionId": "${data.transactionId}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "PROCESSING",
+      "title": "Processing",
+      "terminal": true,
+      "success": true,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Processing deposit ⏳"
+          },
+          {
+            "type": "TextBody",
+            "text": "Deposits typically process in less than 2 minutes. You will receive a notification once successful ✅; otherwise, please check your balance manually to confirm the transaction 💰."
+          },
+          {
+            "type": "Footer",
+            "label": "Done",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {
+                "status": "deposit_initiated"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

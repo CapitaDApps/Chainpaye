@@ -1,0 +1,317 @@
+{
+  "version": "7.2",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "PERSONAL_INFO": ["COUNTRY_SELECT"],
+    "COUNTRY_SELECT": ["SECURITY_INFO"],
+    "SECURITY_INFO": ["SUCCESSFUL"],
+    "SUCCESSFUL": []
+  },
+  "screens": [
+    {
+      "id": "PERSONAL_INFO",
+      "title": "Setup Account",
+      "data": {
+        "countries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" }
+            }
+          },
+          "__example__": [
+            { "id": "NG", "title": "Nigeria" },
+            { "id": "US", "title": "United States" }
+          ]
+        },
+        "default_country": {
+          "type": "string",
+          "__example__": "NG"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "personal_info_form",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Tell us about yourself"
+              },
+              {
+                "type": "TextBody",
+                "text": "Please enter your details exactly as they appear on your official ID."
+              },
+              {
+                "type": "TextInput",
+                "label": "First Name",
+                "name": "first_name",
+                "required": true,
+                "input-type": "text"
+              },
+              {
+                "type": "TextInput",
+                "label": "Last Name",
+                "name": "last_name",
+                "required": true,
+                "input-type": "text"
+              },
+              {
+                "type": "DatePicker",
+                "label": "Date of Birth",
+                "name": "dob",
+                "required": true,
+                "min-date": "1900-01-01",
+                "max-date": "2010-01-01",
+                "helper-text": "You must be 18 or older"
+              },
+              {
+                "type": "EmbeddedLink",
+                "text": "${data.error_message}",
+                "visible": "${data.error_message}",
+                "on-click-action": {
+                  "name": "navigate",
+                  "next": {
+                    "type": "screen",
+                    "name": "PERSONAL_INFO"
+                  },
+                  "payload": {}
+                }
+              },
+              {
+                "type": "Footer",
+                "label": "Continue",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "first_name": "${form.first_name}",
+                    "last_name": "${form.last_name}",
+                    "dob": "${form.dob}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "COUNTRY_SELECT",
+      "title": "Select Country",
+      "data": {
+        "first_name": {
+          "type": "string",
+          "__example__": "John"
+        },
+        "last_name": {
+          "type": "string",
+          "__example__": "Doe"
+        },
+        "dob": {
+          "type": "string",
+          "__example__": "1990-01-01"
+        },
+        "countries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" }
+            }
+          },
+          "__example__": [{ "id": "NG", "title": "Nigeria" }]
+        },
+        "default_country": {
+          "type": "string",
+          "__example__": "NG"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "country_form",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Select your country"
+              },
+              {
+                "type": "TextBody",
+                "text": "Choose your country of residence."
+              },
+              {
+                "type": "Dropdown",
+                "label": "Country",
+                "name": "country",
+                "required": true,
+                "data-source": "${data.countries}",
+                "init-value": "${data.default_country}"
+              },
+              {
+                "type": "Footer",
+                "label": "Continue",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "first_name": "${data.first_name}",
+                    "last_name": "${data.last_name}",
+                    "dob": "${data.dob}",
+                    "country": "${form.country}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "SECURITY_INFO",
+      "title": "Security Setup",
+      "data": {
+        "first_name": {
+          "type": "string",
+          "__example__": "John"
+        },
+        "last_name": {
+          "type": "string",
+          "__example__": "Doe"
+        },
+        "dob": {
+          "type": "string",
+          "__example__": "1990-01-01"
+        },
+        "country": {
+          "type": "string",
+          "__example__": "NG"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "security_form",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Secure your account"
+              },
+              {
+                "type": "TextBody",
+                "text": "Create a 4-digit PIN for transactions. Keep this secure and don't share it."
+              },
+              {
+                "type": "TextInput",
+                "label": "Create PIN",
+                "name": "pin",
+                "required": true,
+                "input-type": "password",
+                "helper-text": "4 digits"
+              },
+              {
+                "type": "TextInput",
+                "label": "Confirm PIN",
+                "name": "confirm_pin",
+                "required": true,
+                "input-type": "password"
+              },
+              {
+                "type": "EmbeddedLink",
+                "text": "${data.error_message}",
+                "visible": "${data.error_message}",
+                "on-click-action": {
+                  "name": "navigate",
+                  "next": {
+                    "type": "screen",
+                    "name": "SECURITY_INFO"
+                  },
+                  "payload": {}
+                }
+              },
+              {
+                "type": "Footer",
+                "label": "Complete Setup",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "first_name": "${data.first_name}",
+                    "last_name": "${data.last_name}",
+                    "dob": "${data.dob}",
+                    "country": "${data.country}",
+                    "pin": "${form.pin}",
+                    "confirm_pin": "${form.confirm_pin}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUCCESSFUL",
+      "title": "Welcome!",
+      "terminal": true,
+      "success": true,
+      "data": {
+        "first_name": {
+          "type": "string",
+          "__example__": "John"
+        },
+        "needs_kyc": {
+          "type": "boolean",
+          "__example__": true
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Welcome to Chainpaye! 🎉"
+          },
+          {
+            "type": "TextBody",
+            "text": "Hi ${data.first_name}, your account has been created successfully!"
+          },
+          {
+            "type": "TextBody",
+            "text": "You can now send and receive money, convert currencies, and more.",
+            "visible": "${!data.needs_kyc}"
+          },
+          {
+            "type": "TextBody",
+            "text": "To unlock all features including bank withdrawals, please complete your BVN verification.",
+            "visible": "${data.needs_kyc}"
+          },
+          {
+            "type": "Footer",
+            "label": "Get Started",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {
+                "type": "new-account"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

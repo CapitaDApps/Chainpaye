@@ -1,0 +1,209 @@
+{
+  "version": "6.0",
+  "screens": [
+    {
+      "id": "REQUEST_RESET",
+      "title": "Reset PIN",
+      "terminal": false,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "🔐 Reset Your PIN"
+          },
+          {
+            "type": "TextBody",
+            "text": "We'll send a verification code to your registered phone number via SMS to confirm your identity."
+          },
+          {
+            "type": "TextCaption",
+            "text": "This process helps keep your account secure. Check your text messages for the code."
+          },
+          {
+            "type": "Footer",
+            "label": "Send Verification Code",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "action": "request_reset"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "VERIFY_OTP",
+      "title": "Enter Verification Code",
+      "terminal": false,
+      "data": {
+        "phone_number": {
+          "type": "string",
+          "__example__": "+1 234 567 8900"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "📱 Verification Code Sent"
+          },
+          {
+            "type": "TextBody",
+            "text": "We've sent a 6-digit verification code to ${data.phone_number} via SMS"
+          },
+          {
+            "type": "TextCaption",
+            "text": "The code expires in 10 minutes. Check your text messages (SMS)."
+          },
+          {
+            "type": "TextInput",
+            "name": "otp_code",
+            "label": "Enter 6-digit code",
+            "input-type": "number",
+            "required": true,
+            "helper-text": "Enter the code sent to your phone"
+          },
+          {
+            "type": "If",
+            "condition": "${data.error_message}",
+            "then": {
+              "type": "TextCaption",
+              "text": "❌ ${data.error_message}",
+              "color": "red"
+            }
+          },
+          {
+            "type": "Footer",
+            "label": "Verify Code",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "otp_code": "${form.otp_code}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "SET_NEW_PIN",
+      "title": "Set New PIN",
+      "terminal": false,
+      "data": {
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "🔒 Create New PIN"
+          },
+          {
+            "type": "TextBody",
+            "text": "Choose a secure 4-6 digit PIN for your transactions."
+          },
+          {
+            "type": "TextCaption",
+            "text": "Make it easy to remember but hard for others to guess."
+          },
+          {
+            "type": "TextInput",
+            "name": "new_pin",
+            "label": "New PIN",
+            "input-type": "password",
+            "required": true,
+            "helper-text": "4-6 digits only"
+          },
+          {
+            "type": "TextInput",
+            "name": "confirm_pin",
+            "label": "Confirm PIN",
+            "input-type": "password",
+            "required": true,
+            "helper-text": "Enter the same PIN again"
+          },
+          {
+            "type": "If",
+            "condition": "${data.error_message}",
+            "then": {
+              "type": "TextCaption",
+              "text": "❌ ${data.error_message}",
+              "color": "red"
+            }
+          },
+          {
+            "type": "Footer",
+            "label": "Update PIN",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "new_pin": "${form.new_pin}",
+                "confirm_pin": "${form.confirm_pin}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUCCESS",
+      "title": "PIN Reset Complete",
+      "terminal": true,
+      "data": {
+        "extension_message_response": {
+          "type": "object",
+          "properties": {
+            "params": {
+              "type": "object",
+              "properties": {
+                "flow_token": {
+                  "type": "string"
+                },
+                "optional_param1": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "✅ PIN Reset Successful"
+          },
+          {
+            "type": "TextBody",
+            "text": "Your PIN has been successfully updated! You can now use your new PIN for all transactions."
+          },
+          {
+            "type": "TextCaption",
+            "text": "Keep your PIN secure and don't share it with anyone."
+          },
+          {
+            "type": "Footer",
+            "label": "Done",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {}
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

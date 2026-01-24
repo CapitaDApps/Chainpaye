@@ -2,29 +2,27 @@ import { ClientSession, Document, mongo, Types } from "mongoose";
 import { Wallet } from "../models/Wallet";
 import { IUser, User } from "../models/User";
 import { ToronetService } from "./ToronetService";
-import { CurrencyType } from "../types/toronetService.types";
+import { CoinType, CurrencyType } from "../types/toronetService.types";
 import { TransactionService } from "./TransactionService";
 import {
   Transaction,
   TransactionStatus,
   TransactionType,
 } from "../models/Transaction";
+import { sendTransferReceipts } from "../utils/sendReceipt";
+import { toronetService, userService } from ".";
 
 export class WalletService {
-  private toronetService: ToronetService;
-  constructor() {
-    this.toronetService = new ToronetService();
-  }
-
   async addWallet(
-    { fullName, userId }: { userId: string; fullName: string },
+    { userId, country }: { userId: string; country: string },
     session: mongo.ClientSession
   ): Promise<void> {
     const wallet = await Wallet.findOne({ userId });
 
     if (!wallet) {
-      const toronetWallet = await this.toronetService.createWallet();
-      const wallet = await Wallet.create(
+      const toronetWallet = await toronetService.createWallet();
+      console.log({ toronetWallet });
+      await Wallet.create(
         [
           {
             userId,
@@ -34,13 +32,6 @@ export class WalletService {
         ],
         { session }
       );
-
-      await User.updateOne({ userId }, { toronetWallet: wallet }, { session });
-
-      await this.toronetService.createVirtualWalletNGN({
-        address: toronetWallet.walletAddress,
-        fullName,
-      });
     }
   }
 
@@ -50,15 +41,15 @@ export class WalletService {
     amount: number,
     currency: CurrencyType
   ) {
-    const user = await User.findOne({ whatsappNumber: `+${from}` });
-    if (!user) throw new Error(`User with phone number - [+${from}] not found`);
+    const user = await User.findOne({ whatsappNumber: from });
+    if (!user) throw new Error(`User with phone number - [${from}] not found`);
     const fromWallet = await Wallet.findOne({ userId: user.userId }).select(
       "+password"
     );
 
     if (!fromWallet)
       throw new Error(
-        `User with phone number - [+${from}] does not have a wallet`
+        `User with phone number - [${from}] does not have a wallet`
       );
 
     const toUser = await User.findOne({ whatsappNumber: to });
@@ -77,9 +68,12 @@ export class WalletService {
         `Could not find wallet for user with phone number - [${to}]`
       );
 
+    const senderFullName = `${user.firstName} ${user.lastName}`;
+    const fullName = `${toUser.firstName} ${toUser.lastName}`;
+
     switch (currency) {
       case "USD":
-        const respUSD = await this.toronetService.getBalanceUSD(
+        const respUSD = await toronetService.getBalanceUSD(
           fromWallet.publicKey
         );
 
@@ -94,7 +88,7 @@ export class WalletService {
             message: "Insufficient balance to make transfer",
           };
 
-        const transferRespUSD = await this.toronetService.transferUSD(
+        const transferRespUSD = await toronetService.transferUSD(
           fromWallet.publicKey,
           toWallet.publicKey,
           amount.toString(),
@@ -102,21 +96,59 @@ export class WalletService {
         );
 
         if (transferRespUSD.result) {
+          const txResult = await TransactionService.recordTransfer({
+            refId: transferRespUSD.transactionHash,
+            toronetTxId: transferRespUSD.transactionHash,
+            amount: amount,
+            fromUser: user._id as Types.ObjectId,
+            toUser: toUser._id as Types.ObjectId,
+            currency: "USD",
+            status: TransactionStatus.COMPLETED,
+          });
+
+          // Send receipts asynchronously
+          sendTransferReceipts(
+            (txResult.debit._id as Types.ObjectId).toString(),
+            (txResult.credit._id as Types.ObjectId).toString(),
+            from,
+            to
+          ).catch((err) => console.log("Error sending receipt", err));
+
           return {
             success: true,
             type: "transfer success",
-            message: `Transfer of ${amount}USD to ${to} was successful`,
+            message: `Transfer of ${amount} USD to ${fullName} was successful`,
+            messageTo: `You've received ${amount} USD from ${senderFullName}`,
           };
         } else {
+          const txResult = await TransactionService.recordTransfer({
+            refId: transferRespUSD.transactionHash,
+            toronetTxId: transferRespUSD.transactionHash,
+            amount: amount,
+            fromUser: user._id as Types.ObjectId,
+            toUser: toUser._id as Types.ObjectId,
+            currency: "USD",
+            status: TransactionStatus.FAILED,
+            failureReason: transferRespUSD.message,
+          });
+
+          // Send receipts asynchronously for failed transaction
+          sendTransferReceipts(
+            (txResult.debit._id as Types.ObjectId).toString(),
+            (txResult.credit._id as Types.ObjectId).toString(),
+            from,
+            to
+          ).catch((err) => console.log("Error sending receipt", err));
+
           return {
             success: false,
             type: "transfer failed",
-            message: `Transfer of ${amount}USD to ${to} was unsuccessful`,
+            message: `Transfer of ${amount}USD to ${fullName} was unsuccessful`,
           };
         }
 
       case "NGN":
-        const respNGN = await this.toronetService.getBalanceNGN(
+        const respNGN = await toronetService.getBalanceNGN(
           fromWallet.publicKey
         );
 
@@ -129,7 +161,7 @@ export class WalletService {
             message: "Insufficient balance to make transfer",
           };
 
-        const transferRespNGN = await this.toronetService.transferNGN(
+        const transferRespNGN = await toronetService.transferNGN(
           fromWallet.publicKey,
           toWallet.publicKey,
           amount.toString(),
@@ -137,16 +169,54 @@ export class WalletService {
         );
 
         if (transferRespNGN.result) {
+          const txResult = await TransactionService.recordTransfer({
+            refId: transferRespNGN.transactionHash,
+            toronetTxId: transferRespNGN.transactionHash,
+            amount: amount,
+            fromUser: user._id as Types.ObjectId,
+            toUser: toUser._id as Types.ObjectId,
+            currency: "NGN",
+            status: TransactionStatus.COMPLETED,
+          });
+
+          // Send receipts asynchronously
+          sendTransferReceipts(
+            (txResult.debit._id as Types.ObjectId).toString(),
+            (txResult.credit._id as Types.ObjectId).toString(),
+            from,
+            to
+          ).catch((err) => console.log("Error sending receipt", err));
+
           return {
             success: true,
             type: "transfer success",
-            message: `Transfer of ${amount}NGN to ${to} was successful`,
+            message: `Transfer of ${amount} NGN to ${fullName} was successful`,
+            messageTo: `You've received ${amount} NGN from ${senderFullName}`,
           };
         } else {
+          const txResult = await TransactionService.recordTransfer({
+            refId: transferRespNGN.transactionHash,
+            toronetTxId: transferRespNGN.transactionHash,
+            amount: amount,
+            fromUser: user._id as Types.ObjectId,
+            toUser: toUser._id as Types.ObjectId,
+            currency: "NGN",
+            status: TransactionStatus.FAILED,
+            failureReason: transferRespNGN.message,
+          });
+
+          // Send receipts asynchronously for failed transaction
+          sendTransferReceipts(
+            (txResult.debit._id as Types.ObjectId).toString(),
+            (txResult.credit._id as Types.ObjectId).toString(),
+            from,
+            to
+          ).catch((err) => console.log("Error sending receipt", err));
+
           return {
             success: false,
             type: "transfer failed",
-            message: `Transfer of ${amount}NGN to ${to} was unsuccessful`,
+            message: `Transfer of ${amount}NGN to ${fullName} was unsuccessful`,
           };
         }
 
@@ -170,7 +240,7 @@ export class WalletService {
         `User with phone number - [+${phoneNumber}] does not have a wallet`
       );
 
-    const data = await this.toronetService.initializeDeposit({
+    const data = await toronetService.initializeDeposit({
       receiverAddress: wallet.publicKey,
       amount,
       currency,
@@ -178,14 +248,48 @@ export class WalletService {
 
     console.log(data);
 
-    TransactionService.recordTransaction({
+    await TransactionService.recordDeposit({
       refId: data.refId,
       toronetTxId: data.transactionId,
       currency,
       status: TransactionStatus.PENDING,
       amount: +amount,
-      type: TransactionType.DEPOSIT,
-    }).catch((err) => console.log("transaction", err));
+      fromUser: user._id as Types.ObjectId,
+    });
+    return data;
+  }
+
+  async depositCrypto(phoneNumber: string, amount: string, currency: CoinType) {
+    console.log({ phoneNumber });
+    phoneNumber = phoneNumber.startsWith("+") ? phoneNumber : `+${phoneNumber}`;
+    console.log({ phoneNumber });
+
+    const { wallet: userToroWallet, user } =
+      await userService.getUserToroWallet(phoneNumber, true);
+
+    const data = await toronetService.initCryptoDeposit({
+      receiverAddress: userToroWallet.publicKey,
+      amount,
+      currency,
+      password: userToroWallet.password,
+    });
+
+    console.log(data);
+
+    // console.log("deposit crypto result", result);
+    const estimatedFees = Number(data.totalAmount) - Number(amount);
+
+    TransactionService.recordCryptoDeposit({
+      refId: data.refId,
+      toronetTxId: data.transactionId,
+      currency,
+      status: TransactionStatus.PENDING,
+      amount: +amount,
+      fromUser: user._id as Types.ObjectId,
+      fees: estimatedFees,
+    }).catch((error) =>
+      console.log("Error recording crypto transaction", error)
+    );
     return data;
   }
 
@@ -207,19 +311,32 @@ export class WalletService {
       };
     }
 
-    let statusResult = await this.toronetService.getTransactionStatus(
+    let statusResult = await toronetService.getTransactionStatus(
       transaction.toronetTransactionId!
     );
 
     let result: any;
 
     if (+statusResult.status == 0) {
-      result = await this.toronetService.recordTransaction(
+      result = await toronetService.recordTransaction(
         transaction.toronetTransactionId!,
         transaction.currency
       );
+      if (result.result) {
+        const st = await toronetService.getTransactionStatus(
+          transaction.toronetTransactionId!
+        );
+        if (st.status === 2) {
+          const data = st.data[0];
+          await Transaction.updateOne(
+            { toronetTransactionId: transactionId },
+            { amount: data.TX_Amount, totalAmount: data.TX_TotalAmount }
+          );
+        }
+      }
     } else {
       transaction.markAsCompleted();
+      transaction.save();
       return {
         success: true,
         message: `Transaction with id - [${transactionId}] has been processed successfully`,
@@ -228,9 +345,11 @@ export class WalletService {
 
     if (result.result) {
       transaction.markAsCompleted();
+      transaction.save();
+
       return {
         success: true,
-        message: `Transaction with id - [${transactionId}] has been processed successfully`,
+        message: `Deposit amount of ${transaction.amount} ${transaction.currency} has been processed successfully`,
       };
     } else {
       return {
@@ -240,11 +359,81 @@ export class WalletService {
     }
   }
 
- async getUserWalletByUserId(userId: string) {
-  if (!userId) return null;
-  const wallet = await Wallet.findOne({ userId }).select("+password");
-  return wallet;
-}
+  async checkCryptoTransactionStatus(transactionId: string) {
+    const transaction = await Transaction.findOne({
+      toronetTransactionId: transactionId,
+    });
+
+    if (!transaction)
+      return {
+        success: false,
+        message: `Transaction with id - [${transactionId}] was not found`,
+      };
+
+    if (transaction.status == TransactionStatus.COMPLETED) {
+      return {
+        success: true,
+        message: `Transaction with id - [${transactionId}] has been processed successfully`,
+      };
+    }
+
+    let statusResult = await toronetService.getTransactionStatus(
+      transaction.toronetTransactionId!
+    );
+
+    let result: any;
+
+    if (+statusResult.status == 0) {
+      result = await toronetService.recordCryptoTransaction(
+        transaction.toronetTransactionId!,
+        transaction.currency
+      );
+      if (result.result) {
+        const st = await toronetService.getTransactionStatus(
+          transaction.toronetTransactionId!
+        );
+        if (st.status === 2) {
+          const data = st.data[0];
+          await Transaction.updateOne(
+            { toronetTransactionId: transactionId },
+            { amount: data.TX_Amount, totalAmount: data.TX_TotalAmount }
+          );
+        }
+      }
+    } else {
+      transaction.markAsCompleted();
+      transaction.save();
+      return {
+        success: true,
+        message: `Transaction with id - [${transactionId}] has been processed successfully`,
+      };
+    }
+
+    if (result.result) {
+      transaction.markAsCompleted();
+      transaction.save();
+
+      return {
+        success: true,
+        message: `Deposit amount of ${transaction.amount} ${transaction.currency} has been processed successfully`,
+      };
+    } else {
+      return {
+        success: false,
+        message: `Transaction with id - [${transactionId}] still pending`,
+      };
+    }
+  }
+
+  async ngnBalance(address: string) {
+    const bal = await toronetService.getBalanceNGN(address);
+    return bal;
+  }
+
+  async usdBalance(address: string) {
+    const bal = await toronetService.getBalanceUSD(address);
+    return bal;
+  }
 
   // TODO update wallet PIN
   async updatePin() {
@@ -260,151 +449,46 @@ export class WalletService {
 
   // TODO Get Wallet INFO
 
-  /**
-   * Execute offramp transaction
-   * Transfers funds from user's wallet to custodial wallet, then to Dexpay wallet
-   */
-  async executeOfframp(
-    phoneNumber: string,
-    custodialWalletAddress: string,
-    amount: number,
-    quoteId: string,
-    blockchain: "SOL" | "BSC"
-  ) {
-    try {
-      const phone = phoneNumber.startsWith("+") ? phoneNumber : `+${phoneNumber}`;
-      const user = await User.findOne({ whatsappNumber: phone });
-      if (!user) {
-        return {
-          success: false,
-          message: `User with phone number - [${phone}] not found`,
-        };
-      }
-
-      const userWallet = await Wallet.findOne({ userId: user.userId }).select(
-        "+password"
-      );
-
-      if (!userWallet) {
-        return {
-          success: false,
-          message: `User with phone number - [${phone}] does not have a wallet`,
-        };
-      }
-
-      // Check balance before proceeding
-      const balanceResp = await this.toronetService.getBalanceUSD(
-        userWallet.publicKey
-      );
-
-      if (!balanceResp.result) {
-        return {
-          success: false,
-          message: "Error checking balance. Please try again.",
-        };
-      }
-
-      if (balanceResp.balance < amount) {
-        return {
-          success: false,
-          message: `Insufficient balance. Your balance is ${balanceResp.balance} USD.`,
-        };
-      }
-
-      // Step 1: Transfer funds from user's wallet to custodial wallet (USD)
-      const transferResult = await this.toronetService.transferUSD(
-        userWallet.publicKey,
-        custodialWalletAddress,
-        amount.toString(),
-        userWallet.password
-      );
-
-      if (!transferResult.result) {
-        return {
-          success: false,
-          message: `Failed to transfer funds to custodial wallet: ${transferResult.message || "Unknown error"}`,
-        };
-      }
-
-      // Step 2: Get Dexpay's wallet address
-      const { DexpayService } = await import("./DexpayService");
-      const dexpayService = new DexpayService();
-      const dexpayWalletAddress = dexpayService.getDexpayWalletAddress(blockchain);
-
-      // Step 3: Execute quote via Dexpay
-      // Note: In a real scenario, you might need to transfer from custodial wallet to Dexpay
-      // This would depend on how Crossmint handles transfers and how Dexpay expects the transaction
-      // For now, we're calling the executeQuote endpoint
-      const executeResult = await dexpayService.executeQuote(
-        quoteId,
-        custodialWalletAddress, // Source wallet (custodial wallet)
-        dexpayWalletAddress // Destination wallet (Dexpay's wallet)
-      );
-
-      if (!executeResult.success) {
-        return {
-          success: false,
-          message: executeResult.message || "Failed to execute quote with Dexpay",
-        };
-      }
-
-      return {
-        success: true,
-        message: `Offramp transaction completed successfully. Transaction ID: ${executeResult.transactionId || "N/A"}`,
-        transactionId: executeResult.transactionId,
-      };
-    } catch (error: any) {
-      console.error("Error executing offramp:", error);
-      return {
-        success: false,
-        message: error.message || "An error occurred processing offramp",
-      };
+  async getUserRecentTransactions(phone: string, limit: number = 10) {
+    const user = await User.findOne({ whatsappNumber: phone });
+    if (!user) {
+      throw new Error(`User with phone number - [${phone}] not found`);
     }
+
+    const transactions = await Transaction.find({
+      $or: [
+        // For TRANSFER transactions:
+        // Show DEBIT entries where user is the sender
+        {
+          type: TransactionType.TRANSFER,
+          entryType: "DEBIT",
+          fromUser: user._id,
+        },
+        // Show CREDIT entries where user is the receiver
+        {
+          type: TransactionType.TRANSFER,
+          entryType: "CREDIT",
+          toUser: user._id,
+        },
+        // For other transaction types (DEPOSIT, WITHDRAWAL, CONVERSION):
+        // Show all where user is the fromUser
+        {
+          type: {
+            $in: [
+              TransactionType.DEPOSIT,
+              TransactionType.WITHDRAWAL,
+              TransactionType.CONVERSION,
+              TransactionType.DIRECT_TRANSFER,
+            ],
+          },
+          fromUser: user._id,
+        },
+      ],
+    })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .populate("fromUser toUser", "firstName lastName whatsappNumber");
+
+    return transactions;
   }
-
-  /**
- * Attempt to locate a custodial wallet for a user for a specific blockchain.
- * Tries multiple likely locations (Wallet collection, User.toronetWallet) and
- * returns an object { address } or null if none found.
- *
- * This is intentionally defensive because different installations may store
- * custodial wallet info in different shapes.
- */
- async findCustodialWalletForUser(userId: string, blockchain: "SOL" | "BSC") {
-  if (!userId) return null;
-
-  // 1) Try Wallet collection (common)
-  try {
-    const wallet = await Wallet.findOne({ userId }).select("+password");
-    if (wallet) {
-      // try several common field names for address
-      const address = (wallet as any).publicKey || (wallet as any).address || (wallet as any).walletAddress;
-      if (address) return { address };
-    }
-  } catch (err) {
-    // ignore and continue to next option
-  }
-
-  // 2) Try User record (some code stores toronetWallet on User)
-  try {
-    const user = await User.findOne({ userId }).lean();
-    if (user) {
-      const toronet = (user as any).toronetWallet;
-      if (toronet) {
-        const address = toronet.publicKey || toronet.address || toronet.walletAddress || toronet;
-        if (address) return { address };
-      }
-      // Also check custodialWallets map if present
-      const custodials = (user as any).custodialWallets;
-      if (custodials && custodials[blockchain]) {
-        const a = custodials[blockchain].address || custodials[blockchain].publicKey;
-        if (a) return { address: a };
-      }
-    }
-  } catch (err) {
-    // ignore
-  }
-
-  return null;
-}
 }

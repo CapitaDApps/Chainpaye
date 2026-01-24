@@ -1,16 +1,18 @@
 import { Request } from "express";
 
 import crypto from "crypto";
-import dotenv from "dotenv";
+import { loadEnv } from "../../config/env";
 import { CustomReq } from "../types/request.type";
-dotenv.config();
+
+// Load environment variables
+loadEnv(false);
 
 const APP_SECRET = process.env.APP_SECRET;
 
 export function isRequestSignatureValid(req: Request) {
   if (!APP_SECRET) {
-    console.warn(
-      "App Secret is not set up. Please Add your app secret in /.env file to check for request validation"
+    console.log(
+      "App Secret is not set up. Please Add your app secret in /.env file to check for request validation",
     );
     return true;
   }
@@ -19,7 +21,7 @@ export function isRequestSignatureValid(req: Request) {
   if (!signatureHeader) throw new Error("Invalid sig head");
   const signatureBuffer = Buffer.from(
     signatureHeader.replace("sha256=", ""),
-    "utf-8"
+    "utf-8",
   );
 
   const hmac = crypto.createHmac("sha256", APP_SECRET);

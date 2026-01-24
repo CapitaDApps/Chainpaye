@@ -1,6 +1,13 @@
 import { redisClient } from "../../services/redis";
 import { UserService } from "../../services/UserService";
 import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService";
+import { getCountryCodeFromPhoneNumber } from "../../utils/countryCodeMapping";
+
+// ============================================================
+// ACCOUNT SETUP FLOW SERVICE
+// Handles user registration without BVN (KYC done separately)
+// Flow: PERSONAL_INFO → COUNTRY_SELECT → SECURITY_INFO → SUCCESSFUL
+// ============================================================
 
 const countries = [
   { id: "NG", title: "Nigeria" },
@@ -20,9 +27,17 @@ export const userSetupScreen = async (decryptedBody: {
   flow_token: string;
 }) => {
   const { screen, data, version, action, flow_token } = decryptedBody;
+  console.log("DEBUG: userSetupScreen called", {
+    screen,
+    action,
+    flow_token,
+    data,
+  });
+
   const userService = new UserService();
   const whatsappBusinessService = new WhatsAppBusinessService();
-  // handle health check request
+
+  // Handle health check request
   if (action === "ping") {
     return {
       data: {
@@ -31,7 +46,7 @@ export const userSetupScreen = async (decryptedBody: {
     };
   }
 
-  // handle error notification
+  // Handle error notification
   if (data?.error) {
     console.warn("Received client error:", data);
     return {
@@ -42,104 +57,239 @@ export const userSetupScreen = async (decryptedBody: {
     };
   }
 
-  // handle initial request when opening the flow
+  // Get user phone number from Redis using flow_token
+  const userPhone = await redisClient.get(flow_token);
+  console.log("DEBUG: Redis get userPhone:", userPhone);
+  const phone = userPhone?.startsWith("+") ? userPhone : `+${userPhone}`;
+
+  // Handle initial request when opening the flow
   if (action === "INIT") {
+    // Detect country from phone number
+    const detectedCountry = getCountryCodeFromPhoneNumber(phone);
     return {
       screen: "PERSONAL_INFO",
-      data: {},
+      data: {
+        countries: countries,
+        default_country: detectedCountry || "NG",
+      },
     };
   }
 
   if (action === "data_exchange") {
-    // handle the request based on the current screen
+    // Handle the request based on the current screen
     switch (screen) {
-      case "SECURITY_INFO":
+      // --------------------------------------------------------
+      // PERSONAL_INFO → COUNTRY_SELECT
+      // User submits name and DOB
+      // --------------------------------------------------------
+      case "PERSONAL_INFO":
+        console.log("DEBUG: Case PERSONAL_INFO");
         try {
-          console.log({ data });
+          const firstName = data.first_name?.trim();
+          const lastName = data.last_name?.trim();
+          const dob = data.dob;
 
-          //       data: {
-          //   first_name: 'Knowledge',
-          //   last_name: 'Okhakumhe',
-          //   dob: '2025-12-09',
-          //   country: 'NG',
-          //   pin: '12314',
-          //   confirm_pin: '124124'
-          // }
+          // Validate required fields
+          if (!firstName || firstName.length < 2) {
+            return {
+              screen: "PERSONAL_INFO",
+              data: {
+                countries: countries,
+                default_country: data.country || "NG",
+                error_message: "Please enter a valid first name",
+              },
+            };
+          }
 
-          //   Get user phone number from Redis using flow_token
-          const userPhone = await redisClient.get(flow_token);
+          if (!lastName || lastName.length < 2) {
+            return {
+              screen: "PERSONAL_INFO",
+              data: {
+                countries: countries,
+                default_country: data.country || "NG",
+                error_message: "Please enter a valid last name",
+              },
+            };
+          }
+
+          // Age validation - must be 18+
+          const currentYear = new Date().getFullYear();
+          const birthYear = Number(dob.split("-")[0]);
+          if (currentYear - birthYear < 18) {
+            return {
+              screen: "PERSONAL_INFO",
+              data: {
+                countries: countries,
+                default_country: data.country || "NG",
+                error_message: "You must be 18 and above to use Chainpaye",
+              },
+            };
+          }
+
+          // Proceed to country selection
+          return {
+            screen: "COUNTRY_SELECT",
+            data: {
+              first_name: firstName,
+              last_name: lastName,
+              dob: dob,
+              countries: countries,
+              default_country: getCountryCodeFromPhoneNumber(phone) || "NG",
+            },
+          };
+        } catch (error) {
+          console.error("Error in PERSONAL_INFO screen:", error);
+          return {
+            screen: "PERSONAL_INFO",
+            data: {
+              countries: countries,
+              default_country: "NG",
+              error_message: "Something went wrong. Please try again.",
+            },
+          };
+        }
+
+      // --------------------------------------------------------
+      // COUNTRY_SELECT → SECURITY_INFO
+      // User confirms country
+      // --------------------------------------------------------
+      case "COUNTRY_SELECT":
+        console.log("DEBUG: Case COUNTRY_SELECT");
+        return {
+          screen: "SECURITY_INFO",
+          data: {
+            first_name: data.first_name,
+            last_name: data.last_name,
+            dob: data.dob,
+            country: data.country || "NG",
+          },
+        };
+
+      // --------------------------------------------------------
+      // SECURITY_INFO → SUCCESSFUL
+      // User creates PIN and account is created
+      // --------------------------------------------------------
+      case "SECURITY_INFO":
+        console.log("DEBUG: Case SECURITY_INFO");
+        try {
           if (!userPhone) {
             return {
               screen: "SECURITY_INFO",
-              error_message: "Session expired",
+              data: {
+                first_name: data.first_name,
+                last_name: data.last_name,
+                dob: data.dob,
+                country: data.country,
+                error_message: "Session expired. Please restart the flow.",
+              },
             };
           }
-          const phone = userPhone.startsWith("+") ? userPhone : `+${userPhone}`;
-
-          // validate pin
-          const pin = data.pin.trim();
-          const confirm_pin = data.confirm_pin.trim();
 
           // Validate PIN input
-          if (!pin || pin.length < 4 || pin.length > 6) {
+          const pin = data.pin?.trim();
+          const confirmPin = data.confirm_pin?.trim();
+
+          if (!pin || pin.length !== 4) {
             return {
               screen: "SECURITY_INFO",
               data: {
-                error_message: "PIN must be 4-6 digits long",
+                first_name: data.first_name,
+                last_name: data.last_name,
+                dob: data.dob,
+                country: data.country,
+                error_message: "PIN must be exactly 4 digits",
               },
             };
           }
 
-          if (isNaN(Number(pin)) || isNaN(Number(confirm_pin))) {
+          if (isNaN(Number(pin))) {
             return {
               screen: "SECURITY_INFO",
               data: {
-                error_message: "Invalid number pin passed. Please numbers only",
+                first_name: data.first_name,
+                last_name: data.last_name,
+                dob: data.dob,
+                country: data.country,
+                error_message: "PIN must contain numbers only",
               },
             };
           }
 
-          if (pin !== confirm_pin) {
+          if (pin !== confirmPin) {
             return {
               screen: "SECURITY_INFO",
               data: {
+                first_name: data.first_name,
+                last_name: data.last_name,
+                dob: data.dob,
+                country: data.country,
                 error_message: "PINs do not match. Please try again.",
               },
             };
           }
 
-          await userService.createUser({
-            countryCode: data.country,
-            fullName: `${data.first_name} ${data.last_name}`,
-            whatsappNumber: phone,
-            pin,
-          });
+          // Check if user already exists
+          const existingUser = await userService.getUser(phone);
+          console.log("DEBUG: Existing user found?", !!existingUser);
 
+          if (!existingUser) {
+            // Create new user WITHOUT KYC verification
+            await userService.createUser({
+              whatsappNumber: phone,
+              pin: pin,
+            });
+            console.log("DEBUG: User created successfully");
+          }
+
+          // Update user with profile information
+          await userService.updateUserProfile(phone, {
+            firstName: data.first_name,
+            lastName: data.last_name,
+            dob: data.dob,
+          });
+          console.log("DEBUG: User profile updated");
+
+          // Store account creation info in Redis for welcome message
           await redisClient.set(
             `${flow_token}_accountCreation`,
             JSON.stringify({
               fullName: `${data.first_name} ${data.last_name}`,
+              country: data.country,
+              needsKyc: data.country === "NG",
             }),
             "EX",
-            3600
+            3600,
           );
 
           return {
             screen: "SUCCESSFUL",
-            data: {},
+            data: {
+              first_name: data.first_name,
+              needs_kyc: data.country === "NG",
+            },
           };
         } catch (error) {
-          console.log("Error sending user creation request", error);
-          throw error;
+          console.error("Error in SECURITY_INFO screen:", error);
+          return {
+            screen: "SECURITY_INFO",
+            data: {
+              first_name: data.first_name,
+              last_name: data.last_name,
+              dob: data.dob,
+              country: data.country,
+              error_message: "Failed to create account. Please try again.",
+            },
+          };
         }
 
       default:
+        console.warn("Unhandled screen:", screen);
         return;
     }
   }
 
   console.error("Unhandled request body:", decryptedBody);
   throw new Error(
-    "Unhandled endpoint request. Make sure you handle the request action & screen logged above."
+    "Unhandled endpoint request. Make sure you handle the request action & screen logged above.",
   );
 };

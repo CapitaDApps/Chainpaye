@@ -5,12 +5,13 @@
  */
 
 import { connectDatabase } from "./config/database";
+import { loadEnv } from "./config/env";
 import { logger } from "./utils/logger";
-import dotenv from "dotenv";
 import { app } from "./webhooks";
 
 // Load environment variables
-dotenv.config();
+loadEnv();
+logger.info("Environment variables loaded");
 
 /**
  * Main bot initialization function
@@ -50,10 +51,10 @@ process.on("uncaughtException", (error) => {
   process.exit(1);
 });
 
-process.on("unhandledRejection", (reason, promise) => {
-  logger.error("Unhandled Rejection at:", promise, "reason:", reason);
-  process.exit(1);
-});
+// process.on("unhandledRejection", (reason, promise) => {
+//   logger.error("Unhandled Rejection at:", promise, "reason:", reason);
+//   process.exit(1);
+// });
 
 // Start the bot
 initializeBot().then(() => {

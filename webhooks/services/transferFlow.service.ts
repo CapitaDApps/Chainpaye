@@ -1,7 +1,12 @@
-import { redisClient } from "../../services/redis";
-import { WalletService } from "../../services/WalletService";
 import { User } from "../../models/User";
-import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService";
+import { Wallet } from "../../models/Wallet";
+import {
+  toronetService,
+  userService,
+  walletService,
+  whatsappBusinessService,
+} from "../../services";
+import { redisClient } from "../../services/redis";
 
 export const getTransferScreen = async (decryptedBody: {
   screen: string;
@@ -11,8 +16,6 @@ export const getTransferScreen = async (decryptedBody: {
   flow_token: string;
 }) => {
   const { screen, data, version, action, flow_token } = decryptedBody;
-  const walletService = new WalletService();
-  const whatsappBusinessService = new WhatsAppBusinessService();
 
   // handle health check request
   if (action === "ping") {
@@ -37,6 +40,9 @@ export const getTransferScreen = async (decryptedBody: {
   try {
     // Get user phone number from Redis using flow_token
     const userPhone = await redisClient.get(flow_token);
+    //   const userPhone = "+2348110236998"; // --- TEMPORARY HARDCODE FOR TESTING ---
+    // Verify user PIN
+    const phone = userPhone?.startsWith("+") ? userPhone : `+${userPhone}`;
 
     // handle initial request when opening the flow
     if (action === "INIT") {
@@ -54,19 +60,52 @@ export const getTransferScreen = async (decryptedBody: {
     if (action === "data_exchange") {
       // handle the request based on the current screen
       switch (screen) {
-        case "TRANSFER":
+        case "TRANSFER": {
+          const { accountNumber, amount, currency } = data;
           if (!userPhone) {
             return {
               screen: "TRANSFER",
-              error_message: "User flow session not found",
+              data: {
+                error_message: "Session expired. Restart flow a new message",
+              },
             };
           }
+
+          const user = await User.findOne({
+            whatsappNumber: `+${accountNumber}`,
+          });
+
+          if (!user) {
+            return {
+              screen: "TRANSFER",
+              data: {
+                error_message: `Could not find user with account number - ${accountNumber}. Please check the account number.`,
+              },
+            };
+          }
+
+          if (user.whatsappNumber === phone) {
+            return {
+              screen: "TRANSFER",
+              data: {
+                error_message: `You can not send to yourself`,
+              },
+            };
+          }
+
           return {
-            screen: "PIN",
-            data: {},
+            screen: "TRANSFER_CONFIRMATION",
+            data: {
+              accountNumber,
+              currency,
+              amount,
+              recipientName: `${user.firstName} ${user.lastName}`,
+            },
           };
-        case "PIN":
-          const { accountNumber, amount, currency, pin } = data;
+        }
+
+        case "PIN": {
+          const { accountNumber, amount, currency, recipientName, pin } = data;
           if (!pin) {
             return {
               screen: "PIN",
@@ -76,21 +115,45 @@ export const getTransferScreen = async (decryptedBody: {
             };
           }
 
-          // Verify user PIN
-          const phone = userPhone?.startsWith("+")
-            ? userPhone
-            : `+${userPhone}`;
-          console.log({ phone });
-          const user = await User.findOne({ whatsappNumber: phone }).select(
-            "+pin"
+          const { user, wallet } = await userService.getUserToroWallet(
+            phone,
+            true,
+            true
           );
+
+          const walletPassword = wallet.password;
+          console.log({ walletPassword }); // --- IGNORE ---
+          const passList = walletPassword.split(":");
+          const version = passList[0];
+          let versionNumber = 1;
+          if (version && passList.length > 1) {
+            versionNumber = Number(version.split("")[1]!);
+            if (isNaN(versionNumber)) {
+              versionNumber = 1;
+            }
+          }
+          console.log({ versionNumber }); // --- IGNORE ---
+          if (versionNumber < toronetService.currentVersion) {
+            const decryptedPassword =
+              toronetService.decryptPassword(walletPassword);
+
+            // re encrypt password with latest version
+            const reEncryptedPassword =
+              toronetService.encryptPassword(decryptedPassword);
+            console.log({ reEncryptedPassword }); // --- IGNORE ---
+            Wallet.updateOne(
+              { _id: wallet._id },
+              { password: reEncryptedPassword }
+            ).catch((err) => {
+              console.error("Error updating wallet password version", err);
+            });
+          }
 
           if (!user?.pin) {
             return {
               screen: "PIN",
               data: {
-                error_message:
-                  "You have to set a pin to proceed. Use the /setup pin command in the chat.",
+                error_message: "You have to set a pin to proceed",
               },
             };
           }
@@ -109,14 +172,9 @@ export const getTransferScreen = async (decryptedBody: {
             : `+${accountNumber}`;
 
           walletService
-            .transfer(userPhone!, acctNo, amount, currency)
+            .transfer(phone, acctNo, amount, currency)
             .then(async (transferResult) => {
-              if (transferResult) {
-                await whatsappBusinessService.sendNormalMessage(
-                  transferResult?.message,
-                  userPhone!
-                );
-              } else {
+              if (!transferResult) {
                 await whatsappBusinessService.sendNormalMessage(
                   `An error occurred processing transfer`,
                   userPhone!
@@ -129,36 +187,8 @@ export const getTransferScreen = async (decryptedBody: {
             screen: "PROCESSING",
             data: {},
           };
+        }
 
-        // if (transferResult?.success) {
-        //   return {
-        //     screen: "SUCCESS",
-        //     data: {
-        //       message: transferResult.message,
-        //     },
-        //   };
-        // } else {
-        //   return {
-        //     screen: "PIN",
-        //     data: {
-        //       error_message:
-        //         transferResult?.message ||
-        //         "Transfer failed. Please try again.",
-        //     },
-        //   };
-        // }
-        // return {
-        //   screen: "SUCCESS",
-        //   data: {
-        //     extension_message_response: {
-        //       params: {
-        //         flow_token: flow_token,
-        //         optional_param1: amount,
-        //         optional_param2: accountNumber,
-        //       },
-        //     },
-        //   },
-        // };
         default:
           break;
       }

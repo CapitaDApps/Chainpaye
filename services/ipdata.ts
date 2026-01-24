@@ -1,8 +1,10 @@
 "use server";
 
 import axios from "axios";
-import dotenv from "dotenv";
-dotenv.config();
+import { loadEnv } from "../config/env";
+
+// Load environment variables
+loadEnv(false);
 
 const ipdata_api_key = process.env.IPDATA_API_KEY;
 

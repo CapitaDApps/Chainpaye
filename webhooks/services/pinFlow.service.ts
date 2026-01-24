@@ -49,7 +49,7 @@ export const getPinScreen = async (decryptedBody: {
           return {
             screen: "SETUP_PIN",
             data: {
-              error_message: "Session expired. Please restart the flow.",
+              error_message: "Session expired. Restart flow a new message",
             },
           };
         }

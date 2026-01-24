@@ -1,0 +1,323 @@
+{
+  "version": "6.0",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "OFFRAMP_DETAILS": ["OFFRAMP_FIAT_REVIEW"],
+    "OFFRAMP_FIAT_REVIEW": ["OFFRAMP_CRYPTO_REVIEW"],
+    "OFFRAMP_CRYPTO_REVIEW": ["OFFRAMP_SUCCESS"],
+    "OFFRAMP_SUCCESS": []
+  },
+  "screens": [
+    {
+      "id": "OFFRAMP_DETAILS",
+      "title": "Off-Ramp (Sell Crypto)",
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Withdraw to Bank"
+          },
+          {
+            "type": "Dropdown",
+            "name": "currency",
+            "label": "Asset to Sell",
+            "required": true,
+            "data-source": [
+              {
+                "id": "USDT",
+                "title": "Tether (USDT)"
+              },
+              {
+                "id": "USDC",
+                "title": "USD Coin (USDC)"
+              }
+            ]
+          },
+          {
+            "type": "Dropdown",
+            "name": "network",
+            "label": "Select Network",
+            "required": true,
+            "data-source": [
+              {
+                "id": "TRC20",
+                "title": "Tron (TRC20)"
+              },
+              {
+                "id": "BEP20",
+                "title": "BNB Smart Chain (BEP20)"
+              },
+              {
+                "id": "SOL",
+                "title": "Solana (SOL)"
+              },
+              {
+                "id": "ERC20",
+                "title": "Ethereum (ERC20)"
+              },
+              {
+                "id": "BASE",
+                "title": "Base Network"
+              }
+            ]
+          },
+          {
+            "type": "Dropdown",
+            "name": "bank_name",
+            "label": "Select Bank",
+            "required": true,
+            "data-source": [
+              {
+                "id": "ACCESS",
+                "title": "Access Bank"
+              },
+              {
+                "id": "GTB",
+                "title": "GTBank"
+              },
+              {
+                "id": "ZENITH",
+                "title": "Zenith Bank"
+              },
+              {
+                "id": "OPAY",
+                "title": "Opay"
+              },
+              {
+                "id": "KUDA",
+                "title": "Kuda Bank"
+              }
+            ]
+          },
+          {
+            "type": "TextInput",
+            "name": "account_number",
+            "label": "Account Number",
+            "required": true,
+            "input-type": "text",
+            "helper-text": "Enter 10-digit account number"
+          },
+          {
+            "type": "TextInput",
+            "name": "sell_amount",
+            "label": "Amount",
+            "required": true,
+            "input-type": "text",
+            "helper-text": "Enter amount in NGN"
+          },
+          {
+            "type": "Footer",
+            "label": "Preview Withdrawal",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "currency": "${form.currency}",
+                "network": "${form.network}",
+                "sell_amount": "${form.sell_amount}",
+                "bank_name": "${form.bank_name}",
+                "account_number": "${form.account_number}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "OFFRAMP_FIAT_REVIEW",
+      "title": "Recipient Overview",
+      "data": {
+        "currency": {
+          "type": "string",
+          "__example__": "USDT"
+        },
+        "network": {
+          "type": "string",
+          "__example__": "TRC20"
+        },
+        "sell_amount": {
+          "type": "string",
+          "__example__": "100"
+        },
+        "bank_name": {
+          "type": "string",
+          "__example__": "GTBank"
+        },
+        "account_number": {
+          "type": "string",
+          "__example__": "0123456789"
+        },
+        "recipient_name": {
+          "type": "string",
+          "__example__": "Alice Smith"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Review Details"
+          },
+          {
+            "type": "TextBody",
+            "text": "Recipient: ${data.recipient_name}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Bank: ${data.bank_name}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Account: ${data.account_number}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Selling: ${data.sell_amount} ${data.currency}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Network: ${data.network}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Rate: 1 ${data.currency} = ₦1,650"
+          },
+          {
+            "type": "Footer",
+            "label": "Proceed to Payment",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "sell_amount": "${data.sell_amount}",
+                "currency": "${data.currency}",
+                "network": "${data.network}",
+                "bank_name": "${data.bank_name}",
+                "account_number": "${data.account_number}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "OFFRAMP_CRYPTO_REVIEW",
+      "title": "Payment Authorization",
+      "data": {
+        "currency": {
+          "type": "string",
+          "__example__": "USDT"
+        },
+        "network": {
+          "type": "string",
+          "__example__": "TRC20"
+        },
+        "sell_amount": {
+          "type": "string",
+          "__example__": "100"
+        },
+        "bank_name": {
+          "type": "string",
+          "__example__": "GTBank"
+        },
+        "account_number": {
+          "type": "string",
+          "__example__": "0123456789"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": "Invalid PIN"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Authorize"
+          },
+          {
+            "type": "TextBody",
+            "text": "${data.error_message}",
+            "visible": "${data.error_message != null}",
+            "style": {
+              "color": "#EF4444"
+            }
+          },
+          {
+            "type": "TextBody",
+            "text": "Selling: ${data.sell_amount} ${data.currency}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Network: ${data.network}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Fee: 1.00 ${data.currency}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Enter PIN to Confirm"
+          },
+          {
+            "type": "TextInput",
+            "name": "pin",
+            "label": "4 Digit PIN",
+            "required": true,
+            "input-type": "password",
+            "min-chars": 4,
+            "max-chars": 4
+          },
+          {
+            "type": "Footer",
+            "label": "Sell & Withdraw",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "pin": "${form.pin}",
+                "sell_amount": "${data.sell_amount}",
+                "currency": "${data.currency}",
+                "network": "${data.network}",
+                "bank_name": "${data.bank_name}",
+                "account_number": "${data.account_number}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "OFFRAMP_SUCCESS",
+      "title": "Processing",
+      "terminal": true,
+      "success": true,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Funds are underway! 🚀"
+          },
+          {
+            "type": "TextBody",
+            "text": "Your withdrawal has been initiated. The funds usually hit the bank account in under 50 seconds."
+          },
+          {
+            "type": "Footer",
+            "label": "Done",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {
+                "status": "offramp_initiated",
+                "result": "success"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

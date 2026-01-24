@@ -1,7 +1,6 @@
+import { scheduleProcessDeposit } from "../../jobs/topUp/job";
+import { userService, walletService } from "../../services";
 import { redisClient } from "../../services/redis";
-import { UserService } from "../../services/UserService";
-import { WalletService } from "../../services/WalletService";
-import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService";
 
 export const getTopUpScreen = async (decryptedBody: {
   screen: string;
@@ -12,9 +11,6 @@ export const getTopUpScreen = async (decryptedBody: {
 }) => {
   const { screen, data, version, action, flow_token } = decryptedBody;
 
-  const userService = new UserService();
-  const walletService = new WalletService();
-  const whatsappBusinessService = new WhatsAppBusinessService();
   // handle health check request
   if (action === "ping") {
     return {
@@ -49,27 +45,26 @@ export const getTopUpScreen = async (decryptedBody: {
   }
 
   if (action === "data_exchange") {
+    // const userPhone = "+2348110236998"; // --- TEMPORARY HARDCODE FOR TESTING ---
+    const userPhone = await redisClient.get(flow_token);
+    const phone = userPhone?.startsWith("+") ? userPhone : `+${userPhone}`;
     // handle the request based on the current screen
     switch (screen) {
-      case "PIN":
-        // { pin: '23456', amount: '12345678', currency: 'USD' }
-        // Get user phone number from Redis using flow_token
-        const userPhone = await redisClient.get(flow_token);
+      case "TOPUP_WALLET": {
         if (!userPhone) {
           return {
-            screen: "PIN",
+            screen: "TOPUP_WALLET",
             data: {
-              error_message: "Session expired",
+              error_message: "Session expired. Restart flow a new message",
             },
           };
         }
-        const phone = userPhone.startsWith("+") ? userPhone : `+${userPhone}`;
 
         const user = await userService.getUser(phone, true);
 
         if (isNaN(Number(data.amount)))
           return {
-            screen: "PIN",
+            screen: "TOPUP_WALLET",
             data: {
               error_message: "Please enter a valid amount",
             },
@@ -77,7 +72,7 @@ export const getTopUpScreen = async (decryptedBody: {
 
         if (!user) {
           return {
-            screen: "PIN",
+            screen: "TOPUP_WALLET",
             data: {
               error_message:
                 "Could not find you in the database. Please try again",
@@ -85,69 +80,63 @@ export const getTopUpScreen = async (decryptedBody: {
           };
         }
 
-        const isValidPin = await user.comparePin(data.pin);
+        // Normalize currency to uppercase to match Transaction model enum
+        const currency = data.currency?.toUpperCase();
 
-        if (!isValidPin) {
+        const result = await walletService.deposit(
+          phone,
+          data.amount,
+          currency,
+        );
+
+        const is_usd = currency === "USD";
+
+        switch (currency) {
+          case "USD":
+            return {
+              screen: "BANK_DETAILS",
+              data: {
+                amount: Number(data.amount).toLocaleString(),
+                currency: currency,
+                accountName: result.accountName,
+                bankName: result.bankName,
+                accountNumber: `${result.accountNumber}`,
+                routingNO: `${result.routingNO}`,
+                is_usd,
+                transactionId: result.transactionId,
+              },
+            };
+          case "NGN":
+            return {
+              screen: "BANK_DETAILS",
+              data: {
+                amount: Number(result.amount).toLocaleString(),
+                currency: currency,
+                accountName: result.accountName,
+                bankName: result.bankName,
+                accountNumber: `${result.accountNumber}`,
+                transactionId: result.transactionId,
+                is_usd,
+                routingNO: "",
+              },
+            };
+
+          default:
+            break;
+        }
+      }
+
+      case "BANK_DETAILS":
+        if (!userPhone) {
           return {
-            screen: "PIN",
+            screen: "BANK_DETAILS",
             data: {
-              error_message: "Incorrect pin.",
+              error_message: "Session expired. Restart flow a new message",
             },
           };
         }
 
-        walletService
-          .deposit(phone, data.amount, data.currency)
-          .then(async (result) => {
-            if (data.currency == "USD") {
-              await whatsappBusinessService.sendNormalMessage(
-                `*Make deposit to the specified account.*
-
-*Amount:* ${data.amount}
-*Account Name:* ${result.accountName}
-*Bank Name:* ${result.bankName}
-*Account Number:* ${result.accountNumber}
-*Routing Number:* ${result.routingNO}
-
-*Transaction Id:* ${result.transactionId}
-
-
-*You can check the status of the transaction by sending this message:*
-
-_/status <transactionId>_
-          `,
-                phone
-              );
-              await whatsappBusinessService.sendNormalMessage(
-                data.transactionId,
-                phone
-              );
-            } else {
-              await whatsappBusinessService.sendNormalMessage(
-                `*Make deposit to the specified account details.*
-
-amount: *${result.amount}*
-account name: *${result.accountName}*
-bank name: *${result.bankName}*
-account number: *${result.accountNumber}* 
-
-transactionId: *${result.transactionId}*
-
-
-*You can check the status of the transaction by sending this message:*
-
-_/status <transactionId>_
-        `,
-                phone
-              );
-              await whatsappBusinessService.sendNormalMessage(
-                result.transactionId,
-                phone
-              );
-            }
-          })
-          .catch((error) => console.log("Error topping up", error));
-
+        scheduleProcessDeposit(data.transactionId);
         return {
           screen: "PROCESSING",
           data: {},
@@ -160,6 +149,6 @@ _/status <transactionId>_
 
   console.error("Unhandled request body:", decryptedBody);
   throw new Error(
-    "Unhandled endpoint request. Make sure you handle the request action & screen logged above."
+    "Unhandled endpoint request. Make sure you handle the request action & screen logged above.",
   );
 };

@@ -1,32 +1,42 @@
-import dotenv from "dotenv";
+import axios from "axios";
 import express, { Express } from "express";
-import { UserService } from "../services/UserService";
-import { WhatsAppBusinessService } from "../services/WhatsAppBusinessService";
+import helmet from "helmet";
+import { commandRouteHandler } from "../commands/route";
+import { loadEnv } from "../config/env";
+import { userService, whatsappBusinessService } from "../services";
+import { redisClient } from "../services/redis";
+import { userRateLimiter, verifyWebhookSignature } from "./middleware";
 import flowRouter from "./route/route";
 import { CustomReq } from "./types/request.type";
-import axios from "axios";
-import { User } from "../models/User";
-import { redisClient } from "../services/redis";
-import { ToronetService } from "../services/ToronetService";
-import { IWallet } from "../models/Wallet";
-import { WalletService } from "../services/WalletService";
 
-dotenv.config();
+// Load environment variables
+loadEnv();
 export const app: Express = express();
+app.use(express.static("public"));
+// Apply helmet security middleware
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'"],
+        imgSrc: ["'self'", "data:", "https:"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+  }),
+);
 
-const userService = new UserService();
-const whatsappBusinessService = new WhatsAppBusinessService();
-const toronetService = new ToronetService();
-const walletService = new WalletService();
 app.use(
   express.json({
     // store the raw request body to use it for signature verification
     verify: (req, res, buf, encoding) => {
       (req as CustomReq).rawBody = buf?.toString(
-        (encoding as BufferEncoding) || "utf8"
+        (encoding as BufferEncoding) || "utf8",
       );
     },
-  })
+  }),
 );
 
 const {
@@ -35,9 +45,10 @@ const {
   APP_SECRET,
   PRIVATE_KEY,
   PASSPHRASE = "",
+  BUSINESS_PHONE_NUMBER_ID,
 } = process.env;
 
-// Route for GET requests
+// Route for GET requests (webhook verification - no rate limiting needed)
 app.get("/webhook", (req, res) => {
   const {
     "hub.mode": mode,
@@ -53,42 +64,54 @@ app.get("/webhook", (req, res) => {
   }
 });
 
-app.get("/", (req, res) => {
+// Health check endpoint with rate limiting
+app.get("/", userRateLimiter, (req, res) => {
   res.status(200).json({ server: "active" });
 });
 
-app.post("/webhook", async (req, res) => {
+async function readMessage(messageId: string) {
+  await axios({
+    method: "POST",
+    url: `https://graph.facebook.com/v24.0/${BUSINESS_PHONE_NUMBER_ID}/messages`,
+    headers: {
+      Authorization: `Bearer ${GRAPH_API_TOKEN}`,
+    },
+    data: {
+      messaging_product: "whatsapp",
+      status: "read",
+      message_id: messageId,
+    },
+  });
+}
+
+async function replyingMessage(messageId: string) {
+  await axios({
+    method: "POST",
+    url: `https://graph.facebook.com/v24.0/${BUSINESS_PHONE_NUMBER_ID}/messages`,
+    headers: {
+      Authorization: `Bearer ${GRAPH_API_TOKEN}`,
+    },
+    data: {
+      messaging_product: "whatsapp",
+      status: "read",
+      message_id: messageId,
+      typing_indicator: {
+        type: "text",
+      },
+    },
+  });
+}
+
+app.post("/webhook", verifyWebhookSignature, async (req, res) => {
   console.log("Incoming webhook message:", JSON.stringify(req.body, null, 2));
 
-  // const ipDetails = await getIpData(req.ip);
-  // console.log({ ip: req.ip?.split(":") });
-
-  // const ipDetails = await getIpData("8.8.8.8");
-
-  // if (!ipDetails) throw new Error("Couldn't detect user's location");
-
-  // console.log({ ipDetails });
   const message = req.body.entry?.[0]?.changes[0]?.value?.messages?.[0];
-  const contact = req.body.entry[0].changes[0].value.contacts?.[0];
+  const contact = req.body.entry?.[0]?.changes?.[0]?.value?.contacts?.[0];
 
   if (message) {
+    await readMessage(message.id);
     try {
       // mark incoming message as read
-      await axios({
-        method: "POST",
-        url: `https://graph.facebook.com/v24.0/${897300070126934}/messages`,
-        headers: {
-          Authorization: `Bearer ${GRAPH_API_TOKEN}`,
-        },
-        data: {
-          messaging_product: "whatsapp",
-          status: "read",
-          message_id: message.id,
-          typing_indicator: {
-            type: "text",
-          },
-        },
-      });
 
       if (contact) {
         const { profile, wa_id } = contact;
@@ -96,61 +119,31 @@ app.post("/webhook", async (req, res) => {
         if (wa_id) {
           const user = await userService.getUser(`+${wa_id}`);
 
-          if (!user) {
-            // send welcome mesage
-            await whatsappBusinessService.sendTemplateIntroMessage(
-              message.from
-            );
+          // Check if user needs to complete registration (no profile info)
+          if (!user || !user.firstName || !user.lastName) {
+            await replyingMessage(message.id);
+            // New user or incomplete profile - send registration flow
+            whatsappBusinessService.sendIntroMessageByFlowId(message.from);
           } else {
-            // send other messages
-            if (message.type == "text") {
-              if (message.text.body.toLowerCase().includes("balance")) {
-                const userWallet = await userService.getUserToroWallet(
-                  message.from
-                );
-                const [NGNBal, USDBal] = await Promise.all([
-                  toronetService.getBalanceNGN(userWallet.publicKey),
-                  toronetService.getBalanceUSD(userWallet.publicKey),
-                ]);
-                await whatsappBusinessService.sendNormalMessage(
-                  `*Your balance:* 
-*USD:* ${USDBal.balance}
-*NGN:* ${NGNBal.balance}
-                  `,
-                  message.from
-                );
-              } else if (message.text.body.startsWith("/status")) {
-                const msgList = message.text.body.split(" ");
-                const txId = msgList[1];
-                console.log({ msgList, txId });
-                if (!txId)
-                  return await whatsappBusinessService.sendNormalMessage(
-                    "Please pass the transaction id in the required format. status: transactionid",
-                    message.from
-                  );
-                const txStatusData = await walletService.checkTransactionStatus(
-                  txId
-                );
+            // User has completed registration
+            // Handle text messages
+            if (message.type == "text" && message.text.body) {
+              await replyingMessage(message.id);
 
-                await whatsappBusinessService.sendNormalMessage(
-                  `${txStatusData.message}
-          `,
-                  message.from
-                );
-              } else {
-                await whatsappBusinessService.sendTemplateInteractiveMessage(
-                  "appointment",
-                  message.from,
-                  "en"
-                );
-              }
+              // Nigerian user without KYC - prompt for verification but still allow basic access
+              // They can still use the app, but some features may be limited
+              const phone = message.from.startsWith("+")
+                ? message.from
+                : `+${message.from}`;
+              await commandRouteHandler(phone, message.text.body);
             }
 
             if (message.type == "button") {
+              await replyingMessage(message.id);
               const { payload } = message.button;
               await whatsappBusinessService.handleButtonPayload(
                 payload,
-                message.from
+                message.from,
               );
             }
 
@@ -159,28 +152,51 @@ app.post("/webhook", async (req, res) => {
               const interactiveType = interactive.type;
               if (interactiveType == "nfm_reply") {
                 const responseJson = JSON.parse(
-                  interactive.nfm_reply.response_json
+                  interactive.nfm_reply.response_json,
                 );
                 console.log({ responseJson });
 
+                // Handle new account registration completion
                 if (responseJson.type == "new-account") {
+                  await replyingMessage(message.id);
                   const userAccount = await redisClient.get(
-                    `${responseJson.flow_token}_accountCreation`
+                    `${responseJson.flow_token}_accountCreation`,
                   );
                   let account: any;
                   if (userAccount) {
                     account = JSON.parse(userAccount);
                   }
+
+                  // Send welcome message
                   await whatsappBusinessService.sendNormalMessage(
                     `Hello *${
-                      account.fullName || profile.name
-                    }*, welcome to Chainpaye.`,
-                    message.from
-                  );
-                  await whatsappBusinessService.sendTemplateInteractiveMessage(
-                    "appointment",
+                      account?.fullName || profile.name
+                    }*, welcome to Chainpaye! 🎉`,
                     message.from,
-                    "en"
+                  );
+
+                  // If Nigerian user, prompt for KYC
+                  if (account?.needsKyc) {
+                    await whatsappBusinessService.sendNormalMessage(
+                      "To unlock all features (including bank withdrawals), please complete your BVN verification. Type 'verify' or 'kyc' to start.",
+                      message.from,
+                    );
+                  }
+
+                  await whatsappBusinessService.sendMenuMessageMyFlowId(
+                    message.from,
+                  );
+                }
+
+                // Handle KYC verification completion
+                if (responseJson.type == "kyc-complete") {
+                  await replyingMessage(message.id);
+                  await whatsappBusinessService.sendNormalMessage(
+                    "Your account has been fully verified! 🎉 You now have access to all Chainpaye features.",
+                    message.from,
+                  );
+                  await whatsappBusinessService.sendMenuMessageMyFlowId(
+                    message.from,
                   );
                 }
               }
@@ -192,19 +208,8 @@ app.post("/webhook", async (req, res) => {
       console.log(error);
     }
   }
-
-  if (message && message.type == "text") {
-    // else if (!messageBody.includes("hello")) {
-    //   const command = messageList[0].trim();
-    //   const text = messageList[1]?.trim();
-    //   console.log({ text });
-    //   whatsappBusinessService
-    //     .handleCommandText(command, text, message.from)
-    //     .catch((err) => console.log("handleCommandText", err));
-    // }
-  }
-
   res.sendStatus(200);
 });
 
-app.use("/flow", flowRouter);
+// Apply rate limiting to flow routes (user-facing endpoints)
+app.use("/flow", userRateLimiter, flowRouter);
