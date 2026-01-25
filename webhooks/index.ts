@@ -120,7 +120,11 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
           const user = await userService.getUser(`+${wa_id}`);
 
           // Check if user needs to complete registration (no profile info)
-          if (!user || !user.firstName || !user.lastName) {
+          // User is valid if they have fullName (new flow) OR firstName+lastName (legacy flow)
+          const isRegistered =
+            user && (user.fullName || (user.firstName && user.lastName));
+
+          if (!isRegistered) {
             await replyingMessage(message.id);
             // New user or incomplete profile - send registration flow
             whatsappBusinessService.sendIntroMessageByFlowId(message.from);
