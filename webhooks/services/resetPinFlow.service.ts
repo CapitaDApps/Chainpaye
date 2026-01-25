@@ -342,11 +342,11 @@ async function handleSetNewPin(
     }
 
     // Hash the new PIN
-    // const hashedPin = await argon2.hash(new_pin);
+    const hashedPin = await argon2.hash(new_pin);
 
     // Update user's PIN in the database
     const phone = userPhone.startsWith("+") ? userPhone : `+${userPhone}`;
-    await User.updateOne({ whatsappNumber: phone }, { pin: new_pin });
+    await User.updateOne({ whatsappNumber: phone }, { pin: hashedPin });
 
     // Clean up reset state
     await redisClient.del(`reset_pin_state:${userPhone}`);
