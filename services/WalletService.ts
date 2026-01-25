@@ -97,12 +97,24 @@ export class WalletService {
 
         if (!respUSD.result) throw new Error("Error fetching USD balance");
 
-        if (respUSD.balance < amount)
+        if (respUSD.balance < amount) {
+          console.warn("Insufficient USD balance:", {
+            balance: respUSD.balance,
+            amount,
+            wallet: fromWallet.publicKey,
+          });
           return {
             success: false,
             type: "Insufficient balance",
             message: "Insufficient balance to make transfer",
           };
+        }
+
+        console.log("Initiating USD transfer...", {
+          amount,
+          from: fromWallet.publicKey,
+          to: toWallet.publicKey,
+        });
 
         const transferRespUSD = await toronetService.transferUSD(
           fromWallet.publicKey,
@@ -110,6 +122,8 @@ export class WalletService {
           amount.toString(),
           fromWallet.password,
         );
+
+        console.log("USD Transfer response:", transferRespUSD);
 
         if (transferRespUSD.result) {
           const txResult = await TransactionService.recordTransfer({
@@ -121,6 +135,8 @@ export class WalletService {
             currency: "USD",
             status: TransactionStatus.COMPLETED,
           });
+
+          console.log("USD Transaction recorded:", txResult);
 
           // Send receipts asynchronously
           sendTransferReceipts(
@@ -148,6 +164,11 @@ export class WalletService {
             failureReason: transferRespUSD.message,
           });
 
+          console.error(
+            "USD Transfer failed, transaction recorded as FAILED:",
+            txResult,
+          );
+
           // Send receipts asynchronously for failed transaction
           sendTransferReceipts(
             (txResult.debit._id as Types.ObjectId).toString(),
@@ -170,12 +191,24 @@ export class WalletService {
 
         if (!respNGN.result) throw new Error("Error fetching NGN balance");
 
-        if (+respNGN.balance < +amount)
+        if (+respNGN.balance < +amount) {
+          console.warn("Insufficient NGN balance:", {
+            balance: respNGN.balance,
+            amount,
+            wallet: fromWallet.publicKey,
+          });
           return {
             success: false,
             type: "Insufficient balance",
             message: "Insufficient balance to make transfer",
           };
+        }
+
+        console.log("Initiating NGN transfer...", {
+          amount,
+          from: fromWallet.publicKey,
+          to: toWallet.publicKey,
+        });
 
         const transferRespNGN = await toronetService.transferNGN(
           fromWallet.publicKey,
@@ -183,6 +216,8 @@ export class WalletService {
           amount.toString(),
           fromWallet.password,
         );
+
+        console.log("NGN Transfer response:", transferRespNGN);
 
         if (transferRespNGN.result) {
           const txResult = await TransactionService.recordTransfer({
@@ -194,6 +229,8 @@ export class WalletService {
             currency: "NGN",
             status: TransactionStatus.COMPLETED,
           });
+
+          console.log("NGN Transaction recorded:", txResult);
 
           // Send receipts asynchronously
           sendTransferReceipts(
@@ -220,6 +257,11 @@ export class WalletService {
             status: TransactionStatus.FAILED,
             failureReason: transferRespNGN.message,
           });
+
+          console.error(
+            "NGN Transfer failed, transaction recorded as FAILED:",
+            txResult,
+          );
 
           // Send receipts asynchronously for failed transaction
           sendTransferReceipts(
