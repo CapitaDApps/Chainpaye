@@ -365,23 +365,32 @@ What would you like to sell?`;
     address: string,
   ) {
     // Message 1: Send the deposit address
-    // await this.sendNormalMessage(
-    //   `📥 *Deposit Address*\n\nSend your ${token.toUpperCase()} on ${network.toUpperCase()} to:\n\n\`${address}\`\n\n⚠️ Only send ${token.toUpperCase()} on ${network.toUpperCase()} network.`,
-    //   to
-    // );
-
     await this.sendNormalMessage(address, to);
 
-    // Message 2: Instructions and start the flow
-    // await this.sendNormalMessage(
-    //   `1. Copy the address above\n2. Send your ${token.toUpperCase()} to the address\n3. Once sent, click below to complete the offramp process`,
-    //   to
-    // );
+    // Fetch banks for the offramp flow
+    let banks: { id: string; title: string }[] = [
+      { id: "000014", title: "Access Bank" },
+      { id: "000013", title: "GTBank" },
+      { id: "000015", title: "Zenith Bank" },
+      { id: "999992", title: "Opay" },
+      { id: "090267", title: "Kuda Bank" },
+    ];
 
-    // Start the flow
+    try {
+      const ngnBanks = await toronetService.getBankListNGN();
+      if (ngnBanks && ngnBanks.length > 0) {
+        banks = ngnBanks;
+      }
+      console.log("DEBUG: Fetched banks for offramp:", banks.length);
+    } catch (error) {
+      console.error("DEBUG: Error fetching banks, using fallback:", error);
+    }
+
+    // Start the flow with banks data
     const cryptoTopUpFlowId = "1372714300817702";
     const cryptoTopUpScreenId = "OFFRAMP_DETAILS";
-    await this.sendTextOnlyFlowById(
+
+    await this.sendTextOnlyFlowWithDataById(
       to,
       cryptoTopUpFlowId,
       cryptoTopUpScreenId,
@@ -390,7 +399,11 @@ What would you like to sell?`;
      `,
         cta: "Complete Off ramp",
       },
+      {
+        banks: banks,
+      },
     );
+
     await redisClient.set(
       `OFFRAMP_${to}`,
       JSON.stringify({ asset: token, network }),
@@ -579,6 +592,75 @@ Our team is ready to assist you!`;
     } catch (error) {
       console.log(
         "error sending text only flow",
+        (error as { response: any }).response.data,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Send a flow with initial screen data
+   * Use this when you need to pass dynamic data to the first screen
+   */
+  private async sendTextOnlyFlowWithDataById(
+    to: string,
+    flowId: string,
+    screenId: string,
+    displayData: {
+      header?: string;
+      body: string;
+      cta: string;
+    },
+    screenData: Record<string, any>,
+  ) {
+    const flowToken = uuidv4();
+    await redisClient.set(flowToken, to, "EX", CONSTANTS.CACHE_24HRS);
+    const body = {
+      messaging_product: "whatsapp",
+      to,
+      recipient_type: "individual",
+      type: "interactive",
+      interactive: {
+        type: "flow",
+        ...(displayData.header && {
+          header: {
+            type: "text",
+            text: displayData.header,
+          },
+        }),
+        body: {
+          text: displayData.body,
+        },
+
+        action: {
+          name: "flow",
+          parameters: {
+            flow_message_version: "3",
+            flow_action: "navigate",
+            flow_token: flowToken,
+            flow_id: flowId,
+            flow_cta: displayData.cta,
+            flow_action_payload: {
+              screen: screenId,
+              data: screenData,
+            },
+          },
+        },
+      },
+    };
+
+    try {
+      await axios({
+        method: "POST",
+        url: `https://graph.facebook.com/v24.0/${this.business_phone_number_id}/messages`,
+        headers: {
+          Authorization: `Bearer ${this.GRAPH_API_TOKEN}`,
+        },
+        data: body,
+      });
+    } catch (error) {
+      console.log(
+        "error sending flow with data",
         (error as { response: any }).response.data,
       );
       throw error;
