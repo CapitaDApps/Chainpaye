@@ -425,15 +425,13 @@ What would you like to sell?`;
     // }
 
     // message should contain the user's account, number, name and balances
-    const verificationStatus = user.isVerified
-      ? "✅ Verified"
-      : "⚠️ Unverified";
+
     const displayName = user.isVerified
       ? `${user.firstName} ${user.lastName}`
       : user.fullName;
 
     // message should contain the user's account, number, name and balances
-    let message = `👋 Hello, ${displayName} ${verificationStatus}
+    let message = `👋 Hello ${displayName},
 
 Account No: ${user.whatsappNumber.replace("+", "")}
 

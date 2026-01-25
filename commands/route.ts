@@ -1,3 +1,4 @@
+import { User } from "../models/User";
 import { whatsappBusinessService } from "../services";
 import { COMMANDS, TriggerPhrase } from "./config";
 import {
@@ -194,7 +195,20 @@ export async function commandRouteHandler(from: string, message: string) {
     case "kyc":
       // KYC verification flow for Nigerian users
       try {
-        await whatsappBusinessService.sendKycFlowById(from);
+        const phone = from.startsWith("+") ? from : `+${from}`;
+        const user = await User.findOne({ whatsappNumber: phone });
+
+        if (user?.isVerified) {
+          const displayName = user.firstName
+            ? `${user.firstName} ${user.lastName}`
+            : user.fullName;
+          await whatsappBusinessService.sendNormalMessage(
+            `Hi ${displayName}, your account is already verified! ✅\n\nYou have full access to all features. No need to verify again.`,
+            from,
+          );
+        } else {
+          await whatsappBusinessService.sendKycFlowById(from);
+        }
       } catch (err) {
         console.log(
           "Error sending KYC flow",
