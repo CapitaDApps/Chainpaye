@@ -425,7 +425,15 @@ What would you like to sell?`;
     // }
 
     // message should contain the user's account, number, name and balances
-    let message = `👋 Hello, ${user.firstName || user.lastName}
+    const verificationStatus = user.isVerified
+      ? "✅ Verified"
+      : "⚠️ Unverified";
+    const displayName = user.isVerified
+      ? `${user.firstName} ${user.lastName}`
+      : user.fullName;
+
+    // message should contain the user's account, number, name and balances
+    let message = `👋 Hello, ${displayName} ${verificationStatus}
 
 Account No: ${user.whatsappNumber.replace("+", "")}
 
@@ -686,10 +694,14 @@ Our team is ready to assist you!`;
           await walletService.usdBalance(wallet.publicKey),
         ]);
 
+        const displayName = user.isVerified
+          ? `${user.firstName} ${user.lastName}`
+          : user.fullName;
+
         const params = [
           {
             type: "text",
-            text: `${user.firstName} ${user.lastName}`,
+            text: displayName,
           },
           {
             type: "text",

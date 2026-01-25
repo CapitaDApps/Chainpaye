@@ -85,32 +85,26 @@ export const userSetupScreen = async (decryptedBody: {
       case "PERSONAL_INFO":
         console.log("DEBUG: Case PERSONAL_INFO");
         try {
-          const firstName = data.first_name?.trim();
-          const lastName = data.last_name?.trim();
+          const fullName = data.full_name?.trim();
           const dob = data.dob;
 
           // Validate required fields
-          if (!firstName || firstName.length < 2) {
+          if (!fullName || fullName.split(" ").length < 2) {
             return {
               screen: "PERSONAL_INFO",
               data: {
                 countries: countries,
                 default_country: data.country || "NG",
-                error_message: "Please enter a valid first name",
+                error_message:
+                  "Please enter your full name (First and Last name)",
               },
             };
           }
 
-          if (!lastName || lastName.length < 2) {
-            return {
-              screen: "PERSONAL_INFO",
-              data: {
-                countries: countries,
-                default_country: data.country || "NG",
-                error_message: "Please enter a valid last name",
-              },
-            };
-          }
+          // Split name for display purposes only (legacy support)
+          const nameParts = fullName.split(" ");
+          const firstName = nameParts[0];
+          const lastName = nameParts.slice(1).join(" ");
 
           // Age validation - must be 18+
           const currentYear = new Date().getFullYear();
@@ -130,6 +124,7 @@ export const userSetupScreen = async (decryptedBody: {
           return {
             screen: "COUNTRY_SELECT",
             data: {
+              full_name: fullName,
               first_name: firstName,
               last_name: lastName,
               dob: dob,
@@ -158,6 +153,7 @@ export const userSetupScreen = async (decryptedBody: {
         return {
           screen: "SECURITY_INFO",
           data: {
+            full_name: data.full_name,
             first_name: data.first_name,
             last_name: data.last_name,
             dob: data.dob,
@@ -237,14 +233,14 @@ export const userSetupScreen = async (decryptedBody: {
             await userService.createUser({
               whatsappNumber: phone,
               pin: pin,
+              fullName: data.full_name,
             });
             console.log("DEBUG: User created successfully");
           }
 
           // Update user with profile information
           await userService.updateUserProfile(phone, {
-            firstName: data.first_name,
-            lastName: data.last_name,
+            fullName: data.full_name,
             dob: data.dob,
           });
           console.log("DEBUG: User profile updated");
@@ -253,7 +249,7 @@ export const userSetupScreen = async (decryptedBody: {
           await redisClient.set(
             `${flow_token}_accountCreation`,
             JSON.stringify({
-              fullName: `${data.first_name} ${data.last_name}`,
+              fullName: data.full_name,
               country: data.country,
               needsKyc: data.country === "NG",
             }),

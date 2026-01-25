@@ -137,8 +137,9 @@ export const kycFlowScreen = async (decryptedBody: {
           screen: "BVN_INPUT",
           data: {
             country: selectedCountry,
-            first_name: userForBvn?.firstName || data.first_name || "",
-            last_name: userForBvn?.lastName || data.last_name || "",
+            full_name: userForBvn?.fullName || "",
+            first_name: "", // Force user to enter
+            last_name: "", // Force user to enter
             dob: userForBvn?.dob || data.dob || "",
           },
         };
@@ -197,9 +198,9 @@ export const kycFlowScreen = async (decryptedBody: {
             };
           }
 
-          // Use user data for KYC if available
-          const firstName = user.firstName || data.first_name;
-          const lastName = user.lastName || data.last_name;
+          // Use explicit data from form for KYC
+          const firstName = data.first_name?.trim();
+          const lastName = data.last_name?.trim();
           const dob = user.dob || data.dob;
 
           if (!firstName || !lastName || !dob) {
@@ -207,11 +208,10 @@ export const kycFlowScreen = async (decryptedBody: {
               screen: "BVN_INPUT",
               data: {
                 country: data.country,
-                first_name: data.first_name,
-                last_name: data.last_name,
-                dob: data.dob,
-                error_message:
-                  "Profile information incomplete. Please update your profile first.",
+                first_name: firstName,
+                last_name: lastName,
+                dob: dob,
+                error_message: "Please enter both First Name and Last Name.",
               },
             };
           }
@@ -246,9 +246,17 @@ export const kycFlowScreen = async (decryptedBody: {
             };
           }
 
-          // KYC successful - mark user as verified
+          // KYC successful - mark user as verified and save names
+          await userService.updateUserKycInfo(phone, {
+            firstName,
+            lastName,
+          });
           await userService.markUserVerified(phone);
-          console.log("DEBUG: User marked as verified");
+          console.log(
+            "DEBUG: User marked as verified with names:",
+            firstName,
+            lastName,
+          );
 
           // Send WhatsApp message to user about successful verification
           try {

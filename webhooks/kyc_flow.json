@@ -131,7 +131,21 @@
               },
               {
                 "type": "TextBody",
-                "text": "Enter your 11-digit BVN. This must match the name and date of birth on your account."
+                "text": "Enter your details exactly as they appear on your BVN."
+              },
+              {
+                "type": "TextInput",
+                "label": "First Name",
+                "name": "first_name",
+                "required": true,
+                "input-type": "text"
+              },
+              {
+                "type": "TextInput",
+                "label": "Last Name",
+                "name": "last_name",
+                "required": true,
+                "input-type": "text"
               },
               {
                 "type": "TextInput",
@@ -161,8 +175,8 @@
                   "name": "data_exchange",
                   "payload": {
                     "country": "${data.country}",
-                    "first_name": "${data.first_name}",
-                    "last_name": "${data.last_name}",
+                    "first_name": "${form.first_name}",
+                    "last_name": "${form.last_name}",
                     "dob": "${data.dob}",
                     "bvn": "${form.bvn}"
                   }

@@ -9,6 +9,7 @@ import { getCountryCodeFromPhoneNumber } from "../utils/countryCodeMapping";
 type CreateUserType = {
   whatsappNumber: string;
   pin: string;
+  fullName: string;
 };
 
 type UpdateUserAfterBvnVerified = {
@@ -77,6 +78,7 @@ export class UserService {
                 country: extractedCountry,
                 pin,
                 userId,
+                fullName: data.fullName,
               },
             ],
             { session },
@@ -117,7 +119,26 @@ export class UserService {
    */
   async updateUserProfile(
     phoneNumber: string,
-    data: { firstName: string; lastName: string; dob: string },
+    data: { fullName: string; dob: string },
+  ) {
+    phoneNumber = phoneNumber.startsWith("+") ? phoneNumber : `+${phoneNumber}`;
+    const user = await User.findOneAndUpdate(
+      { whatsappNumber: phoneNumber },
+      {
+        fullName: data.fullName,
+        dob: data.dob,
+      },
+      { new: true },
+    );
+    return user;
+  }
+
+  /**
+   * Update user KYC info (first name, last name) after successful BVN verification
+   */
+  async updateUserKycInfo(
+    phoneNumber: string,
+    data: { firstName: string; lastName: string },
   ) {
     phoneNumber = phoneNumber.startsWith("+") ? phoneNumber : `+${phoneNumber}`;
     const user = await User.findOneAndUpdate(
@@ -125,7 +146,6 @@ export class UserService {
       {
         firstName: data.firstName,
         lastName: data.lastName,
-        dob: data.dob,
       },
       { new: true },
     );
