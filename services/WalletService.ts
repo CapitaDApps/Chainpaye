@@ -87,7 +87,7 @@ export class WalletService {
     const senderFullName = `${user.firstName} ${user.lastName}`;
     const fullName = `${toUser.firstName} ${toUser.lastName}`;
 
-    switch (currency) {
+    switch (currency.toUpperCase()) {
       case "USD":
         const respUSD = await toronetService.getBalanceUSD(
           fromWallet.publicKey,
@@ -279,7 +279,8 @@ export class WalletService {
         }
 
       default:
-        break;
+        console.log("Unsupported currency:", currency);
+        throw new Error(`Unsupported currency: ${currency}`);
     }
   }
 
