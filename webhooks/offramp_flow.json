@@ -11,7 +11,26 @@
     {
       "id": "OFFRAMP_DETAILS",
       "title": "Off-Ramp (Sell Crypto)",
-      "data": {},
+      "data": {
+        "banks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" }
+            }
+          },
+          "__example__": [
+            { "id": "000014", "title": "Access Bank" },
+            { "id": "000013", "title": "GTBank" }
+          ]
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        }
+      },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
@@ -20,106 +39,104 @@
             "text": "Withdraw to Bank"
           },
           {
-            "type": "Dropdown",
-            "name": "currency",
-            "label": "Asset to Sell",
-            "required": true,
-            "data-source": [
+            "type": "Form",
+            "name": "offramp_form",
+            "children": [
               {
-                "id": "USDT",
-                "title": "Tether (USDT)"
+                "type": "Dropdown",
+                "name": "currency",
+                "label": "Asset to Sell",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "USDT",
+                    "title": "Tether (USDT)"
+                  },
+                  {
+                    "id": "USDC",
+                    "title": "USD Coin (USDC)"
+                  }
+                ]
               },
               {
-                "id": "USDC",
-                "title": "USD Coin (USDC)"
+                "type": "Dropdown",
+                "name": "network",
+                "label": "Select Network",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "TRC20",
+                    "title": "Tron (TRC20)"
+                  },
+                  {
+                    "id": "BEP20",
+                    "title": "BNB Smart Chain (BEP20)"
+                  },
+                  {
+                    "id": "SOL",
+                    "title": "Solana (SOL)"
+                  },
+                  {
+                    "id": "ERC20",
+                    "title": "Ethereum (ERC20)"
+                  },
+                  {
+                    "id": "BASE",
+                    "title": "Base Network"
+                  }
+                ]
+              },
+              {
+                "type": "Dropdown",
+                "name": "bank_code",
+                "label": "Select Bank",
+                "required": true,
+                "data-source": "${data.banks}"
+              },
+              {
+                "type": "TextInput",
+                "name": "account_number",
+                "label": "Account Number",
+                "required": true,
+                "input-type": "text",
+                "helper-text": "Enter 10-digit account number"
+              },
+              {
+                "type": "TextInput",
+                "name": "sell_amount",
+                "label": "Amount",
+                "required": true,
+                "input-type": "text",
+                "helper-text": "Enter amount in NGN"
+              },
+              {
+                "type": "EmbeddedLink",
+                "text": "${data.error_message}",
+                "visible": "${data.error_message}",
+                "on-click-action": {
+                  "name": "navigate",
+                  "next": {
+                    "type": "screen",
+                    "name": "OFFRAMP_DETAILS"
+                  },
+                  "payload": {}
+                }
+              },
+              {
+                "type": "Footer",
+                "label": "Preview Withdrawal",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "currency": "${form.currency}",
+                    "network": "${form.network}",
+                    "sell_amount": "${form.sell_amount}",
+                    "bank_code": "${form.bank_code}",
+                    "account_number": "${form.account_number}"
+                  }
+                }
               }
             ]
-          },
-          {
-            "type": "Dropdown",
-            "name": "network",
-            "label": "Select Network",
-            "required": true,
-            "data-source": [
-              {
-                "id": "TRC20",
-                "title": "Tron (TRC20)"
-              },
-              {
-                "id": "BEP20",
-                "title": "BNB Smart Chain (BEP20)"
-              },
-              {
-                "id": "SOL",
-                "title": "Solana (SOL)"
-              },
-              {
-                "id": "ERC20",
-                "title": "Ethereum (ERC20)"
-              },
-              {
-                "id": "BASE",
-                "title": "Base Network"
-              }
-            ]
-          },
-          {
-            "type": "Dropdown",
-            "name": "bank_name",
-            "label": "Select Bank",
-            "required": true,
-            "data-source": [
-              {
-                "id": "ACCESS",
-                "title": "Access Bank"
-              },
-              {
-                "id": "GTB",
-                "title": "GTBank"
-              },
-              {
-                "id": "ZENITH",
-                "title": "Zenith Bank"
-              },
-              {
-                "id": "OPAY",
-                "title": "Opay"
-              },
-              {
-                "id": "KUDA",
-                "title": "Kuda Bank"
-              }
-            ]
-          },
-          {
-            "type": "TextInput",
-            "name": "account_number",
-            "label": "Account Number",
-            "required": true,
-            "input-type": "text",
-            "helper-text": "Enter 10-digit account number"
-          },
-          {
-            "type": "TextInput",
-            "name": "sell_amount",
-            "label": "Amount",
-            "required": true,
-            "input-type": "text",
-            "helper-text": "Enter amount in NGN"
-          },
-          {
-            "type": "Footer",
-            "label": "Preview Withdrawal",
-            "on-click-action": {
-              "name": "data_exchange",
-              "payload": {
-                "currency": "${form.currency}",
-                "network": "${form.network}",
-                "sell_amount": "${form.sell_amount}",
-                "bank_name": "${form.bank_name}",
-                "account_number": "${form.account_number}"
-              }
-            }
           }
         ]
       }
@@ -143,6 +160,10 @@
         "bank_name": {
           "type": "string",
           "__example__": "GTBank"
+        },
+        "bank_code": {
+          "type": "string",
+          "__example__": "000013"
         },
         "account_number": {
           "type": "string",
@@ -194,6 +215,7 @@
                 "currency": "${data.currency}",
                 "network": "${data.network}",
                 "bank_name": "${data.bank_name}",
+                "bank_code": "${data.bank_code}",
                 "account_number": "${data.account_number}"
               }
             }
@@ -220,6 +242,10 @@
         "bank_name": {
           "type": "string",
           "__example__": "GTBank"
+        },
+        "bank_code": {
+          "type": "string",
+          "__example__": "000013"
         },
         "account_number": {
           "type": "string",
@@ -262,28 +288,35 @@
             "text": "Enter PIN to Confirm"
           },
           {
-            "type": "TextInput",
-            "name": "pin",
-            "label": "4 Digit PIN",
-            "required": true,
-            "input-type": "password",
-            "min-chars": 4,
-            "max-chars": 4
-          },
-          {
-            "type": "Footer",
-            "label": "Sell & Withdraw",
-            "on-click-action": {
-              "name": "data_exchange",
-              "payload": {
-                "pin": "${form.pin}",
-                "sell_amount": "${data.sell_amount}",
-                "currency": "${data.currency}",
-                "network": "${data.network}",
-                "bank_name": "${data.bank_name}",
-                "account_number": "${data.account_number}"
+            "type": "Form",
+            "name": "pin_form",
+            "children": [
+              {
+                "type": "TextInput",
+                "name": "pin",
+                "label": "4 Digit PIN",
+                "required": true,
+                "input-type": "password",
+                "min-chars": 4,
+                "max-chars": 4
+              },
+              {
+                "type": "Footer",
+                "label": "Sell & Withdraw",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "pin": "${form.pin}",
+                    "sell_amount": "${data.sell_amount}",
+                    "currency": "${data.currency}",
+                    "network": "${data.network}",
+                    "bank_name": "${data.bank_name}",
+                    "bank_code": "${data.bank_code}",
+                    "account_number": "${data.account_number}"
+                  }
+                }
               }
-            }
+            ]
           }
         ]
       }

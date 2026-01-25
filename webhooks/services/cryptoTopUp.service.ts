@@ -1,7 +1,17 @@
 import { userService } from "../../services";
 import { redisClient } from "../../services/redis";
+import { ToronetService } from "../../services/ToronetService";
 
 type Network = "bsc" | "sol" | "eth" | "poly" | "trx" | "base";
+
+// Fallback banks in case API fails
+const FALLBACK_BANKS = [
+  { id: "000014", title: "Access Bank" },
+  { id: "000013", title: "GTBank" },
+  { id: "000015", title: "Zenith Bank" },
+  { id: "999992", title: "Opay" },
+  { id: "090267", title: "Kuda Bank" },
+];
 
 export const getCryptoTopUpScreen = async (decryptedBody: {
   screen: string;
@@ -11,6 +21,8 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
   flow_token: string;
 }) => {
   const { screen, data, version, action, flow_token } = decryptedBody;
+
+  const localToronetService = new ToronetService();
 
   // handle health check request
   if (action === "ping") {
@@ -33,23 +45,45 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
   }
 
   const userPhone = await redisClient.get(flow_token);
-  //const userPhone = "+2348110236998";
   const phone = userPhone?.startsWith("+") ? userPhone : `+${userPhone}`;
 
   // handle initial request when opening the flow
   if (action === "INIT") {
+    // Fetch banks from backend with fallback
+    let banks = FALLBACK_BANKS;
+    try {
+      const ngnBanks = await localToronetService.getBankListNGN();
+      if (ngnBanks && ngnBanks.length > 0) {
+        banks = ngnBanks;
+      }
+      console.log("DEBUG: Fetched banks from API:", banks.length);
+    } catch (error) {
+      console.error("DEBUG: Error fetching banks, using fallback:", error);
+    }
+
     return {
       screen: "OFFRAMP_DETAILS",
-      data: {},
+      data: {
+        banks: banks,
+      },
     };
   }
 
   if (action === "data_exchange") {
     if (!userPhone) {
+      // Fetch banks again for error screen
+      let banks = FALLBACK_BANKS;
+      try {
+        banks = await localToronetService.getBankListNGN();
+      } catch {
+        // Use fallback
+      }
+
       return {
-        screen,
+        screen: "OFFRAMP_DETAILS",
         data: {
-          error_message: "Session expired. Restart flow a new message",
+          banks: banks,
+          error_message: "Session expired. Please restart the flow.",
         },
       };
     }
@@ -57,7 +91,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
     // handle the request based on the current screen
     switch (screen) {
       case "OFFRAMP_DETAILS": {
-        const { currency, network, sell_amount, bank_name, account_number } =
+        const { currency, network, sell_amount, bank_code, account_number } =
           data;
 
         // Basic validation
@@ -65,16 +99,70 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
           !currency ||
           !network ||
           !sell_amount ||
-          !bank_name ||
+          !bank_code ||
           !account_number
         ) {
           console.error("Missing required fields", data);
-          // In a real scenario, we might return the same screen with an error message in data
-          // But for this flow structure we proceed or throw/log.
+          // Fetch banks for error return
+          let banks = FALLBACK_BANKS;
+          try {
+            banks = await localToronetService.getBankListNGN();
+          } catch {
+            // Use fallback
+          }
+          return {
+            screen: "OFFRAMP_DETAILS",
+            data: {
+              banks: banks,
+              error_message: "Please fill in all required fields.",
+            },
+          };
         }
 
-        // Mock recipient name resolution or use a placeholder
-        const recipientName = "User Account";
+        // Validate account number (10 digits for Nigerian banks)
+        if (account_number.length !== 10 || isNaN(Number(account_number))) {
+          let banks = FALLBACK_BANKS;
+          try {
+            banks = await localToronetService.getBankListNGN();
+          } catch {
+            // Use fallback
+          }
+          return {
+            screen: "OFFRAMP_DETAILS",
+            data: {
+              banks: banks,
+              error_message: "Account number must be exactly 10 digits.",
+            },
+          };
+        }
+
+        // Resolve bank name from bank code
+        let bankName = "Bank";
+        try {
+          const ngnBanks = await localToronetService.getBankListNGN();
+          const foundBank = ngnBanks.find((b) => b.id === bank_code);
+          if (foundBank) {
+            bankName = foundBank.title;
+          }
+        } catch (error) {
+          console.error("DEBUG: Error resolving bank name:", error);
+        }
+
+        // Resolve recipient name from account number
+        let recipientName = "Account Holder";
+        try {
+          const resolvedName =
+            await localToronetService.resolveBankAccountNameNGN(
+              account_number,
+              bank_code,
+            );
+          if (resolvedName) {
+            recipientName = resolvedName;
+          }
+        } catch (error) {
+          console.error("DEBUG: Error resolving account name:", error);
+          // Don't fail, just use placeholder
+        }
 
         return {
           screen: "OFFRAMP_FIAT_REVIEW",
@@ -82,7 +170,8 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
             currency,
             network,
             sell_amount,
-            bank_name,
+            bank_name: bankName,
+            bank_code,
             account_number,
             recipient_name: recipientName,
           },
@@ -107,6 +196,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
           currency,
           network,
           bank_name,
+          bank_code,
           account_number,
         } = data;
 
@@ -115,6 +205,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
           return {
             screen: "OFFRAMP_CRYPTO_REVIEW",
             data: {
+              ...data,
               error_message: "User not found.",
             },
           };
@@ -125,6 +216,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
           return {
             screen: "OFFRAMP_CRYPTO_REVIEW",
             data: {
+              ...data,
               error_message: "Invalid PIN",
             },
           };
