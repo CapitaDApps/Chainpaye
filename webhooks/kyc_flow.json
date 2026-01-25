@@ -3,8 +3,8 @@
   "data_api_version": "3.0",
   "routing_model": {
     "COUNTRY_SELECT": ["BVN_INPUT"],
-    "BVN_INPUT": ["SUCCESS"],
-    "SUCCESS": []
+    "BVN_INPUT": ["VERIFICATION_COMPLETE"],
+    "VERIFICATION_COMPLETE": []
   },
   "screens": [
     {
@@ -174,7 +174,7 @@
       }
     },
     {
-      "id": "SUCCESS",
+      "id": "VERIFICATION_COMPLETE",
       "title": "Verification Complete",
       "terminal": true,
       "success": true,

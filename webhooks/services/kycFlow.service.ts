@@ -2,12 +2,13 @@ import { Wallet } from "../../models/Wallet";
 import { redisClient } from "../../services/redis";
 import { ToronetService } from "../../services/ToronetService";
 import { UserService } from "../../services/UserService";
+import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService";
 import { formatDate } from "../utils/formatDate";
 
 // ============================================================
 // KYC FLOW SERVICE
 // Handles BVN verification for Nigerian users
-// Flow: COUNTRY_SELECT → BVN_INPUT → VERIFYING → SUCCESS
+// Flow: COUNTRY_SELECT → BVN_INPUT → VERIFICATION_COMPLETE
 // ============================================================
 
 const supportedCountries = [{ id: "NG", title: "Nigeria" }];
@@ -29,6 +30,7 @@ export const kycFlowScreen = async (decryptedBody: {
 
   const userService = new UserService();
   const toronetService = new ToronetService();
+  const whatsappBusinessService = new WhatsAppBusinessService();
 
   // Handle health check request
   if (action === "ping") {
@@ -88,7 +90,7 @@ export const kycFlowScreen = async (decryptedBody: {
     // Check if already verified
     if (user.isVerified) {
       return {
-        screen: "SUCCESS",
+        screen: "VERIFICATION_COMPLETE",
         data: {
           already_verified: true,
         },
@@ -119,7 +121,7 @@ export const kycFlowScreen = async (decryptedBody: {
 
         if (selectedCountry !== "NG") {
           return {
-            screen: "SUCCESS",
+            screen: "VERIFICATION_COMPLETE",
             data: {
               not_required: true,
               message:
@@ -248,6 +250,21 @@ export const kycFlowScreen = async (decryptedBody: {
           await userService.markUserVerified(phone);
           console.log("DEBUG: User marked as verified");
 
+          // Send WhatsApp message to user about successful verification
+          try {
+            await whatsappBusinessService.sendNormalMessage(
+              `🎉 *KYC Verification Successful!*\n\nCongratulations ${firstName}! Your identity has been verified.\n\nYou now have full access to all Chainpaye features including:\n✅ Bank withdrawals\n✅ Higher transaction limits\n✅ Full account access`,
+              phone,
+            );
+            console.log("DEBUG: KYC success WhatsApp message sent");
+          } catch (msgError) {
+            console.error(
+              "DEBUG: Error sending KYC success message:",
+              msgError,
+            );
+            // Don't fail the flow if message fails
+          }
+
           // Create virtual NGN wallet
           try {
             const wallet = await Wallet.findOne({ userId: user.userId });
@@ -275,7 +292,7 @@ export const kycFlowScreen = async (decryptedBody: {
           );
 
           return {
-            screen: "SUCCESS",
+            screen: "VERIFICATION_COMPLETE",
             data: {
               first_name: firstName,
               verified: true,
