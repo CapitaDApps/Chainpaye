@@ -153,7 +153,11 @@ export const userSetupScreen = async (decryptedBody: {
         return {
           screen: "SECURITY_INFO",
           data: {
-            full_name: data.full_name,
+            full_name:
+              data.full_name ||
+              (data.first_name && data.last_name
+                ? `${data.first_name} ${data.last_name}`
+                : undefined),
             first_name: data.first_name,
             last_name: data.last_name,
             dob: data.dob,
@@ -233,23 +237,27 @@ export const userSetupScreen = async (decryptedBody: {
             await userService.createUser({
               whatsappNumber: phone,
               pin: pin,
-              fullName: data.full_name,
+              fullName:
+                data.full_name || `${data.first_name} ${data.last_name}`,
             });
             console.log("DEBUG: User created successfully");
           }
 
           // Update user with profile information
           await userService.updateUserProfile(phone, {
-            fullName: data.full_name,
+            fullName: data.full_name || `${data.first_name} ${data.last_name}`,
             dob: data.dob,
           });
           console.log("DEBUG: User profile updated");
 
           // Store account creation info in Redis for welcome message
+          const userFullName =
+            data.full_name || `${data.first_name} ${data.last_name}`;
+
           await redisClient.set(
             `${flow_token}_accountCreation`,
             JSON.stringify({
-              fullName: data.full_name,
+              fullName: userFullName,
               country: data.country,
               needsKyc: data.country === "NG",
             }),
@@ -260,7 +268,8 @@ export const userSetupScreen = async (decryptedBody: {
           return {
             screen: "SUCCESSFUL",
             data: {
-              first_name: data.first_name,
+              first_name:
+                data.first_name || userFullName.split(" ")[0] || "User",
               needs_kyc: data.country === "NG",
             },
           };

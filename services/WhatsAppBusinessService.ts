@@ -254,14 +254,15 @@ export class WhatsAppBusinessService {
 
     await this.sendImageFlowById(to, introFlowId, introInitScreedId, {
       link,
-      body: `Chainpaye💳 allows
+      body: `Welcome to Chainpaye! 🚀
 
-- Send & Receive money in 🇺🇸 USD, 🇪🇺 EUR, 🇬🇧 GBP 💸
-  ———————————————————
-- Generate payment links in 🇺🇸 USD, 🇪🇺 EUR, 🇬🇧 GBP, 🇳🇬NGN🔗-get paid faster 🤑
-  ———————————————————
-- Off-ramp crypto to fiat 🔄️ in under 50 seconds ⏱️
-  All within WhatsApp 📱 - simple & secure!`,
+We make managing money as easy as sending a text. Here's what you can do:
+
+💸 **Global Transfers**: Send & receive USD, EUR, and GBP instantly.
+🔗 **Get Paid Fast**: Create payment links in seconds.
+🔄 **Crypto to Cash**: Convert crypto to fiat in under 50 seconds.
+
+No complex apps, just secure & fast payments right here! ✨`,
       cta: "Sign Up",
     });
   }

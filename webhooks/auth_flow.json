@@ -157,6 +157,7 @@
                 "on-click-action": {
                   "name": "data_exchange",
                   "payload": {
+                    "full_name": "${data.full_name}",
                     "first_name": "${data.first_name}",
                     "last_name": "${data.last_name}",
                     "dob": "${data.dob}",
@@ -243,6 +244,7 @@
                 "on-click-action": {
                   "name": "data_exchange",
                   "payload": {
+                    "full_name": "${data.full_name}",
                     "first_name": "${data.first_name}",
                     "last_name": "${data.last_name}",
                     "dob": "${data.dob}",
