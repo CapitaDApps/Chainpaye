@@ -99,8 +99,7 @@ export const kycFlowScreen = async (decryptedBody: {
       screen: "COUNTRY_SELECT",
       data: {
         countries: supportedCountries,
-        first_name: user.firstName || "",
-        last_name: user.lastName || "",
+        full_name: user.fullName || "", // Show fullName from onboarding
         dob: user.dob || "",
       },
     };
@@ -135,8 +134,7 @@ export const kycFlowScreen = async (decryptedBody: {
           screen: "BVN_INPUT",
           data: {
             country: selectedCountry,
-            first_name: userForBvn?.firstName || data.first_name || "",
-            last_name: userForBvn?.lastName || data.last_name || "",
+            full_name: userForBvn?.fullName || "", // Show fullName from onboarding
             dob: userForBvn?.dob || data.dob || "",
           },
         };
@@ -149,6 +147,8 @@ export const kycFlowScreen = async (decryptedBody: {
         console.log("DEBUG: Case BVN_INPUT");
         try {
           const bvn = data.bvn?.trim();
+          const firstName = data.first_name?.trim();
+          const lastName = data.last_name?.trim();
 
           // Validate BVN format
           if (!bvn || bvn.length !== 11) {
@@ -156,6 +156,7 @@ export const kycFlowScreen = async (decryptedBody: {
               screen: "BVN_INPUT",
               data: {
                 country: data.country,
+                full_name: data.full_name,
                 first_name: data.first_name,
                 last_name: data.last_name,
                 dob: data.dob,
@@ -169,10 +170,40 @@ export const kycFlowScreen = async (decryptedBody: {
               screen: "BVN_INPUT",
               data: {
                 country: data.country,
+                full_name: data.full_name,
                 first_name: data.first_name,
                 last_name: data.last_name,
                 dob: data.dob,
                 error_message: "BVN must contain numbers only",
+              },
+            };
+          }
+
+          // Validate first and last names
+          if (!firstName || firstName.length < 2) {
+            return {
+              screen: "BVN_INPUT",
+              data: {
+                country: data.country,
+                full_name: data.full_name,
+                first_name: data.first_name,
+                last_name: data.last_name,
+                dob: data.dob,
+                error_message: "Please enter a valid first name",
+              },
+            };
+          }
+
+          if (!lastName || lastName.length < 2) {
+            return {
+              screen: "BVN_INPUT",
+              data: {
+                country: data.country,
+                full_name: data.full_name,
+                first_name: data.first_name,
+                last_name: data.last_name,
+                dob: data.dob,
+                error_message: "Please enter a valid last name",
               },
             };
           }
@@ -186,6 +217,7 @@ export const kycFlowScreen = async (decryptedBody: {
               screen: "BVN_INPUT",
               data: {
                 country: data.country,
+                full_name: data.full_name,
                 first_name: data.first_name,
                 last_name: data.last_name,
                 dob: data.dob,
@@ -195,28 +227,27 @@ export const kycFlowScreen = async (decryptedBody: {
             };
           }
 
-          // Use user data for KYC if available
-          const firstName = user.firstName || data.first_name;
-          const lastName = user.lastName || data.last_name;
+          // Use DOB from user profile
           const dob = user.dob || data.dob;
 
-          if (!firstName || !lastName || !dob) {
+          if (!dob) {
             return {
               screen: "BVN_INPUT",
               data: {
                 country: data.country,
+                full_name: data.full_name,
                 first_name: data.first_name,
                 last_name: data.last_name,
                 dob: data.dob,
                 error_message:
-                  "Profile information incomplete. Please update your profile first.",
+                  "Date of birth missing. Please update your profile first.",
               },
             };
           }
 
           console.log("DEBUG: Performing KYC with BVN");
 
-          // Perform KYC verification via Toronet
+          // Perform KYC verification via Toronet using the entered first/last names
           const kycResult = await toronetService.performKYC({
             firstName: firstName,
             lastName: lastName,
@@ -234,29 +265,33 @@ export const kycFlowScreen = async (decryptedBody: {
               screen: "BVN_INPUT",
               data: {
                 country: data.country,
+                full_name: data.full_name,
                 first_name: firstName,
                 last_name: lastName,
                 dob: dob,
                 error_message:
                   kycResult.message ||
-                  "BVN verification failed. Please check your details.",
+                  "BVN verification failed. Please check your details and ensure your first name, last name match your BVN records exactly.",
               },
             };
           }
 
-          // KYC successful - mark user as verified
-          await userService.markUserVerified(phone);
-          console.log("DEBUG: User marked as verified");
+          // KYC successful - save the verified first/last names to user profile
+          await userService.updateUserKycInfo(phone, {
+            firstName: firstName,
+            lastName: lastName,
+          });
+          console.log("DEBUG: User KYC info updated with verified names");
 
-          // Create virtual NGN wallet
+          // Create virtual NGN wallet using the user's fullName (from onboarding)
           try {
             const wallet = await Wallet.findOne({ userId: user.userId });
             if (wallet) {
               await toronetService.createVirtualWalletNGN({
                 address: wallet.publicKey,
-                fullName: `${firstName} ${lastName}`,
+                fullName: user.fullName, // Use fullName from onboarding for wallet
               });
-              console.log("DEBUG: Virtual NGN wallet created");
+              console.log("DEBUG: Virtual NGN wallet created with fullName");
             }
           } catch (walletError) {
             console.error("DEBUG: Error creating virtual wallet:", walletError);
@@ -267,7 +302,9 @@ export const kycFlowScreen = async (decryptedBody: {
           await redisClient.set(
             `${flow_token}_kycComplete`,
             JSON.stringify({
-              fullName: `${firstName} ${lastName}`,
+              fullName: user.fullName, // Use fullName from onboarding
+              verifiedFirstName: firstName, // Store verified names separately
+              verifiedLastName: lastName,
               verified: true,
             }),
             "EX",
@@ -277,7 +314,7 @@ export const kycFlowScreen = async (decryptedBody: {
           return {
             screen: "SUCCESS",
             data: {
-              first_name: firstName,
+              first_name: firstName, // Show verified first name
               verified: true,
             },
           };
@@ -287,6 +324,7 @@ export const kycFlowScreen = async (decryptedBody: {
             screen: "BVN_INPUT",
             data: {
               country: data.country,
+              full_name: data.full_name,
               first_name: data.first_name,
               last_name: data.last_name,
               dob: data.dob,

@@ -13,8 +13,9 @@ import { IWallet } from "./Wallet";
 export interface IUser extends Document {
   whatsappNumber: string;
   userId: string;
-  firstName?: string;
-  lastName?: string;
+  firstName?: string; // Set during KYC verification
+  lastName?: string;  // Set during KYC verification
+  fullName: string;   // Set during onboarding, used for wallet creation
   email?: string;
   country: string;
   currency: "USD" | "NGN";
@@ -51,12 +52,22 @@ const UserSchema: Schema = new Schema(
       type: String,
       trim: true,
       maxlength: 150,
+      // Set during KYC verification
     },
 
     lastName: {
       type: String,
       trim: true,
       maxlength: 150,
+      // Set during KYC verification
+    },
+
+    fullName: {
+      type: String,
+      required: true, // Required during onboarding
+      trim: true,
+      maxlength: 300,
+      // Used for wallet creation and display before KYC
     },
 
     email: {

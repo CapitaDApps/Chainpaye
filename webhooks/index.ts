@@ -167,7 +167,7 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
                     account = JSON.parse(userAccount);
                   }
 
-                  // Send welcome message
+                  // Send welcome message using fullName
                   await whatsappBusinessService.sendNormalMessage(
                     `Hello *${
                       account?.fullName || profile.name
@@ -191,8 +191,16 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
                 // Handle KYC verification completion
                 if (responseJson.type == "kyc-complete") {
                   await replyingMessage(message.id);
+                  const kycData = await redisClient.get(
+                    `${responseJson.flow_token}_kycComplete`,
+                  );
+                  let kyc: any;
+                  if (kycData) {
+                    kyc = JSON.parse(kycData);
+                  }
+
                   await whatsappBusinessService.sendNormalMessage(
-                    "Your account has been fully verified! 🎉 You now have access to all Chainpaye features.",
+                    `Your account has been fully verified! 🎉 You now have access to all Chainpaye features.\n\nVerified Name: ${kyc?.verifiedFirstName} ${kyc?.verifiedLastName}`,
                     message.from,
                   );
                   await whatsappBusinessService.sendMenuMessageMyFlowId(

@@ -9,6 +9,7 @@ import { getCountryCodeFromPhoneNumber } from "../utils/countryCodeMapping";
 type CreateUserType = {
   whatsappNumber: string;
   pin: string;
+  fullName: string; // Full name for wallet creation
 };
 
 type UpdateUserAfterBvnVerified = {
@@ -73,7 +74,7 @@ export class UserService {
             [
               {
                 whatsappNumber: data.whatsappNumber,
-
+                fullName: data.fullName, // Store full name for wallet creation
                 country: extractedCountry,
                 pin,
                 userId,
@@ -112,12 +113,32 @@ export class UserService {
   }
 
   /**
-   * Update user profile information (name, DOB) without PIN change
-   * Used during registration to save profile after user creation
+   * Update user profile information during onboarding
+   * Used to save fullName and DOB after user creation
    */
   async updateUserProfile(
     phoneNumber: string,
-    data: { firstName: string; lastName: string; dob: string },
+    data: { fullName: string; dob: string },
+  ) {
+    phoneNumber = phoneNumber.startsWith("+") ? phoneNumber : `+${phoneNumber}`;
+    const user = await User.findOneAndUpdate(
+      { whatsappNumber: phoneNumber },
+      {
+        fullName: data.fullName,
+        dob: data.dob,
+      },
+      { new: true },
+    );
+    return user;
+  }
+
+  /**
+   * Update user with verified KYC information
+   * Called after successful BVN verification to save verified first/last names
+   */
+  async updateUserKycInfo(
+    phoneNumber: string,
+    data: { firstName: string; lastName: string },
   ) {
     phoneNumber = phoneNumber.startsWith("+") ? phoneNumber : `+${phoneNumber}`;
     const user = await User.findOneAndUpdate(
@@ -125,7 +146,7 @@ export class UserService {
       {
         firstName: data.firstName,
         lastName: data.lastName,
-        dob: data.dob,
+        isVerified: true, // Mark as verified when KYC info is saved
       },
       { new: true },
     );

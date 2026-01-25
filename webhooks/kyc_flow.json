@@ -22,13 +22,9 @@
           },
           "__example__": [{ "id": "NG", "title": "Nigeria" }]
         },
-        "first_name": {
+        "full_name": {
           "type": "string",
-          "__example__": "John"
-        },
-        "last_name": {
-          "type": "string",
-          "__example__": "Doe"
+          "__example__": "John Doe"
         },
         "dob": {
           "type": "string",
@@ -52,7 +48,7 @@
               },
               {
                 "type": "TextBody",
-                "text": "Complete your Bank Verification Number (BVN) verification to unlock all features."
+                "text": "Complete your Bank Verification Number (BVN) verification to unlock all features. Enter your names exactly as they appear on your BVN."
               },
               {
                 "type": "Dropdown",
@@ -82,8 +78,7 @@
                   "name": "data_exchange",
                   "payload": {
                     "country": "${form.country}",
-                    "first_name": "${data.first_name}",
-                    "last_name": "${data.last_name}",
+                    "full_name": "${data.full_name}",
                     "dob": "${data.dob}"
                   }
                 }
@@ -100,6 +95,10 @@
         "country": {
           "type": "string",
           "__example__": "NG"
+        },
+        "full_name": {
+          "type": "string",
+          "__example__": "John Doe"
         },
         "first_name": {
           "type": "string",
@@ -131,7 +130,23 @@
               },
               {
                 "type": "TextBody",
-                "text": "Enter your 11-digit BVN. This must match the name and date of birth on your account."
+                "text": "Enter your names exactly as they appear on your BVN records, then provide your 11-digit BVN."
+              },
+              {
+                "type": "TextInput",
+                "label": "First Name",
+                "name": "first_name",
+                "required": true,
+                "input-type": "text",
+                "helper-text": "As shown on your BVN"
+              },
+              {
+                "type": "TextInput",
+                "label": "Last Name", 
+                "name": "last_name",
+                "required": true,
+                "input-type": "text",
+                "helper-text": "As shown on your BVN"
               },
               {
                 "type": "TextInput",
@@ -161,8 +176,9 @@
                   "name": "data_exchange",
                   "payload": {
                     "country": "${data.country}",
-                    "first_name": "${data.first_name}",
-                    "last_name": "${data.last_name}",
+                    "full_name": "${data.full_name}",
+                    "first_name": "${form.first_name}",
+                    "last_name": "${form.last_name}",
                     "dob": "${data.dob}",
                     "bvn": "${form.bvn}"
                   }

@@ -426,13 +426,21 @@ What would you like to sell?`;
     // }
 
     // message should contain the user's account, number, name and balances
-    let message = `👋 Hello, ${user.firstName || user.lastName}
+    let message = `👋 Hello, ${user.isVerified && user.firstName && user.lastName 
+      ? `${user.firstName} ${user.lastName}` 
+      : user.fullName}
 
 Account No: ${user.whatsappNumber.replace("+", "")}
+${user.isVerified ? '✅ Verified Account' : '⚠️ Unverified Account'}
 
 Available Balances:
 🇳🇬 NGN: ₦ ${ngnBalance.balance.toFixed(2)}
 🇺🇸 USD: $${usdBalance.balance.toFixed(2)}`;
+
+    // Add verification reminder for unverified Nigerian users
+    if (!user.isVerified && user.country === "NG") {
+      message += `\n\n🔒 Complete your BVN verification to unlock all features including bank withdrawals. Type 'kyc' to start.`;
+    }
 
     let accountnumber: string | null = null;
 

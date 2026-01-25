@@ -80,34 +80,35 @@ export const userSetupScreen = async (decryptedBody: {
     switch (screen) {
       // --------------------------------------------------------
       // PERSONAL_INFO → COUNTRY_SELECT
-      // User submits name and DOB
+      // User submits full name and DOB
       // --------------------------------------------------------
       case "PERSONAL_INFO":
         console.log("DEBUG: Case PERSONAL_INFO");
         try {
-          const firstName = data.first_name?.trim();
-          const lastName = data.last_name?.trim();
+          const fullName = data.full_name?.trim();
           const dob = data.dob;
 
           // Validate required fields
-          if (!firstName || firstName.length < 2) {
+          if (!fullName || fullName.length < 3) {
             return {
               screen: "PERSONAL_INFO",
               data: {
                 countries: countries,
                 default_country: data.country || "NG",
-                error_message: "Please enter a valid first name",
+                error_message: "Please enter your full name (at least 3 characters)",
               },
             };
           }
 
-          if (!lastName || lastName.length < 2) {
+          // Validate that full name has at least 2 words (first and last name)
+          const nameParts = fullName.split(' ').filter((part: string) => part.length > 0);
+          if (nameParts.length < 2) {
             return {
               screen: "PERSONAL_INFO",
               data: {
                 countries: countries,
                 default_country: data.country || "NG",
-                error_message: "Please enter a valid last name",
+                error_message: "Please enter your full name (first and last name)",
               },
             };
           }
@@ -130,8 +131,7 @@ export const userSetupScreen = async (decryptedBody: {
           return {
             screen: "COUNTRY_SELECT",
             data: {
-              first_name: firstName,
-              last_name: lastName,
+              full_name: fullName,
               dob: dob,
               countries: countries,
               default_country: getCountryCodeFromPhoneNumber(phone) || "NG",
@@ -158,8 +158,7 @@ export const userSetupScreen = async (decryptedBody: {
         return {
           screen: "SECURITY_INFO",
           data: {
-            first_name: data.first_name,
-            last_name: data.last_name,
+            full_name: data.full_name,
             dob: data.dob,
             country: data.country || "NG",
           },
@@ -176,8 +175,7 @@ export const userSetupScreen = async (decryptedBody: {
             return {
               screen: "SECURITY_INFO",
               data: {
-                first_name: data.first_name,
-                last_name: data.last_name,
+                full_name: data.full_name,
                 dob: data.dob,
                 country: data.country,
                 error_message: "Session expired. Please restart the flow.",
@@ -193,8 +191,7 @@ export const userSetupScreen = async (decryptedBody: {
             return {
               screen: "SECURITY_INFO",
               data: {
-                first_name: data.first_name,
-                last_name: data.last_name,
+                full_name: data.full_name,
                 dob: data.dob,
                 country: data.country,
                 error_message: "PIN must be exactly 4 digits",
@@ -206,8 +203,7 @@ export const userSetupScreen = async (decryptedBody: {
             return {
               screen: "SECURITY_INFO",
               data: {
-                first_name: data.first_name,
-                last_name: data.last_name,
+                full_name: data.full_name,
                 dob: data.dob,
                 country: data.country,
                 error_message: "PIN must contain numbers only",
@@ -219,8 +215,7 @@ export const userSetupScreen = async (decryptedBody: {
             return {
               screen: "SECURITY_INFO",
               data: {
-                first_name: data.first_name,
-                last_name: data.last_name,
+                full_name: data.full_name,
                 dob: data.dob,
                 country: data.country,
                 error_message: "PINs do not match. Please try again.",
@@ -233,18 +228,18 @@ export const userSetupScreen = async (decryptedBody: {
           console.log("DEBUG: Existing user found?", !!existingUser);
 
           if (!existingUser) {
-            // Create new user WITHOUT KYC verification
+            // Create new user with fullName for wallet creation
             await userService.createUser({
               whatsappNumber: phone,
               pin: pin,
+              fullName: data.full_name,
             });
             console.log("DEBUG: User created successfully");
           }
 
-          // Update user with profile information
+          // Update user with profile information (fullName and DOB)
           await userService.updateUserProfile(phone, {
-            firstName: data.first_name,
-            lastName: data.last_name,
+            fullName: data.full_name,
             dob: data.dob,
           });
           console.log("DEBUG: User profile updated");
@@ -253,7 +248,7 @@ export const userSetupScreen = async (decryptedBody: {
           await redisClient.set(
             `${flow_token}_accountCreation`,
             JSON.stringify({
-              fullName: `${data.first_name} ${data.last_name}`,
+              fullName: data.full_name,
               country: data.country,
               needsKyc: data.country === "NG",
             }),
@@ -264,7 +259,7 @@ export const userSetupScreen = async (decryptedBody: {
           return {
             screen: "SUCCESSFUL",
             data: {
-              first_name: data.first_name,
+              full_name: data.full_name,
               needs_kyc: data.country === "NG",
             },
           };
@@ -273,8 +268,7 @@ export const userSetupScreen = async (decryptedBody: {
           return {
             screen: "SECURITY_INFO",
             data: {
-              first_name: data.first_name,
-              last_name: data.last_name,
+              full_name: data.full_name,
               dob: data.dob,
               country: data.country,
               error_message: "Failed to create account. Please try again.",
