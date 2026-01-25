@@ -482,6 +482,7 @@ Our team is ready to assist you!`;
     flowId: string,
     screenId: string,
     data: {
+      header?: string;
       link: string;
       body: string;
       cta: string;
