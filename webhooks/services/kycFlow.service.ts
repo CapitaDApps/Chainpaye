@@ -140,7 +140,7 @@ export const kycFlowScreen = async (decryptedBody: {
             full_name: userForBvn?.fullName || "",
             first_name: "", // Force user to enter
             last_name: "", // Force user to enter
-            dob: userForBvn?.dob || data.dob || "",
+            dob: "", // Force user to enter
           },
         };
 
@@ -201,7 +201,7 @@ export const kycFlowScreen = async (decryptedBody: {
           // Use explicit data from form for KYC
           const firstName = data.first_name?.trim();
           const lastName = data.last_name?.trim();
-          const dob = user.dob || data.dob;
+          const dob = data.dob;
 
           if (!firstName || !lastName || !dob) {
             return {
@@ -211,7 +211,24 @@ export const kycFlowScreen = async (decryptedBody: {
                 first_name: firstName,
                 last_name: lastName,
                 dob: dob,
-                error_message: "Please enter both First Name and Last Name.",
+                error_message:
+                  "Please enter First Name, Last Name and Date of Birth.",
+              },
+            };
+          }
+
+          // Age validation - must be 18+
+          const currentYear = new Date().getFullYear();
+          const birthYear = Number(dob.split("-")[0]);
+          if (currentYear - birthYear < 18) {
+            return {
+              screen: "BVN_INPUT",
+              data: {
+                country: data.country,
+                first_name: firstName,
+                last_name: lastName,
+                dob: dob,
+                error_message: "You must be 18 and above to use Chainpaye",
               },
             };
           }
@@ -246,16 +263,22 @@ export const kycFlowScreen = async (decryptedBody: {
             };
           }
 
-          // KYC successful - mark user as verified and save names
+          // KYC successful - mark user as verified and save names AND DOB
           await userService.updateUserKycInfo(phone, {
             firstName,
             lastName,
           });
+          // Update DOB as well since it's now collected here
+          await userService.updateUserProfile(phone, {
+            dob: dob,
+          });
+
           await userService.markUserVerified(phone);
           console.log(
             "DEBUG: User marked as verified with names:",
             firstName,
             lastName,
+            dob,
           );
 
           // Send WhatsApp message to user about successful verification

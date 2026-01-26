@@ -148,6 +148,15 @@
                 "input-type": "text"
               },
               {
+                "type": "DatePicker",
+                "label": "Date of Birth",
+                "name": "dob",
+                "required": true,
+                "min-date": "1900-01-01",
+                "max-date": "2010-01-01",
+                "helper-text": "You must be 18 or older"
+              },
+              {
                 "type": "TextInput",
                 "label": "BVN",
                 "name": "bvn",
@@ -177,7 +186,7 @@
                     "country": "${data.country}",
                     "first_name": "${form.first_name}",
                     "last_name": "${form.last_name}",
-                    "dob": "${data.dob}",
+                    "dob": "${form.dob}",
                     "bvn": "${form.bvn}"
                   }
                 }

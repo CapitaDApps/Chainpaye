@@ -2,8 +2,7 @@
   "version": "7.2",
   "data_api_version": "3.0",
   "routing_model": {
-    "PERSONAL_INFO": ["COUNTRY_SELECT"],
-    "COUNTRY_SELECT": ["SECURITY_INFO"],
+    "PERSONAL_INFO": ["SECURITY_INFO"],
     "SECURITY_INFO": ["SUCCESSFUL"],
     "SUCCESSFUL": []
   },
@@ -59,13 +58,19 @@
                 "helper-text": "e.g. John Doe"
               },
               {
-                "type": "DatePicker",
-                "label": "Date of Birth",
-                "name": "dob",
+                "type": "Dropdown",
+                "label": "Country",
+                "name": "country",
                 "required": true,
-                "min-date": "1900-01-01",
-                "max-date": "2010-01-01",
-                "helper-text": "You must be 18 or older"
+                "data-source": [
+                  { "id": "NG", "title": "Nigeria" },
+                  { "id": "US", "title": "United States" },
+                  { "id": "GB", "title": "United Kingdom" },
+                  { "id": "CA", "title": "Canada" },
+                  { "id": "GH", "title": "Ghana" },
+                  { "id": "KE", "title": "Kenya" },
+                  { "id": "ZA", "title": "South Africa" }
+                ]
               },
               {
                 "type": "EmbeddedLink",
@@ -87,7 +92,7 @@
                   "name": "data_exchange",
                   "payload": {
                     "full_name": "${form.full_name}",
-                    "dob": "${form.dob}"
+                    "country": "${form.country}"
                   }
                 }
               }
@@ -148,8 +153,15 @@
                 "label": "Country",
                 "name": "country",
                 "required": true,
-                "data-source": "${data.countries}",
-                "init-value": "${data.default_country}"
+                "data-source": [
+                  { "id": "NG", "title": "Nigeria" },
+                  { "id": "US", "title": "United States" },
+                  { "id": "GB", "title": "United Kingdom" },
+                  { "id": "CA", "title": "Canada" },
+                  { "id": "GH", "title": "Ghana" },
+                  { "id": "KE", "title": "Kenya" },
+                  { "id": "ZA", "title": "South Africa" }
+                ]
               },
               {
                 "type": "Footer",
@@ -226,19 +238,6 @@
                 "input-type": "password"
               },
               {
-                "type": "EmbeddedLink",
-                "text": "${data.error_message}",
-                "visible": "${data.error_message}",
-                "on-click-action": {
-                  "name": "navigate",
-                  "next": {
-                    "type": "screen",
-                    "name": "SECURITY_INFO"
-                  },
-                  "payload": {}
-                }
-              },
-              {
                 "type": "Footer",
                 "label": "Complete Setup",
                 "on-click-action": {
@@ -283,7 +282,7 @@
           },
           {
             "type": "TextBody",
-            "text": "Hi ${data.first_name}, your account has been created successfully!"
+            "text": "`'Hi '${data.first_name}', your account has been created successfully!'`"
           },
           {
             "type": "TextBody",
@@ -292,8 +291,7 @@
           },
           {
             "type": "TextBody",
-            "text": "To unlock all features including bank withdrawals, please complete your BVN verification.",
-            "visible": "${data.needs_kyc}"
+            "text": "To unlock all features including bank withdrawals, please complete your BVN verification."
           },
           {
             "type": "Footer",

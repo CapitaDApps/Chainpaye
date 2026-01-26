@@ -118,16 +118,17 @@ export class UserService {
    * Used during registration to save profile after user creation
    */
   async updateUserProfile(
-    phoneNumber: string,
-    data: { fullName: string; dob: string },
+    phoneNumber: string, // parameter name was mismatched in previous attempt
+    data: { fullName?: string; dob?: string },
   ) {
     phoneNumber = phoneNumber.startsWith("+") ? phoneNumber : `+${phoneNumber}`;
+    const updates: any = {};
+    if (data.fullName) updates.fullName = data.fullName;
+    if (data.dob) updates.dob = data.dob;
+
     const user = await User.findOneAndUpdate(
       { whatsappNumber: phoneNumber },
-      {
-        fullName: data.fullName,
-        dob: data.dob,
-      },
+      updates,
       { new: true },
     );
     return user;
