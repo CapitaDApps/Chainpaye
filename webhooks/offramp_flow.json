@@ -2,121 +2,381 @@
   "version": "6.0",
   "data_api_version": "3.0",
   "routing_model": {
-    "OFFRAMP_DETAILS": ["OFFRAMP_FIAT_REVIEW"],
-    "OFFRAMP_FIAT_REVIEW": ["OFFRAMP_CRYPTO_REVIEW"],
-    "OFFRAMP_CRYPTO_REVIEW": ["OFFRAMP_SUCCESS"],
+    "OFFRAMP_ASSET_SELECTION": ["OFFRAMP_WALLET_DISPLAY"],
+    "OFFRAMP_WALLET_DISPLAY": ["OFFRAMP_AMOUNT_INPUT"],
+    "OFFRAMP_AMOUNT_INPUT": ["OFFRAMP_BANK_SELECTION"],
+    "OFFRAMP_BANK_SELECTION": ["OFFRAMP_ACCOUNT_INPUT"],
+    "OFFRAMP_ACCOUNT_INPUT": ["OFFRAMP_ACCOUNT_CONFIRMATION"],
+    "OFFRAMP_ACCOUNT_CONFIRMATION": ["OFFRAMP_QUOTE_REVIEW"],
+    "OFFRAMP_QUOTE_REVIEW": ["OFFRAMP_PIN_VERIFICATION"],
+    "OFFRAMP_PIN_VERIFICATION": ["OFFRAMP_SUCCESS"],
     "OFFRAMP_SUCCESS": []
   },
   "screens": [
     {
-      "id": "OFFRAMP_DETAILS",
-      "title": "Off-Ramp (Sell Crypto)",
-      "data": {},
+      "id": "OFFRAMP_ASSET_SELECTION",
+      "title": "Crypto Off-ramp",
+      "data": {
+        "user_wallets": {
+          "type": "array",
+          "__example__": [
+            {
+              "chain": "Solana",
+              "address": "Dbt7NnCK15bqJMESTw462wup3s1FVh7jyaDGV26x58iH",
+              "balance": "125.50 USDC"
+            }
+          ]
+        }
+      },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
           {
             "type": "TextHeading",
-            "text": "Withdraw to Bank"
+            "text": "🏦 Convert Crypto to NGN"
+          },
+          {
+            "type": "TextBody",
+            "text": "Select the asset and chain you want to convert to Nigerian Naira"
           },
           {
             "type": "Dropdown",
-            "name": "currency",
-            "label": "Asset to Sell",
+            "name": "asset",
+            "label": "Select Asset",
             "required": true,
             "data-source": [
               {
-                "id": "USDT",
-                "title": "Tether (USDT)"
-              },
-              {
                 "id": "USDC",
                 "title": "USD Coin (USDC)"
+              },
+              {
+                "id": "USDT",
+                "title": "Tether (USDT)"
               }
             ]
           },
           {
             "type": "Dropdown",
-            "name": "network",
+            "name": "chain",
             "label": "Select Network",
             "required": true,
             "data-source": [
               {
-                "id": "TRC20",
-                "title": "Tron (TRC20)"
+                "id": "solana",
+                "title": "Solana"
               },
               {
-                "id": "BEP20",
+                "id": "bep20",
                 "title": "BNB Smart Chain (BEP20)"
               },
               {
-                "id": "SOL",
-                "title": "Solana (SOL)"
-              },
-              {
-                "id": "ERC20",
-                "title": "Ethereum (ERC20)"
-              },
-              {
-                "id": "BASE",
+                "id": "base",
                 "title": "Base Network"
+              },
+              {
+                "id": "arbitrium",
+                "title": "Arbitrum"
+              },
+              {
+                "id": "hedera",
+                "title": "Hedera"
+              },
+              {
+                "id": "apechain",
+                "title": "ApeChain"
+              },
+              {
+                "id": "lisk",
+                "title": "Lisk"
               }
             ]
           },
           {
+            "type": "Footer",
+            "label": "Continue",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "asset": "${form.asset}",
+                "chain": "${form.chain}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "OFFRAMP_WALLET_DISPLAY",
+      "title": "Wallet Information",
+      "data": {
+        "asset": {
+          "type": "string",
+          "__example__": "USDC"
+        },
+        "chain": {
+          "type": "string",
+          "__example__": "solana"
+        },
+        "wallet_address": {
+          "type": "string",
+          "__example__": "Dbt7NnCK15bqJMESTw462wup3s1FVh7jyaDGV26x58iH"
+        },
+        "current_balance": {
+          "type": "string",
+          "__example__": "125.50"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "🏦 ${data.asset} Wallet Ready"
+          },
+          {
+            "type": "TextBody",
+            "text": "Chain: ${data.chain}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Address: ${data.wallet_address}",
+            "style": {
+              "font-family": "monospace",
+              "font-size": "12px"
+            }
+          },
+          {
+            "type": "TextBody",
+            "text": "Current Balance: ${data.current_balance} ${data.asset}"
+          },
+          {
+            "type": "TextBody",
+            "text": "⚠️ Important: Only send ${data.asset} on ${data.chain} network. Sending other tokens or wrong network will result in loss."
+          },
+          {
+            "type": "Footer",
+            "label": "Spend Crypto",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "asset": "${data.asset}",
+                "chain": "${data.chain}",
+                "wallet_address": "${data.wallet_address}",
+                "current_balance": "${data.current_balance}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "OFFRAMP_AMOUNT_INPUT",
+      "title": "Enter Amount",
+      "data": {
+        "asset": {
+          "type": "string",
+          "__example__": "USDC"
+        },
+        "chain": {
+          "type": "string",
+          "__example__": "solana"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "💰 Enter Amount"
+          },
+          {
+            "type": "TextBody",
+            "text": "How much NGN do you want to withdraw to your bank account?"
+          },
+          {
+            "type": "TextInput",
+            "name": "ngn_amount",
+            "label": "Amount in NGN",
+            "required": true,
+            "input-type": "number",
+            "helper-text": "Minimum: ₦1,000 | Maximum: ₦5,000,000"
+          },
+          {
+            "type": "TextBody",
+            "text": "⚠️ Additional fees will apply:\n• Platform fee: 1.5%\n• DexPay fee: $0.20"
+          },
+          {
+            "type": "Footer",
+            "label": "Continue",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "asset": "${data.asset}",
+                "chain": "${data.chain}",
+                "ngn_amount": "${form.ngn_amount}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "OFFRAMP_BANK_SELECTION",
+      "title": "Select Bank",
+      "data": {
+        "asset": {
+          "type": "string",
+          "__example__": "USDC"
+        },
+        "chain": {
+          "type": "string",
+          "__example__": "solana"
+        },
+        "ngn_amount": {
+          "type": "string",
+          "__example__": "50000"
+        },
+        "banks": {
+          "type": "array",
+          "__example__": [
+            {"id": "044", "name": "Access Bank"},
+            {"id": "058", "name": "GTBank"},
+            {"id": "057", "name": "Zenith Bank"}
+          ]
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "🏦 Select Your Bank"
+          },
+          {
+            "type": "TextBody",
+            "text": "Choose your bank from the list below:"
+          },
+          {
             "type": "Dropdown",
-            "name": "bank_name",
+            "name": "selected_bank",
             "label": "Select Bank",
             "required": true,
             "data-source": [
               {
-                "id": "ACCESS",
+                "id": "044",
                 "title": "Access Bank"
               },
               {
-                "id": "GTB",
+                "id": "058",
                 "title": "GTBank"
               },
               {
-                "id": "ZENITH",
+                "id": "057",
                 "title": "Zenith Bank"
               },
               {
-                "id": "OPAY",
-                "title": "Opay"
+                "id": "011",
+                "title": "First Bank"
               },
               {
-                "id": "KUDA",
-                "title": "Kuda Bank"
+                "id": "033",
+                "title": "United Bank for Africa"
+              },
+              {
+                "id": "214",
+                "title": "First City Monument Bank"
+              },
+              {
+                "id": "070",
+                "title": "Fidelity Bank"
+              },
+              {
+                "id": "076",
+                "title": "Polaris Bank"
+              },
+              {
+                "id": "221",
+                "title": "Stanbic IBTC Bank"
+              },
+              {
+                "id": "232",
+                "title": "Sterling Bank"
               }
             ]
+          },
+          {
+            "type": "Footer",
+            "label": "Continue",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "asset": "${data.asset}",
+                "chain": "${data.chain}",
+                "ngn_amount": "${data.ngn_amount}",
+                "selected_bank": "${form.selected_bank}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "OFFRAMP_ACCOUNT_INPUT",
+      "title": "Account Details",
+      "data": {
+        "asset": {
+          "type": "string",
+          "__example__": "USDC"
+        },
+        "chain": {
+          "type": "string",
+          "__example__": "solana"
+        },
+        "ngn_amount": {
+          "type": "string",
+          "__example__": "50000"
+        },
+        "selected_bank": {
+          "type": "string",
+          "__example__": "044"
+        },
+        "bank_name": {
+          "type": "string",
+          "__example__": "Access Bank"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "🏦 ${data.bank_name} Selected"
+          },
+          {
+            "type": "TextBody",
+            "text": "Please enter your account number:"
           },
           {
             "type": "TextInput",
             "name": "account_number",
             "label": "Account Number",
             "required": true,
-            "input-type": "text",
-            "helper-text": "Enter 10-digit account number"
-          },
-          {
-            "type": "TextInput",
-            "name": "sell_amount",
-            "label": "Amount",
-            "required": true,
-            "input-type": "text",
-            "helper-text": "Enter amount in NGN"
+            "input-type": "number",
+            "helper-text": "Enter your 10-digit account number",
+            "min-chars": 10,
+            "max-chars": 10
           },
           {
             "type": "Footer",
-            "label": "Preview Withdrawal",
+            "label": "Verify Account",
             "on-click-action": {
               "name": "data_exchange",
               "payload": {
-                "currency": "${form.currency}",
-                "network": "${form.network}",
-                "sell_amount": "${form.sell_amount}",
-                "bank_name": "${form.bank_name}",
+                "asset": "${data.asset}",
+                "chain": "${data.chain}",
+                "ngn_amount": "${data.ngn_amount}",
+                "selected_bank": "${data.selected_bank}",
+                "bank_name": "${data.bank_name}",
                 "account_number": "${form.account_number}"
               }
             }
@@ -125,32 +385,32 @@
       }
     },
     {
-      "id": "OFFRAMP_FIAT_REVIEW",
-      "title": "Recipient Overview",
+      "id": "OFFRAMP_ACCOUNT_CONFIRMATION",
+      "title": "Verify Account",
       "data": {
-        "currency": {
+        "asset": {
           "type": "string",
-          "__example__": "USDT"
+          "__example__": "USDC"
         },
-        "network": {
+        "chain": {
           "type": "string",
-          "__example__": "TRC20"
+          "__example__": "solana"
         },
-        "sell_amount": {
+        "ngn_amount": {
           "type": "string",
-          "__example__": "100"
+          "__example__": "50000"
         },
         "bank_name": {
           "type": "string",
-          "__example__": "GTBank"
+          "__example__": "Access Bank"
         },
         "account_number": {
           "type": "string",
-          "__example__": "0123456789"
+          "__example__": "1234567890"
         },
-        "recipient_name": {
+        "account_name": {
           "type": "string",
-          "__example__": "Alice Smith"
+          "__example__": "John Doe"
         }
       },
       "layout": {
@@ -158,11 +418,7 @@
         "children": [
           {
             "type": "TextHeading",
-            "text": "Review Details"
-          },
-          {
-            "type": "TextBody",
-            "text": "Recipient: ${data.recipient_name}"
+            "text": "✅ Account Verified"
           },
           {
             "type": "TextBody",
@@ -170,31 +426,29 @@
           },
           {
             "type": "TextBody",
-            "text": "Account: ${data.account_number}"
+            "text": "Account Number: ${data.account_number}"
           },
           {
             "type": "TextBody",
-            "text": "Selling: ${data.sell_amount} ${data.currency}"
+            "text": "Account Name: ${data.account_name}"
           },
           {
             "type": "TextBody",
-            "text": "Network: ${data.network}"
-          },
-          {
-            "type": "TextBody",
-            "text": "Rate: 1 ${data.currency} = ₦1,650"
+            "text": "Is this correct?"
           },
           {
             "type": "Footer",
-            "label": "Proceed to Payment",
+            "label": "Yes, Proceed",
             "on-click-action": {
               "name": "data_exchange",
               "payload": {
-                "sell_amount": "${data.sell_amount}",
-                "currency": "${data.currency}",
-                "network": "${data.network}",
+                "asset": "${data.asset}",
+                "chain": "${data.chain}",
+                "ngn_amount": "${data.ngn_amount}",
                 "bank_name": "${data.bank_name}",
-                "account_number": "${data.account_number}"
+                "account_number": "${data.account_number}",
+                "account_name": "${data.account_name}",
+                "confirmed": "yes"
               }
             }
           }
@@ -202,32 +456,60 @@
       }
     },
     {
-      "id": "OFFRAMP_CRYPTO_REVIEW",
-      "title": "Payment Authorization",
+      "id": "OFFRAMP_QUOTE_REVIEW",
+      "title": "Review Transaction",
       "data": {
-        "currency": {
+        "asset": {
           "type": "string",
-          "__example__": "USDT"
+          "__example__": "USDC"
         },
-        "network": {
+        "chain": {
           "type": "string",
-          "__example__": "TRC20"
+          "__example__": "solana"
         },
-        "sell_amount": {
+        "ngn_amount": {
           "type": "string",
-          "__example__": "100"
+          "__example__": "50000"
+        },
+        "crypto_amount": {
+          "type": "string",
+          "__example__": "62.50"
+        },
+        "exchange_rate": {
+          "type": "string",
+          "__example__": "800"
+        },
+        "platform_fee": {
+          "type": "string",
+          "__example__": "750"
+        },
+        "dexpay_fee": {
+          "type": "string",
+          "__example__": "160"
+        },
+        "total_fees": {
+          "type": "string",
+          "__example__": "910"
+        },
+        "total_crypto_needed": {
+          "type": "string",
+          "__example__": "63.64"
+        },
+        "current_balance": {
+          "type": "string",
+          "__example__": "125.50"
         },
         "bank_name": {
           "type": "string",
-          "__example__": "GTBank"
+          "__example__": "Access Bank"
+        },
+        "account_name": {
+          "type": "string",
+          "__example__": "John Doe"
         },
         "account_number": {
           "type": "string",
-          "__example__": "0123456789"
-        },
-        "error_message": {
-          "type": "string",
-          "__example__": "Invalid PIN"
+          "__example__": "1234567890"
         }
       },
       "layout": {
@@ -235,53 +517,153 @@
         "children": [
           {
             "type": "TextHeading",
-            "text": "Authorize"
+            "text": "💱 Quote Generated"
+          },
+          {
+            "type": "TextBody",
+            "text": "💰 Amount: ₦${data.ngn_amount}"
+          },
+          {
+            "type": "TextBody",
+            "text": "📊 Rate: 1 ${data.asset} = ₦${data.exchange_rate}"
+          },
+          {
+            "type": "TextBody",
+            "text": "🔸 Crypto for NGN: ${data.crypto_amount} ${data.asset}"
+          },
+          {
+            "type": "TextBody",
+            "text": "💸 Fees Breakdown:"
+          },
+          {
+            "type": "TextBody",
+            "text": "• Platform Fee (1.5%): ₦${data.platform_fee}"
+          },
+          {
+            "type": "TextBody",
+            "text": "• DexPay Fee: ₦${data.dexpay_fee}"
+          },
+          {
+            "type": "TextBody",
+            "text": "• Total Fees: ₦${data.total_fees}"
+          },
+          {
+            "type": "TextBody",
+            "text": "📊 Summary:"
+          },
+          {
+            "type": "TextBody",
+            "text": "• You Receive: ₦${data.ngn_amount}"
+          },
+          {
+            "type": "TextBody",
+            "text": "• Total Deducted: ${data.total_crypto_needed} ${data.asset}"
+          },
+          {
+            "type": "TextBody",
+            "text": "• Your Balance: ${data.current_balance} ${data.asset}"
+          },
+          {
+            "type": "TextBody",
+            "text": "🏦 Destination:"
+          },
+          {
+            "type": "TextBody",
+            "text": "${data.bank_name} - ${data.account_name} (${data.account_number})"
+          },
+          {
+            "type": "TextBody",
+            "text": "⏰ Quote expires in 10 minutes"
+          },
+          {
+            "type": "Footer",
+            "label": "Proceed",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "asset": "${data.asset}",
+                "chain": "${data.chain}",
+                "ngn_amount": "${data.ngn_amount}",
+                "crypto_amount": "${data.crypto_amount}",
+                "total_crypto_needed": "${data.total_crypto_needed}",
+                "bank_name": "${data.bank_name}",
+                "account_name": "${data.account_name}",
+                "account_number": "${data.account_number}",
+                "proceed": "yes"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "OFFRAMP_PIN_VERIFICATION",
+      "title": "Authorize Transaction",
+      "data": {
+        "asset": {
+          "type": "string",
+          "__example__": "USDC"
+        },
+        "ngn_amount": {
+          "type": "string",
+          "__example__": "50000"
+        },
+        "total_crypto_needed": {
+          "type": "string",
+          "__example__": "63.64"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "🔐 Enter Your PIN"
           },
           {
             "type": "TextBody",
             "text": "${data.error_message}",
-            "visible": "${data.error_message != null}",
+            "visible": "${data.error_message != null && data.error_message != ''}",
             "style": {
               "color": "#EF4444"
             }
           },
           {
             "type": "TextBody",
-            "text": "Selling: ${data.sell_amount} ${data.currency}"
+            "text": "Please enter your 4-digit transaction PIN to confirm this off-ramp:"
           },
           {
             "type": "TextBody",
-            "text": "Network: ${data.network}"
+            "text": "Amount: ₦${data.ngn_amount}"
           },
           {
             "type": "TextBody",
-            "text": "Fee: 1.00 ${data.currency}"
-          },
-          {
-            "type": "TextBody",
-            "text": "Enter PIN to Confirm"
+            "text": "Crypto Needed: ${data.total_crypto_needed} ${data.asset}"
           },
           {
             "type": "TextInput",
             "name": "pin",
-            "label": "4 Digit PIN",
+            "label": "4-Digit PIN",
             "required": true,
             "input-type": "password",
             "min-chars": 4,
-            "max-chars": 4
+            "max-chars": 4,
+            "helper-text": "Enter your transaction PIN"
           },
           {
             "type": "Footer",
-            "label": "Sell & Withdraw",
+            "label": "Confirm Transaction",
             "on-click-action": {
               "name": "data_exchange",
               "payload": {
                 "pin": "${form.pin}",
-                "sell_amount": "${data.sell_amount}",
-                "currency": "${data.currency}",
-                "network": "${data.network}",
-                "bank_name": "${data.bank_name}",
-                "account_number": "${data.account_number}"
+                "asset": "${data.asset}",
+                "ngn_amount": "${data.ngn_amount}",
+                "total_crypto_needed": "${data.total_crypto_needed}"
               }
             }
           }
@@ -290,20 +672,73 @@
     },
     {
       "id": "OFFRAMP_SUCCESS",
-      "title": "Processing",
+      "title": "Transaction Complete",
       "terminal": true,
       "success": true,
-      "data": {},
+      "data": {
+        "ngn_amount": {
+          "type": "string",
+          "__example__": "50000"
+        },
+        "asset": {
+          "type": "string",
+          "__example__": "USDC"
+        },
+        "crypto_used": {
+          "type": "string",
+          "__example__": "63.64"
+        },
+        "bank_name": {
+          "type": "string",
+          "__example__": "Access Bank"
+        },
+        "account_name": {
+          "type": "string",
+          "__example__": "John Doe"
+        },
+        "transaction_id": {
+          "type": "string",
+          "__example__": "quote_abc123"
+        }
+      },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
           {
             "type": "TextHeading",
-            "text": "Funds are underway! 🚀"
+            "text": "🎉 Off-ramp Successful!"
           },
           {
             "type": "TextBody",
-            "text": "Your withdrawal has been initiated. The funds usually hit the bank account in under 50 seconds."
+            "text": "✅ Transaction completed successfully"
+          },
+          {
+            "type": "TextBody",
+            "text": "💰 Amount: ₦${data.ngn_amount}"
+          },
+          {
+            "type": "TextBody",
+            "text": "🪙 Crypto Used: ${data.crypto_used} ${data.asset}"
+          },
+          {
+            "type": "TextBody",
+            "text": "🏦 Bank: ${data.bank_name}"
+          },
+          {
+            "type": "TextBody",
+            "text": "👤 Account: ${data.account_name}"
+          },
+          {
+            "type": "TextBody",
+            "text": "📋 Reference: ${data.transaction_id}"
+          },
+          {
+            "type": "TextBody",
+            "text": "💳 Your NGN will be credited to your bank account within 5-10 minutes."
+          },
+          {
+            "type": "TextBody",
+            "text": "📧 A confirmation email has been sent to you."
           },
           {
             "type": "Footer",
@@ -311,8 +746,12 @@
             "on-click-action": {
               "name": "complete",
               "payload": {
-                "status": "offramp_initiated",
-                "result": "success"
+                "status": "offramp_completed",
+                "result": "success",
+                "transaction_id": "${data.transaction_id}",
+                "ngn_amount": "${data.ngn_amount}",
+                "crypto_used": "${data.crypto_used}",
+                "asset": "${data.asset}"
               }
             }
           }

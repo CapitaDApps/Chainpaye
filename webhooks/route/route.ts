@@ -5,6 +5,7 @@ import { handleCrossmintDepositWebhook, testDepositNotification } from "../contr
 import { generateLinkFlow } from "../controllers/grl.controller";
 import { invoiceController } from "../controllers/invoice.controller";
 import { kycFlowController } from "../controllers/kyc.controller";
+import { offrampFlowController } from "../controllers/offrampFlow.controller";
 import { resetPinFlow } from "../controllers/resetPinFlow.controller";
 import { setupPinFlow } from "../controllers/setupPinFlow.controller";
 import { topupFlow } from "../controllers/topUpFlow.controller";
@@ -24,7 +25,8 @@ router.post("/kyc", kycFlowController);
 router.post("/withdrawal-flow", withdrawalFlow);
 router.post("/generate-link", generateLinkFlow);
 router.post("/convert", conversionFlow);
-router.post("/offramp", cryptoTopupFlow);
+router.post("/crypto-topup", cryptoTopupFlow);
+router.post("/offramp-flow", offrampFlowController);
 
 // Deposit notification webhooks
 router.post("/deposit-notification", handleCrossmintDepositWebhook);
