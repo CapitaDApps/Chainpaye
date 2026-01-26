@@ -200,7 +200,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
           account_number,
         } = data;
 
-        const user = await userService.getUser(phone);
+        const user = await userService.getUser(phone, true);
         if (!user) {
           return {
             screen: "OFFRAMP_CRYPTO_REVIEW",
