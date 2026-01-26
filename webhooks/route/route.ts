@@ -1,6 +1,10 @@
 import express, { Router } from "express";
 import { conversionFlow } from "../controllers/conversion.controller";
 import { cryptoTopupFlow } from "../controllers/cryptoTopUp.controller";
+import {
+  handleCrossmintDepositWebhook,
+  testDepositNotification,
+} from "../controllers/depositNotification.controller";
 import { generateLinkFlow } from "../controllers/grl.controller";
 import { invoiceController } from "../controllers/invoice.controller";
 import { kycFlowController } from "../controllers/kyc.controller";
@@ -22,4 +26,9 @@ router.post("/withdrawal-flow", withdrawalFlow);
 router.post("/generate-link", generateLinkFlow);
 router.post("/convert", conversionFlow);
 router.post("/offramp", cryptoTopupFlow);
+
+// Deposit notification webhooks
+router.post("/deposit-notification", handleCrossmintDepositWebhook);
+router.post("/test-deposit-notification", testDepositNotification);
+
 export default router;

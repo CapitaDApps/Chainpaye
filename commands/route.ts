@@ -4,7 +4,6 @@ import { COMMANDS, TriggerPhrase } from "./config";
 import {
   handleAccountInfo,
   handleConversion,
-  handleCryptoSellResponse,
   handleOfframp,
   handleSupport,
   handleTopUp,
@@ -144,7 +143,7 @@ function findMatchingCommand(message: string): string | null {
 export async function commandRouteHandler(from: string, message: string) {
   // Check if this is a crypto sell request first (highest priority)
   if (isCryptoSellRequest(message)) {
-    await handleCryptoSellResponse(from, message);
+    await handleOfframp(from);
     return;
   }
 

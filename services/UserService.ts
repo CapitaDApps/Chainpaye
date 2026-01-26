@@ -28,6 +28,13 @@ export class UserService {
     return user;
   }
 
+  async getUserById(userId: string, includePin = false) {
+    const user = await User.findOne({ userId }).select(
+      `${includePin ? "+pin" : ""}`,
+    );
+    return user;
+  }
+
   async getUserToroWallet(
     phoneNumber: string,
     includePassword = false,

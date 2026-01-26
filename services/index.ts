@@ -9,6 +9,9 @@ import { UserService } from "./UserService";
 import { WalletService } from "./WalletService";
 import { WhatsAppBusinessService } from "./WhatsAppBusinessService";
 
+import { crossmintService } from "./CrossmintService";
+import { dexPayService } from "./DexPayService";
+
 const whatsappBusinessService = new WhatsAppBusinessService();
 const toronetService = new ToronetService();
 const userService = new UserService();
@@ -16,9 +19,11 @@ const walletService = new WalletService();
 const transactionService = TransactionService;
 
 export {
-  whatsappBusinessService,
+  crossmintService,
+  dexPayService,
   toronetService,
+  transactionService,
   userService,
   walletService,
-  transactionService,
+  whatsappBusinessService,
 };
