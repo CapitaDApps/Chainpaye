@@ -1,8 +1,3 @@
-import { loadEnv } from "../config/env";
-
-// Load environment variables
-loadEnv();
-
 import { ToronetService } from "./ToronetService";
 import { TransactionService } from "./TransactionService";
 import { UserService } from "./UserService";

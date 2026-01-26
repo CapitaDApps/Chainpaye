@@ -40,7 +40,6 @@ export class CrossmintService {
 
   constructor() {
     const {
-      VERIFY_TOKEN,
       CROSSMINT_API_KEY,
       CROSSMINT_BASE_URL,
       CROSSMINT_ADMIN_SIGNER_ADDRESS,
@@ -48,8 +47,6 @@ export class CrossmintService {
     this.apiKey = CROSSMINT_API_KEY || "";
     this.baseUrl = CROSSMINT_BASE_URL || "https://crossmint.com/api/2025-06-09";
     this.adminSignerAddress = CROSSMINT_ADMIN_SIGNER_ADDRESS || "";
-
-    console.log(process.env);
 
     if (!this.apiKey) {
       logger.warn("Crossmint API key not configured");
