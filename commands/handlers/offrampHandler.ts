@@ -7,6 +7,7 @@ import { userService, whatsappBusinessService } from "../../services";
 import { crossmintService } from "../../services/CrossmintService";
 import { dexPayService } from "../../services/DexPayService";
 import { redisClient } from "../../services/redis";
+import { NormalizedNetworkType } from "../types";
 
 interface OfframpSession {
   step:
@@ -326,24 +327,14 @@ async function handleWalletCreation(
     );
 
     // Send deposit instructions
-    const selectedAsset = session.selectedAsset!;
-    const selectedChain = session.selectedChain!;
-    const message =
-      `🏦 *${selectedAsset.toUpperCase()} Wallet Ready*\n\n` +
-      `Chain: ${selectedChain.toUpperCase()}\n` +
-      `Address: \`${wallet.address}\`\n\n` +
-      `Current Balance: ${currentBalance.toFixed(6)} ${selectedAsset.toUpperCase()}` +
-      (usdValue > 0 ? ` (~$${usdValue.toFixed(2)})` : "") +
-      "\n\n" +
-      `📥 *Deposit Instructions*\n` +
-      `Send ${selectedAsset.toUpperCase()} on ${selectedChain.toUpperCase()} to the address above.\n\n` +
-      `⚠️ *Important:*\n` +
-      `• Only send ${selectedAsset.toUpperCase()} on ${selectedChain.toUpperCase()} network\n` +
-      `• Sending other tokens or wrong network will result in loss\n` +
-      `• You'll receive a notification when deposit is detected\n\n` +
-      `After depositing, you can type *spend crypto* to continue.`;
-
-    await whatsappBusinessService.sendNormalMessage(message, phoneNumber);
+    // Send deposit address using the specialized method
+    const network = parseNormalizedNetwork(session.selectedChain!);
+    await whatsappBusinessService.sendCryptoDepositAddress(
+      phoneNumber,
+      session.selectedAsset!,
+      network,
+      wallet.address,
+    );
   } catch (error) {
     console.error(`Error in handleWalletCreation for ${phoneNumber}:`, error);
     await whatsappBusinessService.sendNormalMessage(
@@ -1261,5 +1252,40 @@ export async function routeOfframpMessage(
   } catch (error) {
     console.error(`Error routing off-ramp message for ${phoneNumber}:`, error);
     return false;
+  }
+}
+
+/**
+ * Helper to parse normalized network type
+ */
+function parseNormalizedNetwork(chain: string): NormalizedNetworkType {
+  const chainLower = chain.toLowerCase();
+  switch (chainLower) {
+    case "solana":
+      return "Solana";
+    case "bep20":
+    case "bsc":
+      return "BNB Smart Chain";
+    case "base":
+      return "Base";
+    case "arbitrum":
+      return "Arbitrum";
+    case "hedera":
+      return "Hedera";
+    case "apechain":
+      return "ApeChain";
+    case "lisk":
+      return "Lisk";
+    case "ethereum":
+    case "eth":
+      return "Ethereum";
+    case "polygon":
+    case "matic":
+      return "Polygon";
+    case "tron":
+      return "Tron";
+    default:
+      // Fallback for unknown chains, though they shouldn't reach here if validated
+      return "BNB Smart Chain";
   }
 }

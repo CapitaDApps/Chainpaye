@@ -4,4 +4,8 @@ export type NormalizedNetworkType =
   | "Polygon"
   | "Tron"
   | "BNB Smart Chain"
-  | "Base";
+  | "Base"
+  | "Arbitrum"
+  | "Hedera"
+  | "ApeChain"
+  | "Lisk";
