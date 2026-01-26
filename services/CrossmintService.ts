@@ -219,7 +219,7 @@ export class CrossmintService {
   ): Promise<CrossmintWallet | null> {
     try {
       const response = await axios.get(
-        `${this.baseUrl}/wallets/userId:${userId}:${chainType}`,
+        `${this.baseUrl}/wallets/userId:${userId}:${chainType}:smart`,
         {
           headers: {
             "X-API-KEY": this.apiKey,
