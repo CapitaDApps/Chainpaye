@@ -216,7 +216,7 @@ export async function handleAssetSelection(
 
     if (!assetChainMatch) {
       await whatsappBusinessService.sendNormalMessage(
-        "❌ *Invalid Format*\n\nPlease specify the asset and chain correctly.\n\n" +
+        "Please specify the asset and chain correctly.\n\n" +
           "Examples:\n• USDC on Solana\n• USDT BEP20\n• USDC Base\n\n" +
           getSupportedAssetsMessage(),
         phoneNumber,
@@ -229,7 +229,7 @@ export async function handleAssetSelection(
 
     if (!asset || !chain) {
       await whatsappBusinessService.sendNormalMessage(
-        "❌ *Invalid Format*\n\nPlease specify the asset and chain correctly.\n\n" +
+        "Please specify the asset and chain correctly.\n\n" +
           "Examples:\n• USDC on Solana\n• USDT BEP20\n• USDC Base\n\n" +
           getSupportedAssetsMessage(),
         phoneNumber,
@@ -311,7 +311,7 @@ async function handleWalletCreation(
 
     // Find balance for selected asset
     const assetBalance = balances.find(
-      (b) => b.token.toLowerCase() === session.selectedAsset,
+      (b) => b.token?.toLowerCase() === session.selectedAsset?.toLowerCase(),
     );
     const currentBalance = assetBalance ? parseFloat(assetBalance.amount) : 0;
     const usdValue = assetBalance?.usdValue || 0;
