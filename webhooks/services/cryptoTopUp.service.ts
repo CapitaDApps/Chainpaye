@@ -241,13 +241,31 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
           if (crossmintChain === "trx") crossmintChain = "tron";
           if (crossmintChain === "matic") crossmintChain = "polygon";
 
+          // Re-resolve account name if missing (frontend might not pass it back)
+          let finalRecipientName = recipientName;
+          if (!finalRecipientName || finalRecipientName === "Beneficiary") {
+            try {
+              console.log("Re-resolving account details for quote...");
+              const resolved = await dexPayService.resolveAccount(
+                account_number,
+                bank_code,
+              );
+              finalRecipientName = resolved.accountName;
+              console.log("Resolved account name:", finalRecipientName);
+            } catch (resolveError) {
+              console.warn("Could not resolve account name:", resolveError);
+              // Fallback to "Beneficiary" if still fails, but this likely causes the quote error
+              finalRecipientName = "Beneficiary";
+            }
+          }
+
           const quoteRequest = {
             fiatAmount: parseFloat(sell_amount) as any, // DexPay API expects number
             asset: currency.toLowerCase(),
             chain: dexPayChain,
             type: "SELL" as const,
             bankCode: bank_code,
-            accountName: recipientName || "Beneficiary",
+            accountName: finalRecipientName,
             accountNumber: account_number,
             receivingAddress: dexPayService.getReceivingAddress(crossmintChain),
           };
