@@ -141,9 +141,8 @@ function findMatchingCommand(message: string): string | null {
 }
 
 export async function commandRouteHandler(from: string, message: string) {
-  // Check if this is a crypto sell request first (highest priority)
   if (isCryptoSellRequest(message)) {
-    await handleOfframp(from);
+    await handleOfframp(from, message);
     return;
   }
 
@@ -188,7 +187,7 @@ export async function commandRouteHandler(from: string, message: string) {
       break;
 
     case "offramp":
-      await handleOfframp(from);
+      await handleOfframp(from, message);
       break;
 
     case "kyc":

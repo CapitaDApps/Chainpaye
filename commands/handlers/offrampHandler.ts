@@ -35,7 +35,10 @@ interface OfframpSession {
 /**
  * Main off-ramp handler - Step 1: Display wallets and prompt for asset selection
  */
-export async function handleOfframp(phoneNumber: string): Promise<void> {
+export async function handleOfframp(
+  phoneNumber: string,
+  initialMessage?: string,
+): Promise<void> {
   try {
     console.log(`Starting off-ramp flow for ${phoneNumber}`);
 
@@ -73,7 +76,18 @@ export async function handleOfframp(phoneNumber: string): Promise<void> {
       30 * 60, // 30 minutes
     );
 
-    // Step 1: Display existing wallets
+    // Step 1: Check if initial message contains asset/chain intent
+    if (initialMessage) {
+      const intentHandled = await handleAssetSelection(
+        phoneNumber,
+        initialMessage,
+      );
+      if (intentHandled) {
+        return;
+      }
+    }
+
+    // Step 2: Display existing wallets
     await displayUserWallets(phoneNumber, user.userId);
   } catch (error) {
     console.error(`Error in handleOfframp for ${phoneNumber}:`, error);
