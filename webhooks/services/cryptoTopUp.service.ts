@@ -3,7 +3,6 @@ import { userService } from "../../services";
 import { crossmintService } from "../../services/CrossmintService";
 import { dexPayService } from "../../services/DexPayService";
 import { redisClient } from "../../services/redis";
-import { ToronetService } from "../../services/ToronetService";
 
 type Network = "bsc" | "sol" | "eth" | "poly" | "trx" | "base";
 
@@ -24,8 +23,6 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
   flow_token: string;
 }) => {
   const { screen, data, version, action, flow_token } = decryptedBody;
-
-  const localToronetService = new ToronetService();
 
   // handle health check request
   if (action === "ping") {
@@ -55,11 +52,11 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
     // Fetch banks from backend with fallback
     let banks = FALLBACK_BANKS;
     try {
-      const ngnBanks = await localToronetService.getBankListNGN();
-      if (ngnBanks && ngnBanks.length > 0) {
-        banks = ngnBanks;
+      const dexPayBanks = await dexPayService.getBanks();
+      if (dexPayBanks && dexPayBanks.length > 0) {
+        banks = dexPayBanks.map((b) => ({ id: b.code, title: b.name }));
       }
-      console.log("DEBUG: Fetched banks from API:", banks.length);
+      console.log("DEBUG: Fetched banks from DexPay API:", banks.length);
     } catch (error) {
       console.error("DEBUG: Error fetching banks, using fallback:", error);
     }
@@ -77,7 +74,10 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
       // Fetch banks again for error screen
       let banks = FALLBACK_BANKS;
       try {
-        banks = await localToronetService.getBankListNGN();
+        const dexPayBanks = await dexPayService.getBanks();
+        if (dexPayBanks && dexPayBanks.length > 0) {
+          banks = dexPayBanks.map((b) => ({ id: b.code, title: b.name }));
+        }
       } catch {
         // Use fallback
       }
@@ -109,7 +109,10 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
           // Fetch banks for error return
           let banks = FALLBACK_BANKS;
           try {
-            banks = await localToronetService.getBankListNGN();
+            const dexPayBanks = await dexPayService.getBanks();
+            if (dexPayBanks && dexPayBanks.length > 0) {
+              banks = dexPayBanks.map((b) => ({ id: b.code, title: b.name }));
+            }
           } catch {
             // Use fallback
           }
@@ -126,7 +129,10 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
         if (account_number.length !== 10 || isNaN(Number(account_number))) {
           let banks = FALLBACK_BANKS;
           try {
-            banks = await localToronetService.getBankListNGN();
+            const dexPayBanks = await dexPayService.getBanks();
+            if (dexPayBanks && dexPayBanks.length > 0) {
+              banks = dexPayBanks.map((b) => ({ id: b.code, title: b.name }));
+            }
           } catch {
             // Use fallback
           }
@@ -142,10 +148,10 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
         // Resolve bank name from bank code
         let bankName = "Bank";
         try {
-          const ngnBanks = await localToronetService.getBankListNGN();
-          const foundBank = ngnBanks.find((b) => b.id === bank_code);
+          const dexPayBanks = await dexPayService.getBanks();
+          const foundBank = dexPayBanks.find((b) => b.code === bank_code);
           if (foundBank) {
-            bankName = foundBank.title;
+            bankName = foundBank.name;
           }
         } catch (error) {
           console.error("DEBUG: Error resolving bank name:", error);
@@ -154,17 +160,36 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
         // Resolve recipient name from account number
         let recipientName = "Account Holder";
         try {
-          const resolvedName =
-            await localToronetService.resolveBankAccountNameNGN(
-              account_number,
-              bank_code,
-            );
-          if (resolvedName) {
-            recipientName = resolvedName;
+          const resolvedAccount = await dexPayService.resolveAccount(
+            account_number,
+            bank_code,
+          );
+          if (resolvedAccount && resolvedAccount.accountName) {
+            recipientName = resolvedAccount.accountName;
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error("DEBUG: Error resolving account name:", error);
-          // Don't fail, just use placeholder
+          let banks = FALLBACK_BANKS;
+          try {
+            const dexPayBanks = await dexPayService.getBanks();
+            if (dexPayBanks && dexPayBanks.length > 0) {
+              banks = dexPayBanks.map((b) => ({ id: b.code, title: b.name }));
+            }
+          } catch {
+            // Use fallback
+          }
+
+          const errorMsg = error.message?.includes("not found")
+            ? "Account not found. Please check details."
+            : "Could not verify account details.";
+
+          return {
+            screen: "OFFRAMP_DETAILS",
+            data: {
+              banks: banks,
+              error_message: errorMsg,
+            },
+          };
         }
 
         return {
@@ -257,6 +282,11 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
               // Fallback to "Beneficiary" if still fails, but this likely causes the quote error
               finalRecipientName = "Beneficiary";
             }
+          }
+
+          // Normalize name to avoid double spaces which might cause "account not found" error
+          if (finalRecipientName) {
+            finalRecipientName = finalRecipientName.trim().replace(/\s+/g, " ");
           }
 
           const quoteRequest = {
