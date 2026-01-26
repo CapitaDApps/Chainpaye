@@ -231,8 +231,7 @@ export class CrossmintService {
         return null;
       }
       logger.error(
-        `Error getting ${chainType} wallet for user ${userId}:`,
-        error,
+        `Error getting ${chainType} wallet for user ${userId}: ${error.response?.data?.message || error.message}`,
       );
       return null;
     }
