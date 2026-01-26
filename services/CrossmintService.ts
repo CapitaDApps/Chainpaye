@@ -119,8 +119,7 @@ export class CrossmintService {
       return response.data;
     } catch (error: any) {
       logger.error(
-        `Error creating ${chainType} wallet for user ${userId}:`,
-        error.response?.data || error.message,
+        `Error creating ${chainType} wallet for user ${userId}: ${error.response?.data?.message || error.message}`,
       );
       throw new Error(
         `Failed to create wallet: ${error.response?.data?.message || error.message}`,
@@ -258,8 +257,7 @@ export class CrossmintService {
       return await this.createWallet(userId, chainType);
     } catch (error: any) {
       logger.error(
-        `Error getting or creating ${chainType} wallet for user ${userId}:`,
-        error,
+        `Error getting or creating ${chainType} wallet for user ${userId}: ${error.message}`,
       );
       throw error;
     }
