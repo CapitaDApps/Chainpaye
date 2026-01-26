@@ -1,4 +1,7 @@
+import { sendOfframpSuccessNotification } from "../../commands/handlers/offrampHandler";
 import { userService } from "../../services";
+import { crossmintService } from "../../services/CrossmintService";
+import { dexPayService } from "../../services/DexPayService";
 import { redisClient } from "../../services/redis";
 import { ToronetService } from "../../services/ToronetService";
 
@@ -174,6 +177,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
             bank_code,
             account_number,
             recipient_name: recipientName,
+            recipientName: recipientName, // Store for next step
           },
         };
       }
@@ -198,6 +202,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
           bank_name,
           bank_code,
           account_number,
+          recipientName,
         } = data;
 
         const user = await userService.getUser(phone, true);
@@ -222,18 +227,118 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
           };
         }
 
-        // TODO: Implement actual Crypto Sell / Withdraw logic here.
-        // Currently expecting a service method like walletService.sellCrypto or similar.
-        // For now, we mock the success as per instructions to "make it work" with current code limitations.
+        // Create quote request
+        try {
+          // 1. Get Quote
+          const quoteRequest = {
+            fiatAmount: sell_amount.toString(),
+            asset: currency.toLowerCase(),
+            chain: network.toLowerCase(),
+            type: "SELL" as const,
+            bankCode: bank_code,
+            accountName: recipientName || "Beneficiary", // Use extracted name or fallback
+            accountNumber: account_number,
+            receivingAddress: dexPayService.getReceivingAddress(network),
+          };
 
-        console.log(
-          `Processing Offramp: Sell ${sell_amount} ${currency} on ${network} to ${bank_name} (${account_number})`,
-        );
+          console.log(`Getting quote for offramp logic...`, quoteRequest);
+          const quote = await dexPayService.getQuote(quoteRequest);
 
-        return {
-          screen: "OFFRAMP_SUCCESS",
-          data: {},
-        };
+          // 2. Calculate Fees
+          const fees = dexPayService.calculateFees(
+            parseFloat(sell_amount),
+            quote.rate,
+          );
+          const feesInCrypto = fees.totalFees / quote.rate;
+          const totalCryptoRequired =
+            quote.cryptoAmount + feesInCrypto + (quote.fees?.networkFee || 0);
+
+          // 3. Check Balance
+          const chainType = crossmintService.getChainType(network);
+          let balances: any[] = [];
+
+          if (chainType === "solana") {
+            balances = await crossmintService.getBalancesByChain(
+              user.userId,
+              network,
+              ["usdc", "sol"],
+            );
+          } else {
+            balances = await crossmintService.getBalancesByChain(
+              user.userId,
+              network,
+              ["usdc", "usdt"],
+            );
+          }
+
+          const assetBalance = balances.find(
+            (b) => b.token.toLowerCase() === currency.toLowerCase(),
+          );
+          const currentBalance = assetBalance
+            ? parseFloat(assetBalance.amount)
+            : 0;
+
+          console.log(
+            `Balance check: Required ${totalCryptoRequired}, Available ${currentBalance}`,
+          );
+
+          if (currentBalance < totalCryptoRequired) {
+            return {
+              screen: "OFFRAMP_CRYPTO_REVIEW",
+              data: {
+                ...data,
+                error_message: `Insufficient balance. You need ${totalCryptoRequired.toFixed(6)} ${currency} but have ${currentBalance.toFixed(6)}.`,
+              },
+            };
+          }
+
+          // 4. Transfer Tokens
+          console.log(
+            `Transferring ${totalCryptoRequired} ${currency} on ${network}...`,
+          );
+          const transferResult = await crossmintService.transferTokens(
+            user.userId,
+            chainType,
+            currency,
+            totalCryptoRequired.toString(),
+            quoteRequest.receivingAddress,
+          );
+          console.log(`Transfer successful:`, transferResult);
+
+          // 5. Complete Off-ramp
+          console.log(`Completing offramp for quote ${quote.id}...`);
+          const offrampResult = await dexPayService.completeOfframp(quote.id);
+          console.log(`Offramp completed:`, offrampResult);
+
+          // 6. Send Notification
+          // We don't await this to avoid delaying the UI response
+          sendOfframpSuccessNotification(
+            phone,
+            parseFloat(sell_amount),
+            quote.cryptoAmount,
+            currency,
+            bank_name,
+            recipientName || "Beneficiary",
+            quote.id,
+          ).catch((err) =>
+            console.error("Error sending success notification:", err),
+          );
+
+          return {
+            screen: "OFFRAMP_SUCCESS",
+            data: {},
+          };
+        } catch (error: any) {
+          console.error("Error processing crypto top-up offramp:", error);
+          return {
+            screen: "OFFRAMP_CRYPTO_REVIEW",
+            data: {
+              ...data,
+              error_message:
+                error.message || "Transaction failed. Please try again.",
+            },
+          };
+        }
       }
 
       // Legacy fallback (optional, if you want to keep old logic reachable, but flow file determines screens)
