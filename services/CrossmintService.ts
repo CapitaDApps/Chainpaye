@@ -57,15 +57,7 @@ export class CrossmintService {
    */
   async listWallets(userId: string): Promise<CrossmintWallet[]> {
     const wallets: CrossmintWallet[] = [];
-    const chainTypes = [
-      "solana",
-      "bsc",
-      "base",
-      "arbitrum",
-      "hedera",
-      "apechain",
-      "lisk",
-    ];
+    const chainTypes = ["evm", "solana"];
 
     await Promise.all(
       chainTypes.map(async (chainType) => {
@@ -154,9 +146,37 @@ export class CrossmintService {
     chain: string,
     tokens: string[] = ["usdc", "usdt"],
   ): Promise<CrossmintBalance[]> {
+    // Helper to request balances for a specific chain using the unified EVM wallet
+    if (this.isEvmChain(chain)) {
+      const chainId = "evm";
+      // Map tokens to chain-specific tokens (e.g. "usdc" -> "base-sepolia:usdc")
+      const tokenChain = this.getTokenChainIdentifier(chain);
+      const prefixedTokens = tokens.map((t) => `${tokenChain}:${t}`);
+
+      const balances = await this.getWalletBalances(
+        userId,
+        chainId,
+        prefixedTokens,
+      );
+
+      // Map back to simple token names for the caller
+      return balances.map((b) => {
+        // b.token is likely "chain:token" like "base-sepolia:usdc"
+        // We want to return just "usdc" to match what the caller expects
+        const simpleToken = b.token.includes(":")
+          ? b.token.split(":")[1]
+          : b.token;
+        return {
+          ...b,
+          token: simpleToken || b.token,
+        };
+      });
+    }
+
     const chainId = this.getChainIdentifier(chain);
     return this.getWalletBalances(userId, chainId, tokens);
   }
+
   async getWalletBalances(
     userId: string,
     chain: string,
@@ -341,6 +361,10 @@ export class CrossmintService {
    * Map chain names to Crossmint chain types
    */
   getChainType(chain: string): string {
+    if (this.isEvmChain(chain)) {
+      return "evm";
+    }
+
     const chainMapping: { [key: string]: string } = {
       solana: "solana",
       bep20: "bsc",
@@ -377,6 +401,24 @@ export class CrossmintService {
   isAssetSupported(asset: string, chain: string): boolean {
     const supportedAssets = this.getSupportedAssets(chain);
     return supportedAssets.includes(asset.toLowerCase());
+  }
+  /**
+   * Check if chain is EVM compatible
+   */
+  isEvmChain(chain: string): boolean {
+    const evmChains = [
+      "bsc",
+      "bep20",
+      "base",
+      "arbitrum",
+      "hedera",
+      "apechain",
+      "lisk",
+      "ethereum",
+      "polygon",
+      "optimism",
+    ];
+    return evmChains.includes(chain.toLowerCase());
   }
 }
 
