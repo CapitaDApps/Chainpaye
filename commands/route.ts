@@ -22,7 +22,7 @@ function isCryptoSellRequest(message: string): boolean {
   // Check if message contains a token (usdc, usdt) and a network
   const hasToken = /\b(usdc|usdt)\b/i.test(normalizedMessage);
   const hasNetwork =
-    /\b(bsc|sol(ana)?|eth(ereum)?|poly(gon)?|tron?|base)\b/i.test(
+    /\b(bsc|bep20|sol(ana)?|eth(ereum)?|poly(gon)?|tron?|base|arbitrum|hedera|apechain|lisk)\b/i.test(
       normalizedMessage,
     );
 
