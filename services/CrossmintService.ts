@@ -34,23 +34,22 @@ export interface CreateWalletRequest {
 }
 
 export class CrossmintService {
-  private apiKey: string;
-  private baseUrl: string;
-  private adminSignerAddress: string;
-
   constructor() {
-    const {
-      CROSSMINT_API_KEY,
-      CROSSMINT_BASE_URL,
-      CROSSMINT_ADMIN_SIGNER_ADDRESS,
-    } = process.env;
-    this.apiKey = CROSSMINT_API_KEY || "";
-    this.baseUrl = CROSSMINT_BASE_URL || "https://crossmint.com/api/2025-06-09";
-    this.adminSignerAddress = CROSSMINT_ADMIN_SIGNER_ADDRESS || "";
+    // API key and config loaded dynamically to avoid init issues
+  }
 
-    if (!this.apiKey) {
-      logger.warn("Crossmint API key not configured");
-    }
+  private get apiKey(): string {
+    return process.env.CROSSMINT_API_KEY || "";
+  }
+
+  private get baseUrl(): string {
+    return (
+      process.env.CROSSMINT_BASE_URL || "https://crossmint.com/api/2025-06-09"
+    );
+  }
+
+  private get adminSignerAddress(): string {
+    return process.env.CROSSMINT_ADMIN_SIGNER_ADDRESS || "";
   }
 
   /**

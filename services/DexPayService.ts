@@ -46,21 +46,24 @@ export interface Quote {
 }
 
 export class DexPayService {
-  private apiKey: string;
-  private apiSecret: string;
-  private baseUrl: string;
-  private receivingAddress: string;
-
   constructor() {
-    this.apiKey = process.env.DEXPAY_API_KEY || "";
-    this.apiSecret = process.env.DEXPAY_API_SECRET || "";
-    this.baseUrl =
-      process.env.DEXPAY_BASE_URL || "https://sandbox-b2b.dexpay.io";
-    this.receivingAddress = process.env.DEXPAY_RECEIVING_ADDRESS || "";
+    // API config loaded dynamically
+  }
 
-    if (!this.apiKey || !this.apiSecret) {
-      logger.warn("DexPay API credentials not configured");
-    }
+  private get apiKey(): string {
+    return process.env.DEXPAY_API_KEY || "";
+  }
+
+  private get apiSecret(): string {
+    return process.env.DEXPAY_API_SECRET || "";
+  }
+
+  private get baseUrl(): string {
+    return process.env.DEXPAY_BASE_URL || "https://sandbox-b2b.dexpay.io";
+  }
+
+  private get receivingAddress(): string {
+    return process.env.DEXPAY_RECEIVING_ADDRESS || "";
   }
 
   /**
