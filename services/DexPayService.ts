@@ -86,8 +86,18 @@ export class DexPayService {
         headers: this.getHeaders(),
       });
 
-      logger.info(`Retrieved ${response.data.length} banks from DexPay`);
-      return response.data;
+      let banks = response.data;
+      if (!Array.isArray(banks) && Array.isArray(response.data.data)) {
+        banks = response.data.data;
+      }
+
+      if (!Array.isArray(banks)) {
+        logger.error("Unexpected bank list format from DexPay:", response.data);
+        return [];
+      }
+
+      logger.info(`Retrieved ${banks.length} banks from DexPay`);
+      return banks;
     } catch (error: any) {
       logger.error(
         "Error fetching banks from DexPay:",
