@@ -4,7 +4,6 @@ import { COMMANDS, TriggerPhrase } from "./config";
 import {
   handleAccountInfo,
   handleConversion,
-  handleCryptoSellResponse,
   handleOfframp,
   handleSupport,
   handleTopUp,
@@ -17,6 +16,11 @@ import {
   handleResetPinNewPin,
   handleResetPinConfirmPin,
   handleCancelResetPin,
+  // New off-ramp handlers
+  handleNewOfframp,
+  handleSpendCrypto,
+  isOfframpSessionActive,
+  routeOfframpMessage,
 } from "./handlers";
 
 /**
@@ -150,7 +154,8 @@ function findMatchingCommand(message: string): string | null {
 export async function commandRouteHandler(from: string, message: string) {
   // Check if this is a crypto sell request first (highest priority)
   if (isCryptoSellRequest(message)) {
-    await handleCryptoSellResponse(from, message);
+    // Route to the new off-ramp flow for crypto sell requests
+    await handleNewOfframp(from);
     return;
   }
 
@@ -158,6 +163,23 @@ export async function commandRouteHandler(from: string, message: string) {
   const resetSession = await checkResetPinSession(from, message);
   if (resetSession) {
     return; // Session handler took care of the message
+  }
+
+  // Check if user is in the middle of an off-ramp session
+  const offrampSession = await isOfframpSessionActive(from);
+  if (offrampSession) {
+    const handled = await routeOfframpMessage(from, message);
+    if (handled) {
+      return; // Off-ramp session handler took care of the message
+    }
+  }
+
+  // Check for spend crypto command
+  if (message.toLowerCase().includes('spend crypto')) {
+    const handled = await handleSpendCrypto(from);
+    if (handled) {
+      return;
+    }
   }
 
   const matchingCommand = findMatchingCommand(message);
@@ -201,7 +223,8 @@ export async function commandRouteHandler(from: string, message: string) {
       break;
 
     case "offramp":
-      await handleOfframp(from);
+      // Use the new comprehensive off-ramp flow
+      await handleNewOfframp(from);
       break;
 
     case "kyc":
