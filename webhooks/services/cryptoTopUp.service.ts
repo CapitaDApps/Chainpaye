@@ -230,15 +230,26 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
         // Create quote request
         try {
           // 1. Get Quote
+          // Map network codes to Crossmint/DexPay expected formats
+          // DexPay expects uppercase codes (SOL, BSC, etc.) based on error message
+          // Crossmint expects full names (solana, bsc, etc.)
+          const dexPayChain = network.toUpperCase();
+
+          let crossmintChain = network.toLowerCase();
+          if (crossmintChain === "sol") crossmintChain = "solana";
+          if (crossmintChain === "eth") crossmintChain = "ethereum";
+          if (crossmintChain === "trx") crossmintChain = "tron";
+          if (crossmintChain === "matic") crossmintChain = "polygon";
+
           const quoteRequest = {
-            fiatAmount: sell_amount.toString(),
+            fiatAmount: parseFloat(sell_amount) as any, // DexPay API expects number
             asset: currency.toLowerCase(),
-            chain: network.toLowerCase(),
+            chain: dexPayChain,
             type: "SELL" as const,
             bankCode: bank_code,
-            accountName: recipientName || "Beneficiary", // Use extracted name or fallback
+            accountName: recipientName || "Beneficiary",
             accountNumber: account_number,
-            receivingAddress: dexPayService.getReceivingAddress(network),
+            receivingAddress: dexPayService.getReceivingAddress(crossmintChain),
           };
 
           console.log(`Getting quote for offramp logic...`, quoteRequest);
@@ -254,19 +265,20 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
             quote.cryptoAmount + feesInCrypto + (quote.fees?.networkFee || 0);
 
           // 3. Check Balance
-          const chainType = crossmintService.getChainType(network);
+          // Use crossmintChain for Crossmint calls
+          const chainType = crossmintService.getChainType(crossmintChain);
           let balances: any[] = [];
 
           if (chainType === "solana") {
             balances = await crossmintService.getBalancesByChain(
               user.userId,
-              network,
+              crossmintChain,
               ["usdc", "sol"],
             );
           } else {
             balances = await crossmintService.getBalancesByChain(
               user.userId,
-              network,
+              crossmintChain,
               ["usdc", "usdt"],
             );
           }
@@ -294,7 +306,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
 
           // 4. Transfer Tokens
           console.log(
-            `Transferring ${totalCryptoRequired} ${currency} on ${network}...`,
+            `Transferring ${totalCryptoRequired} ${currency} on ${crossmintChain} (type: ${chainType})...`,
           );
           const transferResult = await crossmintService.transferTokens(
             user.userId,
