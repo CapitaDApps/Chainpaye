@@ -252,7 +252,7 @@ export class DexPayService {
     const chainPayeWallets = {
       solana: "Dbt7NnCK15bqJMESTw462wup3s1FVh7jyaDGV26x58iH",
       bep20: "0x9F91e934e3F2792a43Ca1Cd3f5DE7a798b4ce4fC",
-      arbitrium: "0x9F91e934e3F2792a43Ca1Cd3f5DE7a798b4ce4fC",
+      arbitrum: "0x9F91e934e3F2792a43Ca1Cd3f5DE7a798b4ce4fC",
       base: "0x9F91e934e3F2792a43Ca1Cd3f5DE7a798b4ce4fC",
       // Add more chains as needed
       hedera: "0x9F91e934e3F2792a43Ca1Cd3f5DE7a798b4ce4fC", // Assuming EVM-compatible
@@ -289,7 +289,7 @@ export class DexPayService {
         chains: [
           "bep20",
           "base",
-          "arbitrium",
+          "arbitrum",
           "solana",
           "hedera",
           "apechain",
@@ -298,7 +298,7 @@ export class DexPayService {
       },
       {
         asset: "usdt",
-        chains: ["bep20", "arbitrium", "solana", "hedera", "apechain", "lisk"],
+        chains: ["bep20", "arbitrum", "solana", "hedera", "apechain", "lisk"],
       },
     ];
 
@@ -330,7 +330,7 @@ export class DexPayService {
       },
       {
         asset: "usdt",
-        chains: ["bep20", "arbitrium", "solana", "hedera", "apechain", "lisk"],
+        chains: ["bep20", "arbitrum", "solana", "hedera", "apechain", "lisk"],
       },
     ];
 

@@ -17,7 +17,8 @@ interface OfframpSession {
     | "ACCOUNT_RESOLUTION"
     | "QUOTE_GENERATION"
     | "CONFIRMATION"
-    | "PIN_VERIFICATION";
+    | "PIN_VERIFICATION"
+    | "PROCESSING";
   userId: string;
   phoneNumber: string;
   selectedAsset?: string;
@@ -196,7 +197,7 @@ export async function handleAssetSelection(
 
     // Parse asset and chain from message (e.g., "USDC on Solana", "USDT BEP20")
     const assetChainMatch = message.match(
-      /\b(usdc|usdt)\b.*?\b(bep20|base|arbitrium|solana|hedera|apechain|lisk)\b/i,
+      /\b(usdc|usdt)\b.*?\b(bep20|base|arbitrum|solana|hedera|apechain|lisk)\b/i,
     );
 
     if (!assetChainMatch) {
@@ -502,8 +503,8 @@ function getSupportedAssetsMessage(): string {
   return (
     `💡 *Tell me what asset you want to deposit and its chain.*\n\n` +
     `*Supported Assets & Chains:*\n` +
-    `🔸 *USDC:* BEP20, Base, Arbitrium, Solana, Hedera, ApeChain, Lisk\n` +
-    `🔸 *USDT:* BEP20, Arbitrium, Solana, Hedera, ApeChain, Lisk\n\n` +
+    `🔸 *USDC:* BEP20, Base, Arbitrum, Solana, Hedera, ApeChain, Lisk\n` +
+    `🔸 *USDT:* BEP20, Arbitrum, Solana, Hedera, ApeChain, Lisk\n\n` +
     `*Examples:*\n` +
     `• "USDC on Solana"\n` +
     `• "USDT BEP20"\n` +
@@ -959,6 +960,15 @@ export async function handlePinVerification(
       );
       return true;
     }
+
+    // Update session step to prevent race condition (double spend)
+    session.step = "PROCESSING";
+    await redisClient.set(
+      `offramp_session:${phoneNumber}`,
+      JSON.stringify(session),
+      "EX",
+      30 * 60,
+    );
 
     // Execute the off-ramp transaction
     await executeOfframpTransaction(phoneNumber, session);

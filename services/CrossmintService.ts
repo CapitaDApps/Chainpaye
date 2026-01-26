@@ -54,30 +54,32 @@ export class CrossmintService {
    * List all wallets for a user
    */
   async listWallets(userId: string): Promise<CrossmintWallet[]> {
-    try {
-      const response = await axios.get(
-        `${this.baseUrl}/wallets/userId:${userId}:evm/balance?tokens=usdc`,
-        {
-          headers: {
-            "X-API-KEY": this.apiKey,
-          },
-          params: {
-            owner: `userId:${userId}`,
-          },
-        },
-      );
+    const wallets: CrossmintWallet[] = [];
+    const chainTypes = [
+      "solana",
+      "bsc",
+      "base",
+      "arbitrum",
+      "hedera",
+      "apechain",
+      "lisk",
+    ];
 
-      logger.info(`Listed ${response.data.length} wallets for user ${userId}`);
-      return response.data;
-    } catch (error: any) {
-      logger.error(
-        `Error listing wallets for user ${userId}:`,
-        error.response?.data || error.message,
-      );
-      throw new Error(
-        `Failed to list wallets: ${error.response?.data?.message || error.message}`,
-      );
-    }
+    await Promise.all(
+      chainTypes.map(async (chainType) => {
+        try {
+          const wallet = await this.getWalletByChain(userId, chainType);
+          if (wallet) {
+            wallets.push(wallet);
+          }
+        } catch (error) {
+          // Ignore errors looking up specific chains
+        }
+      }),
+    );
+
+    logger.info(`Listed ${wallets.length} wallets for user ${userId}`);
+    return wallets;
   }
 
   /**
@@ -133,7 +135,7 @@ export class CrossmintService {
     const chainMappings: { [key: string]: string } = {
       solana: "solana",
       bep20: "bsc", // BSC for BEP20 tokens
-      arbitrium: "arbitrum",
+      arbitrum: "arbitrum",
       base: "base",
       hedera: "hedera",
       apechain: "apechain",
@@ -215,9 +217,19 @@ export class CrossmintService {
     chainType: string,
   ): Promise<CrossmintWallet | null> {
     try {
-      const wallets = await this.listWallets(userId);
-      return wallets.find((wallet) => wallet.chainType === chainType) || null;
-    } catch (error) {
+      const response = await axios.get(
+        `${this.baseUrl}/wallets/userId:${userId}:${chainType}`,
+        {
+          headers: {
+            "X-API-KEY": this.apiKey,
+          },
+        },
+      );
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        return null;
+      }
       logger.error(
         `Error getting ${chainType} wallet for user ${userId}:`,
         error,
@@ -334,7 +346,7 @@ export class CrossmintService {
       solana: "solana",
       bep20: "bsc",
       base: "base",
-      arbitrium: "arbitrum",
+      arbitrum: "arbitrum",
       hedera: "hedera",
       apechain: "apechain",
       lisk: "lisk",
@@ -350,7 +362,7 @@ export class CrossmintService {
     const supportedAssets: { [key: string]: string[] } = {
       bep20: ["usdc", "usdt"],
       base: ["usdc"],
-      arbitrium: ["usdc", "usdt"],
+      arbitrum: ["usdc", "usdt"],
       solana: ["usdc", "usdt"],
       hedera: ["usdc", "usdt"],
       apechain: ["usdc", "usdt"],
