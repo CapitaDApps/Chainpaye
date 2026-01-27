@@ -138,9 +138,9 @@ export class DexPayService {
       logger.info(`Resolved account response:`, JSON.stringify(data));
 
       return {
-        accountNumber: data.accountNumber || data.account_number,
+        accountNumber: data.accountNumber || payload.accountNumber,
         accountName: data.accountName || data.account_name,
-        bankCode: data.bankCode || data.bank_code,
+        bankCode: data.bankCode || payload.bankCode,
         bankName: data.bankName || data.bank_name,
       };
     } catch (error: any) {
