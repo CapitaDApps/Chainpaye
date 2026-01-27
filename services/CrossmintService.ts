@@ -149,7 +149,7 @@ export class CrossmintService {
     // Helper to request balances for a specific chain using the unified EVM wallet
     if (this.isEvmChain(chain)) {
       const chainId = "evm";
-      // Map tokens to chain-specific tokens (e.g. "usdc" -> "base-sepolia:usdc")
+      // Map tokens to chain-specific tokens (e.g. "usdc" -> "base:usdc")
       const tokenChain = this.getTokenChainIdentifier(chain);
       const prefixedTokens = tokens.map((t) => `${tokenChain}:${t}`);
 
@@ -161,7 +161,7 @@ export class CrossmintService {
 
       // Map back to simple token names for the caller
       return balances.map((b) => {
-        // b.token is likely "chain:token" like "base-sepolia:usdc"
+        // b.token is likely "chain:token" like "base:usdc"
         // We want to return just "usdc" to match what the caller expects
         const tokenVal = b.token || "";
         const simpleToken = tokenVal.includes(":")
@@ -347,7 +347,7 @@ export class CrossmintService {
       solana: "solana",
       bsc: "bsc", // For BEP20 tokens
       arbitrum: "arbitrum",
-      base: "base-sepolia", // Using sepolia testnet for base
+      base: "base", // Production Base mainnet
       hedera: "hedera",
       apechain: "apechain",
       lisk: "lisk",

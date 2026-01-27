@@ -178,6 +178,7 @@ export class DexPayService {
       logger.info(
         `Generated quote ${response.data.id} for ${request.fiatAmount} NGN`,
       );
+      console.log({ response });
       return response.data;
     } catch (error: any) {
       logger.error(
