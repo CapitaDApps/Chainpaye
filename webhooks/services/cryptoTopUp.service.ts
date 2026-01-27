@@ -218,6 +218,8 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
         };
       }
 
+      // Fixed OFFRAMP_CRYPTO_REVIEW logic
+
       case "OFFRAMP_CRYPTO_REVIEW": {
         const {
           pin,
@@ -252,72 +254,63 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
           };
         }
 
-        // Create quote request
         try {
-          // 1. Get Quote
-          // Map network codes to Crossmint/DexPay expected formats
-          // DexPay expects uppercase codes (SOL, BSC, etc.) based on error message
-          // Crossmint expects full names (solana, bsc, etc.)
-          const dexPayChain = network.toUpperCase();
-
+          // 1. NORMALIZE CHAIN NAMES
+          // Map frontend network codes to proper format
+          let dexPayChain = network.toLowerCase(); // Keep lowercase for DexPay
           let crossmintChain = network.toLowerCase();
-          if (crossmintChain === "sol") crossmintChain = "solana";
-          if (crossmintChain === "eth") crossmintChain = "ethereum";
-          if (crossmintChain === "trx") crossmintChain = "tron";
-          if (crossmintChain === "matic") crossmintChain = "polygon";
 
-          // Re-resolve account name if missing (frontend might not pass it back)
-          let finalRecipientName = recipientName;
-          if (
-            !finalRecipientName ||
-            finalRecipientName === "Beneficiary" ||
-            finalRecipientName === "Account Holder"
-          ) {
-            try {
-              console.log("Re-resolving account details for quote...");
-              const resolved = await dexPayService.resolveAccount(
-                account_number,
-                bank_code,
-              );
-              finalRecipientName = resolved.accountName;
-              console.log("Resolved account name:", finalRecipientName);
-            } catch (resolveError) {
-              console.warn("Could not resolve account name:", resolveError);
-              // Fallback to "Beneficiary" if still fails, but this likely causes the quote error
-              finalRecipientName = "Beneficiary";
-            }
-          }
-
-          // Normalize name to avoid double spaces which might cause "account not found" error
-          if (finalRecipientName) {
-            finalRecipientName = finalRecipientName.trim().replace(/\s+/g, " ");
-          }
-
-          const quoteRequest = {
-            fiatAmount: parseFloat(sell_amount) as any, // DexPay API expects number
-            asset: currency.toUpperCase(),
-            chain: dexPayChain,
-            type: "SELL" as const,
-            bankCode: bank_code,
-            accountName: finalRecipientName,
-            accountNumber: account_number,
-            receivingAddress: dexPayService.getReceivingAddress(crossmintChain),
+          // Normalize chain names
+          const chainMapping: Record<
+            string,
+            { dexPay: string; crossmint: string }
+          > = {
+            sol: { dexPay: "solana", crossmint: "solana" },
+            bsc: { dexPay: "bep20", crossmint: "bsc" },
+            eth: { dexPay: "ethereum", crossmint: "ethereum" },
+            poly: { dexPay: "polygon", crossmint: "polygon" },
+            matic: { dexPay: "polygon", crossmint: "polygon" },
+            trx: { dexPay: "tron", crossmint: "tron" },
+            base: { dexPay: "base", crossmint: "base" },
+            arbitrum: { dexPay: "arbitrum", crossmint: "arbitrum" },
+            hedera: { dexPay: "hedera", crossmint: "hedera" },
+            apechain: { dexPay: "apechain", crossmint: "apechain" },
+            lisk: { dexPay: "lisk", crossmint: "lisk" },
           };
 
-          console.log(`Getting quote for offramp logic...`, quoteRequest);
-          const quote = await dexPayService.getQuote(quoteRequest);
+          const normalizedChain = chainMapping[network.toLowerCase()];
+          if (!normalizedChain) {
+            return {
+              screen: "OFFRAMP_CRYPTO_REVIEW",
+              data: {
+                ...data,
+                error_message: `Unsupported network: ${network}`,
+              },
+            };
+          }
 
-          // 2. Calculate Fees
-          const fees = dexPayService.calculateFees(
-            parseFloat(sell_amount),
-            quote.rate,
+          dexPayChain = normalizedChain.dexPay;
+          crossmintChain = normalizedChain.crossmint;
+
+          console.log(
+            `Chain mapping: ${network} -> DexPay: ${dexPayChain}, Crossmint: ${crossmintChain}`,
           );
-          const feesInCrypto = fees.totalFees / quote.rate;
-          const totalCryptoRequired =
-            quote.cryptoAmount + feesInCrypto + (quote.fees?.networkFee || 0);
 
-          // 3. Check Balance
-          // Use crossmintChain for Crossmint calls
+          // 2. VERIFY ASSET-CHAIN COMBINATION
+          const normalizedAsset = currency.toLowerCase();
+          if (
+            !dexPayService.isSupportedAssetChain(normalizedAsset, dexPayChain)
+          ) {
+            return {
+              screen: "OFFRAMP_CRYPTO_REVIEW",
+              data: {
+                ...data,
+                error_message: `${currency.toUpperCase()} is not supported on ${dexPayChain.toUpperCase()}`,
+              },
+            };
+          }
+
+          // 3. GET WALLET BALANCE FIRST
           const chainType = crossmintService.getChainType(crossmintChain);
           let balances: any[] = [];
 
@@ -336,53 +329,146 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
           }
 
           const assetBalance = balances.find(
-            (b) => b.token.toLowerCase() === currency.toLowerCase(),
+            (b) => b.token.toLowerCase() === normalizedAsset,
           );
           const currentBalance = assetBalance
             ? parseFloat(assetBalance.amount)
             : 0;
 
           console.log(
-            `Balance check: Required ${totalCryptoRequired}, Available ${currentBalance}`,
+            `Current balance for ${normalizedAsset} on ${crossmintChain}: ${currentBalance}`,
           );
 
-          if (currentBalance < totalCryptoRequired) {
+          if (currentBalance === 0) {
             return {
               screen: "OFFRAMP_CRYPTO_REVIEW",
               data: {
                 ...data,
-                error_message: `Insufficient balance. You need ${totalCryptoRequired.toFixed(6)} ${currency} but have ${currentBalance.toFixed(6)}.`,
+                error_message: `No ${currency.toUpperCase()} balance found on ${network.toUpperCase()}. Please deposit first.`,
               },
             };
           }
 
-          // 4. Transfer Tokens
+          // 4. RESOLVE ACCOUNT NAME (if missing)
+          let finalRecipientName = recipientName;
+          if (
+            !finalRecipientName ||
+            finalRecipientName === "Beneficiary" ||
+            finalRecipientName === "Account Holder"
+          ) {
+            try {
+              console.log("Resolving account details for quote...");
+              const resolved = await dexPayService.resolveAccount(
+                account_number,
+                bank_code,
+              );
+              finalRecipientName = resolved.accountName;
+              console.log("Resolved account name:", finalRecipientName);
+            } catch (resolveError) {
+              console.error("Could not resolve account name:", resolveError);
+              return {
+                screen: "OFFRAMP_CRYPTO_REVIEW",
+                data: {
+                  ...data,
+                  error_message:
+                    "Could not verify account details. Please try again.",
+                },
+              };
+            }
+          }
+
+          // Normalize name (remove extra spaces)
+          finalRecipientName = finalRecipientName.trim().replace(/\s+/g, " ");
+
+          // 5. GET RECEIVING ADDRESS
+          const receivingAddress =
+            dexPayService.getReceivingAddress(dexPayChain);
           console.log(
-            `Transferring ${totalCryptoRequired} ${currency} on ${crossmintChain} (type: ${chainType})...`,
+            `Receiving address for ${dexPayChain}: ${receivingAddress}`,
           );
+
+          // 6. CREATE QUOTE REQUEST
+          const ngnAmount = parseFloat(sell_amount);
+          const quoteRequest = {
+            fiatAmount: ngnAmount.toString(), // Send as string
+            asset: normalizedAsset.toUpperCase(), // USDC, USDT
+            chain: dexPayChain, // lowercase: solana, bep20, etc.
+            type: "SELL" as const,
+            bankCode: bank_code,
+            accountName: finalRecipientName,
+            accountNumber: account_number,
+            receivingAddress: receivingAddress,
+          };
+
+          console.log("Quote request:", JSON.stringify(quoteRequest, null, 2));
+
+          // 7. GET QUOTE
+          const quote = await dexPayService.getQuote(quoteRequest);
+          console.log("Quote received:", JSON.stringify(quote, null, 2));
+
+          // 8. CALCULATE TOTAL FEES
+          const fees = dexPayService.calculateFees(ngnAmount, quote.rate);
+          const feesInCrypto = fees.totalFees / quote.rate;
+          const networkFeeInCrypto = quote.fees?.networkFee || 0;
+          const totalCryptoRequired =
+            quote.cryptoAmount + feesInCrypto + networkFeeInCrypto;
+
+          console.log(`Fee calculation:
+      - NGN Amount: ${ngnAmount}
+      - Quote Rate: ${quote.rate}
+      - Crypto Amount: ${quote.cryptoAmount}
+      - Platform Fees: ${fees.totalFees} NGN (${feesInCrypto} ${normalizedAsset})
+      - Network Fee: ${networkFeeInCrypto} ${normalizedAsset}
+      - Total Required: ${totalCryptoRequired} ${normalizedAsset}
+      - Current Balance: ${currentBalance} ${normalizedAsset}
+    `);
+
+          // 9. CHECK IF SUFFICIENT BALANCE
+          if (currentBalance < totalCryptoRequired) {
+            const shortfall = totalCryptoRequired - currentBalance;
+            return {
+              screen: "OFFRAMP_CRYPTO_REVIEW",
+              data: {
+                ...data,
+                error_message: `Insufficient balance. You need ${totalCryptoRequired.toFixed(6)} ${currency.toUpperCase()} but have ${currentBalance.toFixed(6)}. Please deposit ${shortfall.toFixed(6)} more ${currency.toUpperCase()}.`,
+              },
+            };
+          }
+
+          // 10. TRANSFER TOKENS
+          console.log(
+            `Transferring ${totalCryptoRequired} ${normalizedAsset} on ${crossmintChain}...`,
+          );
+
           const transferResult = await crossmintService.transferTokens(
             user.userId,
             chainType,
-            currency,
+            normalizedAsset,
             totalCryptoRequired.toString(),
-            quoteRequest.receivingAddress,
+            receivingAddress,
           );
-          console.log(`Transfer successful:`, transferResult);
 
-          // 5. Complete Off-ramp
+          console.log(
+            "Transfer successful:",
+            JSON.stringify(transferResult, null, 2),
+          );
+
+          // 11. COMPLETE OFF-RAMP
           console.log(`Completing offramp for quote ${quote.id}...`);
           const offrampResult = await dexPayService.completeOfframp(quote.id);
-          console.log(`Offramp completed:`, offrampResult);
+          console.log(
+            "Offramp completed:",
+            JSON.stringify(offrampResult, null, 2),
+          );
 
-          // 6. Send Notification
-          // We don't await this to avoid delaying the UI response
+          // 12. SEND SUCCESS NOTIFICATION (non-blocking)
           sendOfframpSuccessNotification(
             phone,
-            parseFloat(sell_amount),
+            ngnAmount,
             quote.cryptoAmount,
             currency,
             bank_name,
-            recipientName || "Beneficiary",
+            finalRecipientName,
             quote.id,
           ).catch((err) =>
             console.error("Error sending success notification:", err),
@@ -393,13 +479,28 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
             data: {},
           };
         } catch (error: any) {
-          console.error("Error processing crypto top-up offramp:", error);
+          console.error("Error processing crypto offramp:", error);
+          console.error("Error stack:", error.stack);
+
           let errorMessage =
             error.message || "Transaction failed. Please try again.";
 
+          // Better error messages
           if (errorMessage.toLowerCase().includes("no trade ad available")) {
             errorMessage =
-              "Service temporarily unavailable for this trade. Please try a different amount.";
+              "Service temporarily unavailable. Please try a different amount or wait a few minutes.";
+          } else if (
+            errorMessage.toLowerCase().includes("insufficient balance")
+          ) {
+            errorMessage =
+              "Insufficient balance in your wallet. Please deposit more crypto.";
+          } else if (errorMessage.toLowerCase().includes("account not found")) {
+            errorMessage =
+              "Bank account not found. Please verify your account details.";
+          } else if (errorMessage.toLowerCase().includes("expired")) {
+            errorMessage = "Quote has expired. Please try again.";
+          } else if (errorMessage.toLowerCase().includes("fiat amount")) {
+            errorMessage = `Invalid amount. Please try a different amount between ₦1,000 and ₦5,000,000.`;
           }
 
           return {

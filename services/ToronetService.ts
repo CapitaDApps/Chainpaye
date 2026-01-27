@@ -244,7 +244,7 @@ export class ToronetService {
       };
     }
 
-    console.log({ currency, resp });
+    // console.log({ currency, resp });
 
     return {
       result: data.result,
