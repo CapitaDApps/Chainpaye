@@ -784,8 +784,11 @@ async function generateQuote(
       console.error("Error getting balances for quote:", error);
     }
 
+    // Crossmint API returns 'symbol' for the token name (e.g., "usdc")
     const assetBalance = balances.find(
-      (b) => b.token.toLowerCase() === selectedAsset,
+      (b) =>
+        (b.symbol?.toLowerCase() || b.token?.toLowerCase()) ===
+        selectedAsset.toLowerCase(),
     );
     const currentBalance = assetBalance ? parseFloat(assetBalance.amount) : 0;
 
