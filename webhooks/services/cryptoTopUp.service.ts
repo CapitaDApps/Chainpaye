@@ -328,8 +328,13 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
             );
           }
 
+          console.log(
+            `DEBUG: Balances for ${crossmintChain}:`,
+            JSON.stringify(balances, null, 2),
+          );
+
           const assetBalance = balances.find(
-            (b) => b.token.toLowerCase() === normalizedAsset,
+            (b) => b.token?.toLowerCase() === normalizedAsset,
           );
           const currentBalance = assetBalance
             ? parseFloat(assetBalance.amount)
