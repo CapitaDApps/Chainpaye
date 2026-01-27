@@ -25,6 +25,7 @@ export class UserService {
     const user = await User.findOne({ whatsappNumber: phoneNumber }).select(
       `${includePin ? "+pin" : ""}`,
     );
+    console.log("User", user);
     return user;
   }
 
