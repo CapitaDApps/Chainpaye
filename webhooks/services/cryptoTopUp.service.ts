@@ -268,7 +268,11 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
 
           // Re-resolve account name if missing (frontend might not pass it back)
           let finalRecipientName = recipientName;
-          if (!finalRecipientName || finalRecipientName === "Beneficiary") {
+          if (
+            !finalRecipientName ||
+            finalRecipientName === "Beneficiary" ||
+            finalRecipientName === "Account Holder"
+          ) {
             try {
               console.log("Re-resolving account details for quote...");
               const resolved = await dexPayService.resolveAccount(
@@ -291,7 +295,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
 
           const quoteRequest = {
             fiatAmount: parseFloat(sell_amount) as any, // DexPay API expects number
-            asset: currency.toLowerCase(),
+            asset: currency.toUpperCase(),
             chain: dexPayChain,
             type: "SELL" as const,
             bankCode: bank_code,
