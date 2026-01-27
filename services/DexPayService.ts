@@ -97,6 +97,9 @@ export class DexPayService {
       }
 
       logger.info(`Retrieved ${banks.length} banks from DexPay`);
+      if (banks.length > 0) {
+        logger.info("Sample bank object:", JSON.stringify(banks[0]));
+      }
       return banks;
     } catch (error: any) {
       logger.error(
@@ -117,12 +120,15 @@ export class DexPayService {
     bankCode: string,
   ): Promise<AccountResolution> {
     try {
+      const payload = {
+        account_number: accountNumber,
+        bank_code: bankCode,
+      };
+      logger.info("Resolving account with payload:", payload);
+
       const response = await axios.post(
         `${this.baseUrl}/banks/resolve`,
-        {
-          accountNumber,
-          bankCode,
-        },
+        payload,
         {
           headers: this.getHeaders(),
         },
@@ -133,13 +139,17 @@ export class DexPayService {
     } catch (error: any) {
       logger.error(
         `Error resolving account ${accountNumber}:`,
-        error.response?.data || error.message,
+        JSON.stringify(error.response?.data || error.message),
       );
 
-      if (error.response?.status === 404) {
-        throw new Error(
-          "Account not found. Please check the account number and try again.",
-        );
+      if (error.response?.status === 404 || error.response?.status === 400) {
+        // DexPay might return 400 for not found with specific message
+        const msg = error.response?.data?.message || "";
+        if (msg.toLowerCase().includes("not found")) {
+          throw new Error(
+            "Account not found. Please check the account number and try again.",
+          );
+        }
       }
 
       throw new Error(
