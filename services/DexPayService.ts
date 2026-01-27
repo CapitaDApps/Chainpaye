@@ -133,9 +133,16 @@ export class DexPayService {
           headers: this.getHeaders(),
         },
       );
+      console.log(response);
+      const data = response.data;
+      logger.info(`Resolved account response:`, JSON.stringify(data));
 
-      logger.info(`Resolved account ${accountNumber} for bank ${bankCode}`);
-      return response.data;
+      return {
+        accountNumber: data.accountNumber || data.account_number,
+        accountName: data.accountName || data.account_name,
+        bankCode: data.bankCode || data.bank_code,
+        bankName: data.bankName || data.bank_name,
+      };
     } catch (error: any) {
       logger.error(
         `Error resolving account ${accountNumber}:`,
