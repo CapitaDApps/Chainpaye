@@ -163,9 +163,10 @@ export class CrossmintService {
       return balances.map((b) => {
         // b.token is likely "chain:token" like "base-sepolia:usdc"
         // We want to return just "usdc" to match what the caller expects
-        const simpleToken = b.token.includes(":")
-          ? b.token.split(":")[1]
-          : b.token;
+        const tokenVal = b.token || "";
+        const simpleToken = tokenVal.includes(":")
+          ? tokenVal.split(":")[1]
+          : tokenVal;
         return {
           ...b,
           token: simpleToken || b.token,
