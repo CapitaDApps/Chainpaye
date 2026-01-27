@@ -134,7 +134,7 @@ export class DexPayService {
         },
       );
       console.log(response);
-      const data = response.data;
+      const data = response.data.data;
       logger.info(`Resolved account response:`, JSON.stringify(data));
 
       return {
