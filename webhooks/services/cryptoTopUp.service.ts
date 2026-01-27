@@ -394,12 +394,19 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
           };
         } catch (error: any) {
           console.error("Error processing crypto top-up offramp:", error);
+          let errorMessage =
+            error.message || "Transaction failed. Please try again.";
+
+          if (errorMessage.toLowerCase().includes("no trade ad available")) {
+            errorMessage =
+              "Service temporarily unavailable for this trade. Please try a different amount.";
+          }
+
           return {
             screen: "OFFRAMP_CRYPTO_REVIEW",
             data: {
               ...data,
-              error_message:
-                error.message || "Transaction failed. Please try again.",
+              error_message: errorMessage,
             },
           };
         }
