@@ -121,8 +121,8 @@ export class DexPayService {
   ): Promise<AccountResolution> {
     try {
       const payload = {
-        account_number: accountNumber,
-        bank_code: bankCode,
+        accountNumber: accountNumber,
+        bankCode: bankCode,
       };
       logger.info("Resolving account with payload:", payload);
 
@@ -144,8 +144,9 @@ export class DexPayService {
 
       if (error.response?.status === 404 || error.response?.status === 400) {
         // DexPay might return 400 for not found with specific message
-        const msg = error.response?.data?.message || "";
-        if (msg.toLowerCase().includes("not found")) {
+        const data = error.response?.data || {};
+        const msg = data.message || data.error || "";
+        if (String(msg).toLowerCase().includes("not found")) {
           throw new Error(
             "Account not found. Please check the account number and try again.",
           );
