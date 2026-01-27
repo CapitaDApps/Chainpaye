@@ -741,10 +741,11 @@ async function generateQuote(
     );
 
     // Generate quote
+    // DexPay API requires: fiatAmount as number, chain as uppercase
     const quoteRequest = {
-      fiatAmount: session.ngnAmount!.toString(),
-      asset: session.selectedAsset!,
-      chain: session.selectedChain!,
+      fiatAmount: session.ngnAmount!, // Must be a number
+      asset: session.selectedAsset!.toUpperCase(),
+      chain: session.selectedChain!.toUpperCase(), // Must be uppercase: BASE, BSC, SOL, etc.
       type: "SELL" as const,
       bankCode: session.selectedBank!.code,
       accountName: session.resolvedAccount!.accountName,
