@@ -85,6 +85,7 @@ export class UserService {
                 country: extractedCountry,
                 pin,
                 userId,
+                fullName: data.fullName,
               },
             ],
             { session },

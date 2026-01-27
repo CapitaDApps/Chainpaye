@@ -4,8 +4,7 @@
  */
 
 import argon2 from "argon2";
-import mongoose, { Document, Schema, Types } from "mongoose";
-import { IWallet } from "./Wallet";
+import mongoose, { Document, Schema } from "mongoose";
 
 /**
  * Interface for User document
@@ -117,7 +116,7 @@ const UserSchema: Schema = new Schema(
   },
   {
     timestamps: true, // Automatically add createdAt and updatedAt
-  }
+  },
 );
 
 /**
@@ -146,7 +145,7 @@ UserSchema.index({ email: 1 });
  * Method to compare PIN for authentication
  */
 UserSchema.methods.comparePin = async function (
-  candidatePin: string
+  candidatePin: string,
 ): Promise<boolean> {
   try {
     return await argon2.verify(this.pin, candidatePin);

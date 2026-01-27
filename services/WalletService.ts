@@ -30,7 +30,7 @@ export class WalletService {
             password: toronetWallet.password,
           },
         ],
-        { session }
+        { session },
       );
     }
   }
@@ -39,13 +39,15 @@ export class WalletService {
     from: string,
     to: string,
     amount: number,
-    currency: CurrencyType
+    currency: CurrencyType,
   ) {
     const user = await User.findOne({ whatsappNumber: from });
     if (!user) throw new Error(`User with phone number - [${from}] not found`);
     const fromWallet = await Wallet.findOne({ userId: user.userId }).select(
-      "+password"
+      "+password",
     );
+
+    console.log("Sender wallet found:", { walletId: fromWallet?._id });
 
     if (!fromWallet)
       throw new Error(
@@ -53,6 +55,10 @@ export class WalletService {
       );
 
     const toUser = await User.findOne({ whatsappNumber: to });
+    console.log("Recipient user search result:", {
+      toUserFound: !!toUser,
+      toPhone: to,
+    });
     if (!toUser)
       return {
         success: false,
@@ -61,11 +67,14 @@ export class WalletService {
         data: to,
       };
     const toWallet = await Wallet.findOne({ userId: toUser.userId }).select(
-      "+password"
+      "+password",
     );
+    console.log("Recipient wallet search result:", {
+      toWalletFound: !!toWallet,
+    });
     if (!toWallet)
       throw new Error(
-        `Could not find wallet for user with phone number - [${to}]`
+        `Could not find wallet for user with phone number - [${to}]`,
       );
 
     const senderFullName = `${user.firstName} ${user.lastName}`;
@@ -81,19 +90,27 @@ export class WalletService {
 
         if (!respUSD.result) throw new Error("Error fetching USD balance");
 
-        if (respUSD.balance < amount)
+        if (respUSD.balance < amount) {
+          console.warn("Insufficient USD balance:", {
+            balance: respUSD.balance,
+            amount,
+            wallet: fromWallet.publicKey,
+          });
           return {
             success: false,
             type: "Insufficient balance",
             message: "Insufficient balance to make transfer",
           };
+        }
 
         const transferRespUSD = await toronetService.transferUSD(
           fromWallet.publicKey,
           toWallet.publicKey,
           amount.toString(),
-          fromWallet.password
+          fromWallet.password,
         );
+
+        console.log("USD Transfer response:", transferRespUSD);
 
         if (transferRespUSD.result) {
           const txResult = await TransactionService.recordTransfer({
@@ -154,19 +171,33 @@ export class WalletService {
 
         if (!respNGN.result) throw new Error("Error fetching NGN balance");
 
-        if (+respNGN.balance < +amount)
+        if (+respNGN.balance < +amount) {
+          console.warn("Insufficient NGN balance:", {
+            balance: respNGN.balance,
+            amount,
+            wallet: fromWallet.publicKey,
+          });
           return {
             success: false,
             type: "Insufficient balance",
             message: "Insufficient balance to make transfer",
           };
+        }
+
+        console.log("Initiating NGN transfer...", {
+          amount,
+          from: fromWallet.publicKey,
+          to: toWallet.publicKey,
+        });
 
         const transferRespNGN = await toronetService.transferNGN(
           fromWallet.publicKey,
           toWallet.publicKey,
           amount.toString(),
-          fromWallet.password
+          fromWallet.password,
         );
+
+        console.log("NGN Transfer response:", transferRespNGN);
 
         if (transferRespNGN.result) {
           const txResult = await TransactionService.recordTransfer({
@@ -221,7 +252,8 @@ export class WalletService {
         }
 
       default:
-        break;
+        console.log("Unsupported currency:", currency);
+        throw new Error(`Unsupported currency: ${currency}`);
     }
   }
 
@@ -237,7 +269,7 @@ export class WalletService {
 
     if (!wallet)
       throw new Error(
-        `User with phone number - [+${phoneNumber}] does not have a wallet`
+        `User with phone number - [+${phoneNumber}] does not have a wallet`,
       );
 
     const data = await toronetService.initializeDeposit({
@@ -320,7 +352,7 @@ export class WalletService {
     if (+statusResult.status == 0) {
       result = await toronetService.recordTransaction(
         transaction.toronetTransactionId!,
-        transaction.currency
+        transaction.currency,
       );
       if (result.result) {
         const st = await toronetService.getTransactionStatus(

@@ -158,6 +158,7 @@ export const getTransferScreen = async (decryptedBody: {
             };
           }
           const pinValid = await user.comparePin(pin);
+          console.log("PIN validation result", { pinValid });
           if (!user || !pinValid) {
             return {
               screen: "PIN",
@@ -176,12 +177,18 @@ export const getTransferScreen = async (decryptedBody: {
             .then(async (transferResult) => {
               if (!transferResult) {
                 await whatsappBusinessService.sendNormalMessage(
-                  `An error occurred processing transfer`,
-                  userPhone!
+                  `Transfer failed: ${errorMessage}`,
+                  userPhone!,
                 );
               }
             })
-            .catch((error) => console.log("Error transferring", error));
+            .catch(async (error) => {
+              console.error("Error transferring", error);
+              await whatsappBusinessService.sendNormalMessage(
+                `An error occurred processing transfer. Please try again later.`,
+                userPhone!,
+              );
+            });
 
           return {
             screen: "PROCESSING",
@@ -195,7 +202,7 @@ export const getTransferScreen = async (decryptedBody: {
     }
     console.error("Unhandled request body:", decryptedBody);
     throw new Error(
-      "Unhandled endpoint request. Make sure you handle the request action & screen logged above."
+      "Unhandled endpoint request. Make sure you handle the request action & screen logged above.",
     );
   } catch (error) {
     console.error("An error occurred", error);
