@@ -21,9 +21,9 @@ export interface AccountResolution {
 }
 
 export interface QuoteRequest {
-  fiatAmount: string;
+  fiatAmount: number; // DexPay API requires a number
   asset: string;
-  chain: string;
+  chain: string; // Must be uppercase: BASE, BSC, SOL, etc.
   type: "SELL";
   bankCode: string;
   accountName: string;

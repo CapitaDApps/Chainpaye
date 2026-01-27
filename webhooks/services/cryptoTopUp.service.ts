@@ -396,11 +396,12 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
           );
 
           // 6. CREATE QUOTE REQUEST
+          // DexPay API requires: fiatAmount as number, chain as uppercase
           const ngnAmount = parseFloat(sell_amount);
           const quoteRequest = {
-            fiatAmount: ngnAmount.toString(), // Send as string
+            fiatAmount: ngnAmount, // Must be a number, not string
             asset: normalizedAsset.toUpperCase(), // USDC, USDT
-            chain: dexPayChain, // lowercase: solana, bep20, etc.
+            chain: dexPayChain.toUpperCase(), // Must be uppercase: BASE, BSC, SOL, etc.
             type: "SELL" as const,
             bankCode: bank_code,
             accountName: finalRecipientName,
