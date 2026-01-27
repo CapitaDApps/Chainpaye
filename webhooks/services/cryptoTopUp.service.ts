@@ -333,8 +333,11 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
             JSON.stringify(balances, null, 2),
           );
 
+          // Crossmint API returns 'symbol' for the token name (e.g., "usdc")
           const assetBalance = balances.find(
-            (b) => b.token?.toLowerCase() === normalizedAsset,
+            (b) =>
+              (b.symbol?.toLowerCase() || b.token?.toLowerCase()) ===
+              normalizedAsset,
           );
           const currentBalance = assetBalance
             ? parseFloat(assetBalance.amount)

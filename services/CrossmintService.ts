@@ -15,10 +15,14 @@ export interface CrossmintWallet {
 }
 
 export interface CrossmintBalance {
-  token: string;
+  token?: string; // Legacy property (may not be present)
+  symbol?: string; // Token symbol (e.g., "usdc")
+  name?: string; // Token name (e.g., "USD Coin")
   amount: string;
   decimals: number;
+  rawAmount?: string;
   usdValue?: number;
+  chains?: Record<string, any>; // Chain-specific balance data
 }
 
 export interface CreateWalletRequest {
@@ -161,15 +165,16 @@ export class CrossmintService {
 
       // Map back to simple token names for the caller
       return balances.map((b) => {
-        // b.token is likely "chain:token" like "base:usdc"
+        // b.token or b.symbol is likely "chain:token" like "base:usdc"
         // We want to return just "usdc" to match what the caller expects
-        const tokenVal = b.token || "";
+        const tokenVal = b.token || b.symbol || "";
         const simpleToken = tokenVal.includes(":")
           ? tokenVal.split(":")[1]
           : tokenVal;
         return {
           ...b,
-          token: simpleToken || b.token,
+          token: simpleToken || tokenVal,
+          symbol: b.symbol || simpleToken || tokenVal,
         };
       });
     }
