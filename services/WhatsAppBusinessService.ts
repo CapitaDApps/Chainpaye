@@ -307,6 +307,18 @@ What can I do for you?
   }
 
   async sendWithdrawalFlowById(to: string) {
+    const phone = to.startsWith("+") ? to : `+${to}`;
+    const user = await userService.getUser(phone);
+
+    if (!user || !user.isVerified) {
+      await this.sendNormalMessage(
+        "You need to complete KYC verification to withdraw funds. Please complete the verification process below.",
+        to,
+      );
+      await this.sendKycFlowById(to);
+      return;
+    }
+
     const withdrawFlowId = "1373120947345936";
     const screenId = "WITHDRAWAL_CURRENCY";
     await this.sendTextOnlyFlowById(to, withdrawFlowId, screenId, {
