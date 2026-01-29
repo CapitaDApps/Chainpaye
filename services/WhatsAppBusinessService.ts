@@ -432,11 +432,6 @@ What would you like to sell?`;
       toronetService.getBalanceNGN(wallet.publicKey),
     ]);
 
-    // if (user.country === "NG") {
-    //   // update wallet for indirect transfers
-
-    // }
-
     // message should contain the user's account, number, name and balances
 
     const displayName = user.isVerified
