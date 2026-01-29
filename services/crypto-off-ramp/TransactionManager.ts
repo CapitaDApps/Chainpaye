@@ -3,7 +3,7 @@
  *
  * This service implements crypto-first transaction sequencing where crypto transfers
  * must complete successfully before any DexPay operations begin, ensuring transaction
- * integrity and preventing partial failures.
+ * integrity and preventing partial failures
  *
  * Requirements: 10.1, 10.2, 10.3
  */

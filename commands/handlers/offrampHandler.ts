@@ -131,6 +131,7 @@ export async function handleOfframp(
 
 /**
  * Display user's existing wallets with balances using WorkflowController
+ * If user has no wallets, create EVM and Solana wallets and send offramp flow
  * Requirements: 2.1, 2.2, 2.3, 2.4
  */
 async function displayUserWallets(
@@ -142,6 +143,61 @@ async function displayUserWallets(
     // Get all user wallets
     const wallets = await crossmintService.listWallets(userId);
 
+    // If user has NO wallets, create wallets and send the offramp flow
+    if (!wallets || wallets.length === 0) {
+      console.log(
+        `[OFFRAMP] User ${userId} has no wallets - creating EVM and Solana wallets`,
+      );
+
+      try {
+        // Create both EVM and Solana wallets for the user
+        const [evmWallet, solanaWallet] = await Promise.all([
+          crossmintService.getOrCreateWallet(userId, "evm"),
+          crossmintService.getOrCreateWallet(userId, "solana"),
+        ]);
+
+        console.log(
+          `[OFFRAMP] Created wallets - EVM: ${evmWallet.address}, Solana: ${solanaWallet.address}`,
+        );
+
+        // Send wallet info message to user
+        let walletMessage = `🆕 *Wallets Created Successfully!*\n\n`;
+        walletMessage += `We've created crypto wallets for you:\n\n`;
+        walletMessage += `🔷 *EVM Wallet* (for USDC/USDT on BSC, Base, Arbitrum, etc.)\n`;
+        walletMessage += `\`${evmWallet.address}\`\n\n`;
+        walletMessage += `🟣 *Solana Wallet* (for USDC on Solana)\n`;
+        walletMessage += `\`${solanaWallet.address}\`\n\n`;
+        walletMessage += `💡 Deposit crypto to these addresses, then use the button below to sell and withdraw to your bank account.`;
+
+        await whatsappBusinessService.sendNormalMessage(
+          walletMessage,
+          phoneNumber,
+        );
+
+        // Send the offramp flow to the user
+        // TODO! Verify the flow ID is correct for your Meta Business Suite setup
+        await whatsappBusinessService.sendCryptoDepositAddress(
+          phoneNumber,
+          "USDC", // Default token
+          "base" as NormalizedNetworkType, // Default network
+          evmWallet.address, // Show EVM address by default
+        );
+
+        return;
+      } catch (createError) {
+        console.error(
+          `[OFFRAMP] Error creating wallets for user ${userId}:`,
+          createError,
+        );
+        await whatsappBusinessService.sendNormalMessage(
+          "❌ *Error Creating Wallets*\n\nCouldn't create your wallets. Please try again later or contact support.",
+          phoneNumber,
+        );
+        return;
+      }
+    }
+
+    // User has existing wallets - get balances
     let walletsWithBalances: any[] = [];
 
     // Get balances for each wallet
@@ -203,22 +259,50 @@ async function displayUserWallets(
     let walletsMessage = "📱 *Your Off-ramp Wallets*\n\n";
 
     if (walletsWithBalances.length === 0) {
-      walletsMessage =
-        "📱 *No Wallets Found*\n\nYou don't have any off-ramp wallets yet. When you select an asset and chain, we'll create a wallet for you.\n\n";
-    } else {
-      for (const wallet of walletsWithBalances) {
+      // User has wallets but no balances - show addresses and send flow
+      walletsMessage = "📱 *Your Wallets*\n\n";
+      walletsMessage +=
+        "You have wallets but no balance yet. Deposit crypto to get started:\n\n";
+      for (const wallet of wallets) {
         walletsMessage += `🔗 *${wallet.chainType.toUpperCase()}*\n`;
-        walletsMessage += `Address: \`${wallet.address}\`\n`;
-
-        for (const balance of wallet.balances) {
-          const amount = parseFloat(balance.amount).toFixed(6);
-          const usdValue = balance.usdValue
-            ? ` (~$${balance.usdValue.toFixed(2)})`
-            : "";
-          walletsMessage += `• ${balance.token.toUpperCase()}: ${amount}${usdValue}\n`;
-        }
-        walletsMessage += "\n";
+        walletsMessage += `\`${wallet.address}\`\n\n`;
       }
+      walletsMessage +=
+        "💡 Once you deposit, use the button below to sell and withdraw to your bank.";
+
+      await whatsappBusinessService.sendNormalMessage(
+        walletsMessage,
+        phoneNumber,
+      );
+
+      // Send the offramp flow
+      const firstWallet = wallets[0];
+      if (firstWallet) {
+        await whatsappBusinessService.sendCryptoDepositAddress(
+          phoneNumber,
+          "USDC",
+          (firstWallet.chainType === "solana"
+            ? "sol"
+            : "base") as NormalizedNetworkType,
+          firstWallet.address,
+        );
+      }
+      return;
+    }
+
+    // User has wallets with balances - display them
+    for (const wallet of walletsWithBalances) {
+      walletsMessage += `🔗 *${wallet.chainType.toUpperCase()}*\n`;
+      walletsMessage += `Address: \`${wallet.address}\`\n`;
+
+      for (const balance of wallet.balances) {
+        const amount = parseFloat(balance.amount).toFixed(6);
+        const usdValue = balance.usdValue
+          ? ` (~$${balance.usdValue.toFixed(2)})`
+          : "";
+        walletsMessage += `• ${balance.token.toUpperCase()}: ${amount}${usdValue}\n`;
+      }
+      walletsMessage += "\n";
     }
 
     walletsMessage += getSupportedAssetsMessage();
@@ -226,6 +310,18 @@ async function displayUserWallets(
     await whatsappBusinessService.sendNormalMessage(
       walletsMessage,
       phoneNumber,
+    );
+
+    // Also send the offramp flow so user can easily start offramping
+    const primaryWallet = walletsWithBalances[0];
+    const primaryBalance = primaryWallet.balances[0];
+    await whatsappBusinessService.sendCryptoDepositAddress(
+      phoneNumber,
+      primaryBalance?.token?.toUpperCase() || "USDC",
+      (primaryWallet.chainType === "solana"
+        ? "sol"
+        : "base") as NormalizedNetworkType,
+      primaryWallet.address,
     );
   } catch (error) {
     console.error(`Error displaying wallets for ${phoneNumber}:`, error);
