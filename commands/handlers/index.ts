@@ -1,33 +1,24 @@
 export { handleAccountInfo } from "./accountInfoHandler";
 export { handleConversion } from "./conversionHandler";
-export { handleWithdrawal } from "./withdrawalHandler";
+export { handleOfframp } from "./offrampHandler";
+export { handleSupport } from "./supportHandler";
 export { handleTopUp } from "./topUpHandler";
 export { handleTransactionHistory } from "./transactionHandler";
 export { handleTransfer } from "./transferHandler";
-export { handleOfframp } from "./offrampHandler";
-export { handleSupport } from "./supportHandler";
-export { 
-  handleResetPin, 
-  handleResetPinConversational,
-  handleResetPinOTPVerification,
-  handleResetPinNewPin,
-  handleResetPinConfirmPin,
-  handleCancelResetPin 
-} from "./resetPinHandler";
+export { handleWithdrawal } from "./withdrawalHandler";
 
-// New off-ramp handlers
 export {
-  handleOfframp as handleNewOfframp,
-  handleSpendCrypto,
-  handleAssetSelection,
-  handleAmountInput,
-  handleBankSelection,
-  handleAccountResolution,
   handleAccountConfirmation,
-  handleTransactionConfirmation,
-  handlePinVerification,
+  handleAccountResolution,
+  handleAmountInput,
+  handleAssetSelection,
+  handleBankSelection,
   handleDepositNotification,
-  sendOfframpSuccessNotification,
+  handlePinVerification,
+  handleSpendCrypto,
+  handleTransactionConfirmation,
   isOfframpSessionActive,
-  routeOfframpMessage
+  routeOfframpMessage,
+  sendOfframpSuccessNotification,
+  updateWorkflowForDeposit,
 } from "./offrampHandler";

@@ -5,18 +5,17 @@
  */
 import axios, { AxiosInstance, AxiosResponse } from "axios";
 import cryptojs from "crypto-js";
+import { Types } from "mongoose";
 import { nanoid } from "nanoid";
+import { TransactionStatus } from "../models/Transaction";
+import { User } from "../models/User";
 import {
   CoinType,
   CurrencyType,
   KycDataType,
 } from "../types/toronetService.types";
-import { User } from "../models/User";
 import { redisClient } from "./redis";
-import { Types } from "mongoose";
-import { TransactionStatus } from "../models/Transaction";
 import { TransactionService } from "./TransactionService";
-import { Wallet } from "../models/Wallet";
 
 export interface Bank {
   id: string; // Mapped from bankCode
@@ -244,6 +243,8 @@ export class ToronetService {
         refId,
       };
     }
+
+    // console.log({ currency, resp });
 
     return {
       result: data.result,
@@ -496,7 +497,7 @@ export class ToronetService {
         const data = resp.data;
 
         return data;
-      }
+      },
     );
 
     return data;
@@ -508,7 +509,7 @@ export class ToronetService {
       async () => {
         const data = await this.getVirtualWalletByAddress(publicKey);
         return data;
-      }
+      },
     );
 
     const body = {
@@ -666,7 +667,7 @@ export class ToronetService {
     from: string,
     to: string,
     amount: string,
-    password: string
+    password: string,
   ) {
     const body = this.formTransferBody(from, to, amount, password);
 
@@ -684,7 +685,7 @@ export class ToronetService {
     from: string,
     to: string,
     amount: string,
-    password: string
+    password: string,
   ) {
     const body = this.formTransferBody(from, to, amount, password);
 
@@ -704,7 +705,7 @@ export class ToronetService {
     from: string,
     to: string,
     amount: string,
-    password: string
+    password: string,
   ) {
     const body = this.formTransferBody(from, to, amount, password);
 
@@ -929,7 +930,7 @@ export class ToronetService {
         const bankList = data.data;
         const cleanBankList = this.processBanks(bankList);
         return cleanBankList;
-      }
+      },
     );
 
     return bankList;
@@ -950,7 +951,7 @@ export class ToronetService {
         const bankList = data.data;
         const cleanBankList = this.processBanks(bankList);
         return cleanBankList;
-      }
+      },
     );
 
     return bankList;
@@ -958,7 +959,7 @@ export class ToronetService {
 
   async resolveBankAccountNameNGN(
     accountNumber: string,
-    bankCode: string
+    bankCode: string,
   ): Promise<string> {
     const accountName = await redisClient.getOrSetCache(
       accountNumber,
@@ -986,7 +987,7 @@ export class ToronetService {
 
         const data = result.data;
         return data.data.accountName;
-      }
+      },
     );
     return accountName;
   }
@@ -1372,7 +1373,7 @@ export class ToronetService {
           toroReceivedAmount = calcData.amount;
         } else {
           throw new Error(
-            calcData.error || "Error calculating NGN to TORO conversion"
+            calcData.error || "Error calculating NGN to TORO conversion",
           );
         }
         break;
@@ -1388,7 +1389,7 @@ export class ToronetService {
           toroReceivedAmount = calcData.amount;
         } else {
           throw new Error(
-            calcData.error || "Error calculating USD to TORO conversion"
+            calcData.error || "Error calculating USD to TORO conversion",
           );
         }
         break;
@@ -1413,7 +1414,7 @@ export class ToronetService {
           finalAmount = calcData.amount;
         } else {
           throw new Error(
-            calcData.error || "Error calculating TORO to NGN conversion"
+            calcData.error || "Error calculating TORO to NGN conversion",
           );
         }
         break;
@@ -1431,7 +1432,7 @@ export class ToronetService {
           finalAmount = calcData.amount;
         } else {
           throw new Error(
-            calcData.error || "Error calculating TORO to USD conversion"
+            calcData.error || "Error calculating TORO to USD conversion",
           );
         }
         break;
@@ -1514,11 +1515,11 @@ export class ToronetService {
 
         if (!respData.result)
           throw new Error(
-            `Could not get wallet address for token - ${data.network}`
+            `Could not get wallet address for token - ${data.network}`,
           );
 
         return respData.accountnumber;
-      }
+      },
     );
     return address;
   }
@@ -1542,7 +1543,7 @@ export class ToronetService {
     from: string,
     to: string,
     amount: string,
-    password: string
+    password: string,
   ) {
     const decryptedPassword = this.decrypt(password);
     console.log({ decryptedPassword });

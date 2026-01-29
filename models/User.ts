@@ -4,8 +4,7 @@
  */
 
 import argon2 from "argon2";
-import mongoose, { Document, Schema, Types } from "mongoose";
-import { IWallet } from "./Wallet";
+import mongoose, { Document, Schema } from "mongoose";
 
 /**
  * Interface for User document
@@ -14,8 +13,8 @@ export interface IUser extends Document {
   whatsappNumber: string;
   userId: string;
   firstName?: string; // Set during KYC verification
-  lastName?: string;  // Set during KYC verification
-  fullName: string;   // Set during onboarding, used for wallet creation
+  lastName?: string; // Set during KYC verification
+  fullName: string; // Set during onboarding, used for wallet creation
   email?: string;
   country: string;
   currency: "USD" | "NGN";
@@ -52,22 +51,19 @@ const UserSchema: Schema = new Schema(
       type: String,
       trim: true,
       maxlength: 150,
-      // Set during KYC verification
     },
 
     lastName: {
       type: String,
       trim: true,
       maxlength: 150,
-      // Set during KYC verification
     },
 
     fullName: {
       type: String,
-      required: true, // Required during onboarding
+      required: true,
       trim: true,
       maxlength: 300,
-      // Used for wallet creation and display before KYC
     },
 
     email: {
@@ -117,7 +113,7 @@ const UserSchema: Schema = new Schema(
   },
   {
     timestamps: true, // Automatically add createdAt and updatedAt
-  }
+  },
 );
 
 /**
@@ -146,7 +142,7 @@ UserSchema.index({ email: 1 });
  * Method to compare PIN for authentication
  */
 UserSchema.methods.comparePin = async function (
-  candidatePin: string
+  candidatePin: string,
 ): Promise<boolean> {
   try {
     return await argon2.verify(this.pin, candidatePin);

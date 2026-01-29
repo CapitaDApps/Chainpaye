@@ -80,61 +80,42 @@ export const userSetupScreen = async (decryptedBody: {
     switch (screen) {
       // --------------------------------------------------------
       // PERSONAL_INFO → COUNTRY_SELECT
-      // User submits full name and DOB
+      // User submits name and DOB
       // --------------------------------------------------------
       case "PERSONAL_INFO":
         console.log("DEBUG: Case PERSONAL_INFO");
         try {
           const fullName = data.full_name?.trim();
-          const dob = data.dob;
+          // DOB removed from this step
+          // const dob = data.dob;
 
           // Validate required fields
-          if (!fullName || fullName.length < 3) {
+          if (!fullName || fullName.split(" ").length < 2) {
             return {
               screen: "PERSONAL_INFO",
               data: {
                 countries: countries,
                 default_country: data.country || "NG",
-                error_message: "Please enter your full name (at least 3 characters)",
+                error_message:
+                  "Please enter your full name (First and Last name)",
               },
             };
           }
 
-          // Validate that full name has at least 2 words (first and last name)
-          const nameParts = fullName.split(' ').filter((part: string) => part.length > 0);
-          if (nameParts.length < 2) {
-            return {
-              screen: "PERSONAL_INFO",
-              data: {
-                countries: countries,
-                default_country: data.country || "NG",
-                error_message: "Please enter your full name (first and last name)",
-              },
-            };
-          }
+          // Split name for display purposes only (legacy support)
+          const nameParts = fullName.split(" ");
+          const firstName = nameParts[0];
+          const lastName = nameParts.slice(1).join(" ");
 
-          // Age validation - must be 18+
-          const currentYear = new Date().getFullYear();
-          const birthYear = Number(dob.split("-")[0]);
-          if (currentYear - birthYear < 18) {
-            return {
-              screen: "PERSONAL_INFO",
-              data: {
-                countries: countries,
-                default_country: data.country || "NG",
-                error_message: "You must be 18 and above to use Chainpaye",
-              },
-            };
-          }
-
-          // Proceed to country selection
+          // Proceed to security setup (Skipping COUNTRY_SELECT)
           return {
-            screen: "COUNTRY_SELECT",
+            screen: "SECURITY_INFO",
             data: {
               full_name: fullName,
-              dob: dob,
-              countries: countries,
-              default_country: getCountryCodeFromPhoneNumber(phone) || "NG",
+              first_name: firstName,
+              last_name: lastName,
+              // dob: dob, // Removed
+              country: data.country || "NG",
             },
           };
         } catch (error) {
@@ -153,16 +134,25 @@ export const userSetupScreen = async (decryptedBody: {
       // COUNTRY_SELECT → SECURITY_INFO
       // User confirms country
       // --------------------------------------------------------
-      case "COUNTRY_SELECT":
-        console.log("DEBUG: Case COUNTRY_SELECT");
-        return {
-          screen: "SECURITY_INFO",
-          data: {
-            full_name: data.full_name,
-            dob: data.dob,
-            country: data.country || "NG",
-          },
-        };
+      // --------------------------------------------------------
+      // COUNTRY_SELECT (REMOVED)
+      // --------------------------------------------------------
+      // case "COUNTRY_SELECT":
+      //   console.log("DEBUG: Case COUNTRY_SELECT");
+      //   return {
+      //     screen: "SECURITY_INFO",
+      //     data: {
+      //       full_name:
+      //         data.full_name ||
+      //         (data.first_name && data.last_name
+      //           ? `${data.first_name} ${data.last_name}`
+      //           : undefined),
+      //       first_name: data.first_name,
+      //       last_name: data.last_name,
+      //       dob: data.dob,
+      //       country: data.country || "NG",
+      //     },
+      //   };
 
       // --------------------------------------------------------
       // SECURITY_INFO → SUCCESSFUL
@@ -175,7 +165,8 @@ export const userSetupScreen = async (decryptedBody: {
             return {
               screen: "SECURITY_INFO",
               data: {
-                full_name: data.full_name,
+                first_name: data.first_name,
+                last_name: data.last_name,
                 dob: data.dob,
                 country: data.country,
                 error_message: "Session expired. Please restart the flow.",
@@ -191,8 +182,9 @@ export const userSetupScreen = async (decryptedBody: {
             return {
               screen: "SECURITY_INFO",
               data: {
-                full_name: data.full_name,
-                dob: data.dob,
+                first_name: data.first_name,
+                last_name: data.last_name,
+                // dob: data.dob,
                 country: data.country,
                 error_message: "PIN must be exactly 4 digits",
               },
@@ -203,8 +195,9 @@ export const userSetupScreen = async (decryptedBody: {
             return {
               screen: "SECURITY_INFO",
               data: {
-                full_name: data.full_name,
-                dob: data.dob,
+                first_name: data.first_name,
+                last_name: data.last_name,
+                // dob: data.dob,
                 country: data.country,
                 error_message: "PIN must contain numbers only",
               },
@@ -215,8 +208,9 @@ export const userSetupScreen = async (decryptedBody: {
             return {
               screen: "SECURITY_INFO",
               data: {
-                full_name: data.full_name,
-                dob: data.dob,
+                first_name: data.first_name,
+                last_name: data.last_name,
+                // dob: data.dob,
                 country: data.country,
                 error_message: "PINs do not match. Please try again.",
               },
@@ -228,27 +222,31 @@ export const userSetupScreen = async (decryptedBody: {
           console.log("DEBUG: Existing user found?", !!existingUser);
 
           if (!existingUser) {
-            // Create new user with fullName for wallet creation
+            // Create new user WITHOUT KYC verification
             await userService.createUser({
               whatsappNumber: phone,
               pin: pin,
-              fullName: data.full_name,
+              fullName:
+                data.full_name || `${data.first_name} ${data.last_name}`,
             });
             console.log("DEBUG: User created successfully");
           }
 
-          // Update user with profile information (fullName and DOB)
+          // Update user with profile information
           await userService.updateUserProfile(phone, {
-            fullName: data.full_name,
-            dob: data.dob,
+            fullName: data.full_name || `${data.first_name} ${data.last_name}`,
+            dob: "", // No DOB collected at signup
           });
           console.log("DEBUG: User profile updated");
 
           // Store account creation info in Redis for welcome message
+          const userFullName =
+            data.full_name || `${data.first_name} ${data.last_name}`;
+
           await redisClient.set(
             `${flow_token}_accountCreation`,
             JSON.stringify({
-              fullName: data.full_name,
+              fullName: userFullName,
               country: data.country,
               needsKyc: data.country === "NG",
             }),
@@ -259,7 +257,8 @@ export const userSetupScreen = async (decryptedBody: {
           return {
             screen: "SUCCESSFUL",
             data: {
-              full_name: data.full_name,
+              first_name:
+                data.first_name || userFullName.split(" ")[0] || "User",
               needs_kyc: data.country === "NG",
             },
           };
@@ -268,8 +267,9 @@ export const userSetupScreen = async (decryptedBody: {
           return {
             screen: "SECURITY_INFO",
             data: {
-              full_name: data.full_name,
-              dob: data.dob,
+              first_name: data.first_name,
+              last_name: data.last_name,
+              // dob: data.dob,
               country: data.country,
               error_message: "Failed to create account. Please try again.",
             },

@@ -8,7 +8,10 @@
     "start": "tsx index.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint --ext .ts",
-    "lint:fix": "eslint --ext .ts --fix"
+    "lint:fix": "eslint --ext .ts --fix",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "keywords": [
     "whatsapp",
@@ -48,6 +51,7 @@
     "@types/crypto-js": "^4.2.2",
     "@types/express": "^5.0.5",
     "@types/fs-extra": "^11.0.4",
+    "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "^9.0.5",
     "@types/node": "^20.10.4",
     "@types/puppeteer": "^7.0.4",
@@ -55,6 +59,9 @@
     "@typescript-eslint/eslint-plugin": "^6.13.1",
     "@typescript-eslint/parser": "^6.13.1",
     "eslint": "^8.54.0",
+    "fast-check": "^4.5.3",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.6",
     "ts-node": "^10.9.2"
   }
 }

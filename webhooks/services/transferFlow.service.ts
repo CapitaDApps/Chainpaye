@@ -105,6 +105,7 @@ export const getTransferScreen = async (decryptedBody: {
         }
 
         case "PIN": {
+          console.log("Processing PIN step for transfer", { data });
           const { accountNumber, amount, currency, recipientName, pin } = data;
           if (!pin) {
             return {
@@ -118,8 +119,14 @@ export const getTransferScreen = async (decryptedBody: {
           const { user, wallet } = await userService.getUserToroWallet(
             phone,
             true,
-            true
+            true,
           );
+
+          console.log("Retrieved user and wallet for transfer", {
+            userFound: !!user,
+            walletFound: !!wallet,
+            phone,
+          });
 
           const walletPassword = wallet.password;
           console.log({ walletPassword }); // --- IGNORE ---
@@ -143,7 +150,7 @@ export const getTransferScreen = async (decryptedBody: {
             console.log({ reEncryptedPassword }); // --- IGNORE ---
             Wallet.updateOne(
               { _id: wallet._id },
-              { password: reEncryptedPassword }
+              { password: reEncryptedPassword },
             ).catch((err) => {
               console.error("Error updating wallet password version", err);
             });
@@ -158,6 +165,7 @@ export const getTransferScreen = async (decryptedBody: {
             };
           }
           const pinValid = await user.comparePin(pin);
+          console.log("PIN validation result", { pinValid });
           if (!user || !pinValid) {
             return {
               screen: "PIN",
@@ -173,15 +181,28 @@ export const getTransferScreen = async (decryptedBody: {
 
           walletService
             .transfer(phone, acctNo, amount, currency)
-            .then(async (transferResult) => {
-              if (!transferResult) {
+            .then(async (transferResult: any) => {
+              console.log("Transfer result:", transferResult);
+
+              if (!transferResult || transferResult.success === false) {
+                const errorMessage =
+                  transferResult?.message ||
+                  "An error occurred processing transfer";
+                console.error("Transfer failed:", errorMessage);
+
                 await whatsappBusinessService.sendNormalMessage(
-                  `An error occurred processing transfer`,
-                  userPhone!
+                  `Transfer failed: ${errorMessage}`,
+                  userPhone!,
                 );
               }
             })
-            .catch((error) => console.log("Error transferring", error));
+            .catch(async (error) => {
+              console.error("Error transferring", error);
+              await whatsappBusinessService.sendNormalMessage(
+                `An error occurred processing transfer. Please try again later.`,
+                userPhone!,
+              );
+            });
 
           return {
             screen: "PROCESSING",
@@ -195,7 +216,7 @@ export const getTransferScreen = async (decryptedBody: {
     }
     console.error("Unhandled request body:", decryptedBody);
     throw new Error(
-      "Unhandled endpoint request. Make sure you handle the request action & screen logged above."
+      "Unhandled endpoint request. Make sure you handle the request action & screen logged above.",
     );
   } catch (error) {
     console.error("An error occurred", error);

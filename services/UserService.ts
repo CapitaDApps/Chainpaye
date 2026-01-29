@@ -9,7 +9,7 @@ import { getCountryCodeFromPhoneNumber } from "../utils/countryCodeMapping";
 type CreateUserType = {
   whatsappNumber: string;
   pin: string;
-  fullName: string; // Full name for wallet creation
+  fullName: string;
 };
 
 type UpdateUserAfterBvnVerified = {
@@ -25,6 +25,7 @@ export class UserService {
     const user = await User.findOne({ whatsappNumber: phoneNumber }).select(
       `${includePin ? "+pin" : ""}`,
     );
+    // console.log("User", user);
     return user;
   }
 
@@ -81,10 +82,11 @@ export class UserService {
             [
               {
                 whatsappNumber: data.whatsappNumber,
-                fullName: data.fullName, // Store full name for wallet creation
+
                 country: extractedCountry,
                 pin,
                 userId,
+                fullName: data.fullName,
               },
             ],
             { session },
@@ -120,28 +122,28 @@ export class UserService {
   }
 
   /**
-   * Update user profile information during onboarding
-   * Used to save fullName and DOB after user creation
+   * Update user profile information (name, DOB) without PIN change
+   * Used during registration to save profile after user creation
    */
   async updateUserProfile(
-    phoneNumber: string,
-    data: { fullName: string; dob: string },
+    phoneNumber: string, // parameter name was mismatched in previous attempt
+    data: { fullName?: string; dob?: string },
   ) {
     phoneNumber = phoneNumber.startsWith("+") ? phoneNumber : `+${phoneNumber}`;
+    const updates: any = {};
+    if (data.fullName) updates.fullName = data.fullName;
+    if (data.dob) updates.dob = data.dob;
+
     const user = await User.findOneAndUpdate(
       { whatsappNumber: phoneNumber },
-      {
-        fullName: data.fullName,
-        dob: data.dob,
-      },
+      updates,
       { new: true },
     );
     return user;
   }
 
   /**
-   * Update user with verified KYC information
-   * Called after successful BVN verification to save verified first/last names
+   * Update user KYC info (first name, last name) after successful BVN verification
    */
   async updateUserKycInfo(
     phoneNumber: string,
@@ -153,7 +155,6 @@ export class UserService {
       {
         firstName: data.firstName,
         lastName: data.lastName,
-        isVerified: true, // Mark as verified when KYC info is saved
       },
       { new: true },
     );

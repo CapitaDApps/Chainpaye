@@ -2,15 +2,13 @@ import axios from "axios";
 import express, { Express } from "express";
 import helmet from "helmet";
 import { commandRouteHandler } from "../commands/route";
-import { loadEnv } from "../config/env";
+import "../config/init";
 import { userService, whatsappBusinessService } from "../services";
 import { redisClient } from "../services/redis";
 import { userRateLimiter, verifyWebhookSignature } from "./middleware";
 import flowRouter from "./route/route";
 import { CustomReq } from "./types/request.type";
 
-// Load environment variables
-loadEnv();
 export const app: Express = express();
 app.use(express.static("public"));
 // Apply helmet security middleware
@@ -120,7 +118,11 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
           const user = await userService.getUser(`+${wa_id}`);
 
           // Check if user needs to complete registration (no profile info)
-          if (!user || !user.firstName || !user.lastName) {
+          // User is valid if they have fullName (new flow) OR firstName+lastName (legacy flow)
+          const isRegistered =
+            user && (user.fullName || (user.firstName && user.lastName));
+
+          if (!isRegistered) {
             await replyingMessage(message.id);
             // New user or incomplete profile - send registration flow
             whatsappBusinessService.sendIntroMessageByFlowId(message.from);
@@ -167,7 +169,7 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
                     account = JSON.parse(userAccount);
                   }
 
-                  // Send welcome message using fullName
+                  // Send welcome message
                   await whatsappBusinessService.sendNormalMessage(
                     `Hello *${
                       account?.fullName || profile.name
@@ -177,30 +179,23 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
 
                   // If Nigerian user, prompt for KYC
                   if (account?.needsKyc) {
-                    await whatsappBusinessService.sendNormalMessage(
-                      "To unlock all features (including bank withdrawals), please complete your BVN verification. Type 'verify' or 'kyc' to start.",
-                      message.from,
-                    );
+                    // await whatsappBusinessService.sendNormalMessage(
+                    //   "To unlock all features (including bank withdrawals), please complete your BVN verification. Type 'verify' or 'kyc' to start.",
+                    //   message.from,
+                    // );
+                    await whatsappBusinessService.sendKycFlowById(message.from);
                   }
 
-                  await whatsappBusinessService.sendMenuMessageMyFlowId(
-                    message.from,
-                  );
+                  // await whatsappBusinessService.sendMenuMessageMyFlowId(
+                  //   message.from,
+                  // );
                 }
 
                 // Handle KYC verification completion
                 if (responseJson.type == "kyc-complete") {
                   await replyingMessage(message.id);
-                  const kycData = await redisClient.get(
-                    `${responseJson.flow_token}_kycComplete`,
-                  );
-                  let kyc: any;
-                  if (kycData) {
-                    kyc = JSON.parse(kycData);
-                  }
-
                   await whatsappBusinessService.sendNormalMessage(
-                    `Your account has been fully verified! 🎉 You now have access to all Chainpaye features.\n\nVerified Name: ${kyc?.verifiedFirstName} ${kyc?.verifiedLastName}`,
+                    "Your account has been fully verified! 🎉 You now have access to all Chainpaye features.",
                     message.from,
                   );
                   await whatsappBusinessService.sendMenuMessageMyFlowId(

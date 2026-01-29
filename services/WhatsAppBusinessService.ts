@@ -254,14 +254,15 @@ export class WhatsAppBusinessService {
 
     await this.sendImageFlowById(to, introFlowId, introInitScreedId, {
       link,
-      body: `Chainpaye💳 allows
+      body: `Welcome to Chainpaye! 🚀
 
-- Send & Receive money in 🇺🇸 USD, 🇪🇺 EUR, 🇬🇧 GBP 💸
-  ———————————————————
-- Generate payment links in 🇺🇸 USD, 🇪🇺 EUR, 🇬🇧 GBP, 🇳🇬NGN🔗-get paid faster 🤑
-  ———————————————————
-- Off-ramp crypto to fiat 🔄️ in under 50 seconds ⏱️
-  All within WhatsApp 📱 - simple & secure!`,
+We make managing money as easy as sending a text. Here's what you can do:
+
+💸 **Global Transfers**: Send & receive USD, EUR, and GBP instantly.
+🔗 **Get Paid Fast**: Create payment links in seconds.
+🔄 **Crypto to Cash**: Convert crypto to fiat in under 50 seconds.
+
+No complex apps, just secure & fast payments right here! ✨`,
       cta: "Sign Up",
     });
   }
@@ -306,6 +307,18 @@ What can I do for you?
   }
 
   async sendWithdrawalFlowById(to: string) {
+    const phone = to.startsWith("+") ? to : `+${to}`;
+    const user = await userService.getUser(phone);
+
+    if (!user || !user.isVerified) {
+      await this.sendNormalMessage(
+        "You need to complete KYC verification to withdraw funds. Please complete the verification process below.",
+        to,
+      );
+      await this.sendKycFlowById(to);
+      return;
+    }
+
     const withdrawFlowId = "1373120947345936";
     const screenId = "WITHDRAWAL_CURRENCY";
     await this.sendTextOnlyFlowById(to, withdrawFlowId, screenId, {
@@ -340,20 +353,6 @@ What can I do for you?
     });
   }
 
-  /**
-   * Send reset PIN flow to users
-   * This allows them to reset their transaction PIN securely
-   */
-  async sendResetPinFlowById(to: string) {
-    const resetPinFlowId = process.env.RESET_PIN_FLOW_ID || "YOUR_RESET_PIN_FLOW_ID";
-    const resetPinScreenId = "REQUEST_RESET";
-    await this.sendTextOnlyFlowById(to, resetPinFlowId, resetPinScreenId, {
-      header: "🔐 Reset Your PIN",
-      body: "Reset your ChainPaye transaction PIN securely with verification.",
-      cta: "Start Reset",
-    });
-  }
-
   async sendOfframpInstructions(to: string) {
     const message = `🪙 Sell Crypto for Fiat
 
@@ -379,23 +378,32 @@ What would you like to sell?`;
     address: string,
   ) {
     // Message 1: Send the deposit address
-    // await this.sendNormalMessage(
-    //   `📥 *Deposit Address*\n\nSend your ${token.toUpperCase()} on ${network.toUpperCase()} to:\n\n\`${address}\`\n\n⚠️ Only send ${token.toUpperCase()} on ${network.toUpperCase()} network.`,
-    //   to
-    // );
-
     await this.sendNormalMessage(address, to);
 
-    // Message 2: Instructions and start the flow
-    // await this.sendNormalMessage(
-    //   `1. Copy the address above\n2. Send your ${token.toUpperCase()} to the address\n3. Once sent, click below to complete the offramp process`,
-    //   to
-    // );
+    // Fetch banks for the offramp flow
+    let banks: { id: string; title: string }[] = [
+      { id: "000014", title: "Access Bank" },
+      { id: "000013", title: "GTBank" },
+      { id: "000015", title: "Zenith Bank" },
+      { id: "999992", title: "Opay" },
+      { id: "090267", title: "Kuda Bank" },
+    ];
 
-    // Start the flow
+    try {
+      const ngnBanks = await toronetService.getBankListNGN();
+      if (ngnBanks && ngnBanks.length > 0) {
+        banks = ngnBanks;
+      }
+      console.log("DEBUG: Fetched banks for offramp:", banks.length);
+    } catch (error) {
+      console.error("DEBUG: Error fetching banks, using fallback:", error);
+    }
+
+    // Start the flow with banks data
     const cryptoTopUpFlowId = "1372714300817702";
     const cryptoTopUpScreenId = "OFFRAMP_DETAILS";
-    await this.sendTextOnlyFlowById(
+
+    await this.sendTextOnlyFlowWithDataById(
       to,
       cryptoTopUpFlowId,
       cryptoTopUpScreenId,
@@ -404,7 +412,11 @@ What would you like to sell?`;
      `,
         cta: "Complete Off ramp",
       },
+      {
+        banks: banks,
+      },
     );
+
     await redisClient.set(
       `OFFRAMP_${to}`,
       JSON.stringify({ asset: token, network }),
@@ -426,21 +438,19 @@ What would you like to sell?`;
     // }
 
     // message should contain the user's account, number, name and balances
-    let message = `👋 Hello, ${user.isVerified && user.firstName && user.lastName 
-      ? `${user.firstName} ${user.lastName}` 
-      : user.fullName}
+
+    const displayName = user.isVerified
+      ? `${user.firstName} ${user.lastName}`
+      : user.fullName;
+
+    // message should contain the user's account, number, name and balances
+    let message = `👋 Hello ${displayName},
 
 Account No: ${user.whatsappNumber.replace("+", "")}
-${user.isVerified ? '✅ Verified Account' : '⚠️ Unverified Account'}
 
 Available Balances:
 🇳🇬 NGN: ₦ ${ngnBalance.balance.toFixed(2)}
 🇺🇸 USD: $${usdBalance.balance.toFixed(2)}`;
-
-    // Add verification reminder for unverified Nigerian users
-    if (!user.isVerified && user.country === "NG") {
-      message += `\n\n🔒 Complete your BVN verification to unlock all features including bank withdrawals. Type 'kyc' to start.`;
-    }
 
     let accountnumber: string | null = null;
 
@@ -607,6 +617,75 @@ Our team is ready to assist you!`;
     }
   }
 
+  /**
+   * Send a flow with initial screen data
+   * Use this when you need to pass dynamic data to the first screen
+   */
+  private async sendTextOnlyFlowWithDataById(
+    to: string,
+    flowId: string,
+    screenId: string,
+    displayData: {
+      header?: string;
+      body: string;
+      cta: string;
+    },
+    screenData: Record<string, any>,
+  ) {
+    const flowToken = uuidv4();
+    await redisClient.set(flowToken, to, "EX", CONSTANTS.CACHE_24HRS);
+    const body = {
+      messaging_product: "whatsapp",
+      to,
+      recipient_type: "individual",
+      type: "interactive",
+      interactive: {
+        type: "flow",
+        ...(displayData.header && {
+          header: {
+            type: "text",
+            text: displayData.header,
+          },
+        }),
+        body: {
+          text: displayData.body,
+        },
+
+        action: {
+          name: "flow",
+          parameters: {
+            flow_message_version: "3",
+            flow_action: "navigate",
+            flow_token: flowToken,
+            flow_id: flowId,
+            flow_cta: displayData.cta,
+            flow_action_payload: {
+              screen: screenId,
+              data: screenData,
+            },
+          },
+        },
+      },
+    };
+
+    try {
+      await axios({
+        method: "POST",
+        url: `https://graph.facebook.com/v24.0/${this.business_phone_number_id}/messages`,
+        headers: {
+          Authorization: `Bearer ${this.GRAPH_API_TOKEN}`,
+        },
+        data: body,
+      });
+    } catch (error) {
+      console.log(
+        "error sending flow with data",
+        (error as { response: any }).response.data,
+      );
+      throw error;
+    }
+  }
+
   async handleButtonPayload(payload: ButtonPayloadType, to: string) {
     switch (payload) {
       case "My Account": {
@@ -626,10 +705,14 @@ Our team is ready to assist you!`;
           await walletService.usdBalance(wallet.publicKey),
         ]);
 
+        const displayName = user.isVerified
+          ? `${user.firstName} ${user.lastName}`
+          : user.fullName;
+
         const params = [
           {
             type: "text",
-            text: `${user.firstName} ${user.lastName}`,
+            text: displayName,
           },
           {
             type: "text",

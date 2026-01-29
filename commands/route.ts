@@ -1,5 +1,5 @@
+import { User } from "../models/User";
 import { whatsappBusinessService } from "../services";
-import { redisClient } from "../services/redis";
 import { COMMANDS, TriggerPhrase } from "./config";
 import {
   handleAccountInfo,
@@ -10,17 +10,6 @@ import {
   handleTransactionHistory,
   handleTransfer,
   handleWithdrawal,
-  handleResetPin,
-  handleResetPinConversational,
-  handleResetPinOTPVerification,
-  handleResetPinNewPin,
-  handleResetPinConfirmPin,
-  handleCancelResetPin,
-  // New off-ramp handlers
-  handleNewOfframp,
-  handleSpendCrypto,
-  isOfframpSessionActive,
-  routeOfframpMessage,
 } from "./handlers";
 
 /**
@@ -33,7 +22,7 @@ function isCryptoSellRequest(message: string): boolean {
   // Check if message contains a token (usdc, usdt) and a network
   const hasToken = /\b(usdc|usdt)\b/i.test(normalizedMessage);
   const hasNetwork =
-    /\b(bsc|sol(ana)?|eth(ereum)?|poly(gon)?|tron?|base)\b/i.test(
+    /\b(bsc|bep20|sol(ana)?|eth(ereum)?|poly(gon)?|tron?|base|arbitrum|hedera|apechain|lisk)\b/i.test(
       normalizedMessage,
     );
 
@@ -152,34 +141,9 @@ function findMatchingCommand(message: string): string | null {
 }
 
 export async function commandRouteHandler(from: string, message: string) {
-  // Check if this is a crypto sell request first (highest priority)
   if (isCryptoSellRequest(message)) {
-    // Route to the new off-ramp flow for crypto sell requests
-    await handleNewOfframp(from);
+    await handleOfframp(from, message);
     return;
-  }
-
-  // Check if user is in the middle of a conversational PIN reset
-  const resetSession = await checkResetPinSession(from, message);
-  if (resetSession) {
-    return; // Session handler took care of the message
-  }
-
-  // Check if user is in the middle of an off-ramp session
-  const offrampSession = await isOfframpSessionActive(from);
-  if (offrampSession) {
-    const handled = await routeOfframpMessage(from, message);
-    if (handled) {
-      return; // Off-ramp session handler took care of the message
-    }
-  }
-
-  // Check for spend crypto command
-  if (message.toLowerCase().includes('spend crypto')) {
-    const handled = await handleSpendCrypto(from);
-    if (handled) {
-      return;
-    }
   }
 
   const matchingCommand = findMatchingCommand(message);
@@ -223,14 +187,26 @@ export async function commandRouteHandler(from: string, message: string) {
       break;
 
     case "offramp":
-      // Use the new comprehensive off-ramp flow
-      await handleNewOfframp(from);
+      await handleOfframp(from, message);
       break;
 
     case "kyc":
       // KYC verification flow for Nigerian users
       try {
-        await whatsappBusinessService.sendKycFlowById(from);
+        const phone = from.startsWith("+") ? from : `+${from}`;
+        const user = await User.findOne({ whatsappNumber: phone });
+
+        if (user?.isVerified) {
+          const displayName = user.firstName
+            ? `${user.firstName} ${user.lastName}`
+            : user.fullName;
+          await whatsappBusinessService.sendNormalMessage(
+            `Hi ${displayName}, your account is already verified! ✅\n\nYou have full access to all features. No need to verify again.`,
+            from,
+          );
+        } else {
+          await whatsappBusinessService.sendKycFlowById(from);
+        }
       } catch (err) {
         console.log(
           "Error sending KYC flow",
@@ -248,22 +224,6 @@ export async function commandRouteHandler(from: string, message: string) {
       await handleSupport(from);
       break;
 
-    case "resetPin":
-      // Check if this is a cancel request
-      const normalizedMsg = message.toLowerCase().trim();
-      if (normalizedMsg.includes("cancel")) {
-        await handleCancelResetPin(from);
-      } else {
-        // Try WhatsApp Flow first, fallback to conversational
-        try {
-          await handleResetPin(from);
-        } catch (error) {
-          console.log("Flow-based reset failed, using conversational mode:", error);
-          await handleResetPinConversational(from);
-        }
-      }
-      break;
-
     default:
       // No command matched - show the main menu
       try {
@@ -275,53 +235,5 @@ export async function commandRouteHandler(from: string, message: string) {
         );
       }
       break;
-  }
-}
-
-/**
- * Checks if user is in the middle of a conversational PIN reset session
- * and handles the message accordingly
- * @param from User's phone number
- * @param message User's message
- * @returns true if message was handled by reset session, false otherwise
- */
-async function checkResetPinSession(from: string, message: string): Promise<boolean> {
-  try {
-    const sessionData = await redisClient.get(`reset_pin_session:${from}`);
-    if (!sessionData) {
-      return false; // No active session
-    }
-
-    const session = JSON.parse(sessionData);
-    const normalizedMessage = message.toLowerCase().trim();
-
-    // Handle cancel requests
-    if (normalizedMessage.includes("cancel") && normalizedMessage.includes("reset")) {
-      await handleCancelResetPin(from);
-      return true;
-    }
-
-    // Route based on current step
-    switch (session.step) {
-      case 'VERIFY_OTP':
-        await handleResetPinOTPVerification(from, message);
-        return true;
-
-      case 'SET_NEW_PIN':
-        await handleResetPinNewPin(from, message);
-        return true;
-
-      case 'CONFIRM_PIN':
-        await handleResetPinConfirmPin(from, message);
-        return true;
-
-      default:
-        // Unknown step, clean up session
-        await redisClient.del(`reset_pin_session:${from}`);
-        return false;
-    }
-  } catch (error) {
-    console.error("Error checking reset PIN session:", error);
-    return false;
   }
 }

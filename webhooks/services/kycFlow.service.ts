@@ -2,12 +2,13 @@ import { Wallet } from "../../models/Wallet";
 import { redisClient } from "../../services/redis";
 import { ToronetService } from "../../services/ToronetService";
 import { UserService } from "../../services/UserService";
+import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService";
 import { formatDate } from "../utils/formatDate";
 
 // ============================================================
 // KYC FLOW SERVICE
 // Handles BVN verification for Nigerian users
-// Flow: COUNTRY_SELECT → BVN_INPUT → VERIFYING → SUCCESS
+// Flow: COUNTRY_SELECT → BVN_INPUT → VERIFICATION_COMPLETE
 // ============================================================
 
 const supportedCountries = [{ id: "NG", title: "Nigeria" }];
@@ -29,6 +30,7 @@ export const kycFlowScreen = async (decryptedBody: {
 
   const userService = new UserService();
   const toronetService = new ToronetService();
+  const whatsappBusinessService = new WhatsAppBusinessService();
 
   // Handle health check request
   if (action === "ping") {
@@ -88,7 +90,7 @@ export const kycFlowScreen = async (decryptedBody: {
     // Check if already verified
     if (user.isVerified) {
       return {
-        screen: "SUCCESS",
+        screen: "VERIFICATION_COMPLETE",
         data: {
           already_verified: true,
         },
@@ -99,7 +101,8 @@ export const kycFlowScreen = async (decryptedBody: {
       screen: "COUNTRY_SELECT",
       data: {
         countries: supportedCountries,
-        full_name: user.fullName || "", // Show fullName from onboarding
+        first_name: user.firstName || "",
+        last_name: user.lastName || "",
         dob: user.dob || "",
       },
     };
@@ -118,7 +121,7 @@ export const kycFlowScreen = async (decryptedBody: {
 
         if (selectedCountry !== "NG") {
           return {
-            screen: "SUCCESS",
+            screen: "VERIFICATION_COMPLETE",
             data: {
               not_required: true,
               message:
@@ -134,8 +137,10 @@ export const kycFlowScreen = async (decryptedBody: {
           screen: "BVN_INPUT",
           data: {
             country: selectedCountry,
-            full_name: userForBvn?.fullName || "", // Show fullName from onboarding
-            dob: userForBvn?.dob || data.dob || "",
+            full_name: userForBvn?.fullName || "",
+            first_name: "", // Force user to enter
+            last_name: "", // Force user to enter
+            dob: "", // Force user to enter
           },
         };
 
@@ -147,8 +152,6 @@ export const kycFlowScreen = async (decryptedBody: {
         console.log("DEBUG: Case BVN_INPUT");
         try {
           const bvn = data.bvn?.trim();
-          const firstName = data.first_name?.trim();
-          const lastName = data.last_name?.trim();
 
           // Validate BVN format
           if (!bvn || bvn.length !== 11) {
@@ -156,7 +159,6 @@ export const kycFlowScreen = async (decryptedBody: {
               screen: "BVN_INPUT",
               data: {
                 country: data.country,
-                full_name: data.full_name,
                 first_name: data.first_name,
                 last_name: data.last_name,
                 dob: data.dob,
@@ -170,40 +172,10 @@ export const kycFlowScreen = async (decryptedBody: {
               screen: "BVN_INPUT",
               data: {
                 country: data.country,
-                full_name: data.full_name,
                 first_name: data.first_name,
                 last_name: data.last_name,
                 dob: data.dob,
                 error_message: "BVN must contain numbers only",
-              },
-            };
-          }
-
-          // Validate first and last names
-          if (!firstName || firstName.length < 2) {
-            return {
-              screen: "BVN_INPUT",
-              data: {
-                country: data.country,
-                full_name: data.full_name,
-                first_name: data.first_name,
-                last_name: data.last_name,
-                dob: data.dob,
-                error_message: "Please enter a valid first name",
-              },
-            };
-          }
-
-          if (!lastName || lastName.length < 2) {
-            return {
-              screen: "BVN_INPUT",
-              data: {
-                country: data.country,
-                full_name: data.full_name,
-                first_name: data.first_name,
-                last_name: data.last_name,
-                dob: data.dob,
-                error_message: "Please enter a valid last name",
               },
             };
           }
@@ -217,7 +189,6 @@ export const kycFlowScreen = async (decryptedBody: {
               screen: "BVN_INPUT",
               data: {
                 country: data.country,
-                full_name: data.full_name,
                 first_name: data.first_name,
                 last_name: data.last_name,
                 dob: data.dob,
@@ -227,27 +198,44 @@ export const kycFlowScreen = async (decryptedBody: {
             };
           }
 
-          // Use DOB from user profile
-          const dob = user.dob || data.dob;
+          // Use explicit data from form for KYC
+          const firstName = data.first_name?.trim();
+          const lastName = data.last_name?.trim();
+          const dob = data.dob;
 
-          if (!dob) {
+          if (!firstName || !lastName || !dob) {
             return {
               screen: "BVN_INPUT",
               data: {
                 country: data.country,
-                full_name: data.full_name,
-                first_name: data.first_name,
-                last_name: data.last_name,
-                dob: data.dob,
+                first_name: firstName,
+                last_name: lastName,
+                dob: dob,
                 error_message:
-                  "Date of birth missing. Please update your profile first.",
+                  "Please enter First Name, Last Name and Date of Birth.",
+              },
+            };
+          }
+
+          // Age validation - must be 18+
+          const currentYear = new Date().getFullYear();
+          const birthYear = Number(dob.split("-")[0]);
+          if (currentYear - birthYear < 18) {
+            return {
+              screen: "BVN_INPUT",
+              data: {
+                country: data.country,
+                first_name: firstName,
+                last_name: lastName,
+                dob: dob,
+                error_message: "You must be 18 and above to use Chainpaye",
               },
             };
           }
 
           console.log("DEBUG: Performing KYC with BVN");
 
-          // Perform KYC verification via Toronet using the entered first/last names
+          // Perform KYC verification via Toronet
           const kycResult = await toronetService.performKYC({
             firstName: firstName,
             lastName: lastName,
@@ -265,33 +253,58 @@ export const kycFlowScreen = async (decryptedBody: {
               screen: "BVN_INPUT",
               data: {
                 country: data.country,
-                full_name: data.full_name,
                 first_name: firstName,
                 last_name: lastName,
                 dob: dob,
                 error_message:
                   kycResult.message ||
-                  "BVN verification failed. Please check your details and ensure your first name, last name match your BVN records exactly.",
+                  "BVN verification failed. Please check your details.",
               },
             };
           }
 
-          // KYC successful - save the verified first/last names to user profile
+          // KYC successful - mark user as verified and save names AND DOB
           await userService.updateUserKycInfo(phone, {
-            firstName: firstName,
-            lastName: lastName,
+            firstName,
+            lastName,
           });
-          console.log("DEBUG: User KYC info updated with verified names");
+          // Update DOB as well since it's now collected here
+          await userService.updateUserProfile(phone, {
+            dob: dob,
+          });
 
-          // Create virtual NGN wallet using the user's fullName (from onboarding)
+          await userService.markUserVerified(phone);
+          console.log(
+            "DEBUG: User marked as verified with names:",
+            firstName,
+            lastName,
+            dob,
+          );
+
+          // Send WhatsApp message to user about successful verification
+          try {
+            await whatsappBusinessService.sendNormalMessage(
+              `🎉 *KYC Verification Successful!*\n\nCongratulations ${firstName}! Your identity has been verified.\n\nYou now have full access to all Chainpaye features including:\n✅ Bank withdrawals\n✅ Higher transaction limits\n✅ Full account access`,
+              phone,
+            );
+            console.log("DEBUG: KYC success WhatsApp message sent");
+          } catch (msgError) {
+            console.error(
+              "DEBUG: Error sending KYC success message:",
+              msgError,
+            );
+            // Don't fail the flow if message fails
+          }
+
+          // Create virtual NGN wallet
           try {
             const wallet = await Wallet.findOne({ userId: user.userId });
             if (wallet) {
               await toronetService.createVirtualWalletNGN({
                 address: wallet.publicKey,
-                fullName: user.fullName, // Use fullName from onboarding for wallet
+                fullName: `${firstName} ${lastName}`,
               });
-              console.log("DEBUG: Virtual NGN wallet created with fullName");
+              console.log("DEBUG: Virtual NGN wallet created");
             }
           } catch (walletError) {
             console.error("DEBUG: Error creating virtual wallet:", walletError);
@@ -302,9 +315,7 @@ export const kycFlowScreen = async (decryptedBody: {
           await redisClient.set(
             `${flow_token}_kycComplete`,
             JSON.stringify({
-              fullName: user.fullName, // Use fullName from onboarding
-              verifiedFirstName: firstName, // Store verified names separately
-              verifiedLastName: lastName,
+              fullName: `${firstName} ${lastName}`,
               verified: true,
             }),
             "EX",
@@ -312,9 +323,9 @@ export const kycFlowScreen = async (decryptedBody: {
           );
 
           return {
-            screen: "SUCCESS",
+            screen: "VERIFICATION_COMPLETE",
             data: {
-              first_name: firstName, // Show verified first name
+              first_name: firstName,
               verified: true,
             },
           };
@@ -324,7 +335,6 @@ export const kycFlowScreen = async (decryptedBody: {
             screen: "BVN_INPUT",
             data: {
               country: data.country,
-              full_name: data.full_name,
               first_name: data.first_name,
               last_name: data.last_name,
               dob: data.dob,

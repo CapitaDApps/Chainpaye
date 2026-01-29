@@ -1,13 +1,11 @@
 import { Types } from "mongoose";
-import { User } from "../../models/User";
-import { Wallet } from "../../models/Wallet";
+import { nanoid } from "nanoid";
+import { TransactionStatus } from "../../models/Transaction";
 import { redisClient } from "../../services/redis";
 import { ToronetService } from "../../services/ToronetService";
 import { TransactionService } from "../../services/TransactionService";
 import { UserService } from "../../services/UserService";
 import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService";
-import { TransactionStatus } from "../../models/Transaction";
-import { nanoid } from "nanoid";
 import { sendTransactionReceipt } from "../../utils/sendReceipt";
 
 export async function getWithdrawalFlowScreen(decryptedBody: {
@@ -76,6 +74,7 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
                 currency,
                 banks: usdBanks,
                 acct_name_visible: true,
+                is_usd: true,
               },
             };
           case "NGN":
@@ -87,6 +86,7 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
                 currency,
                 banks: ngnBanks,
                 acct_name_visible: false,
+                is_usd: false,
               },
             };
           default:
@@ -100,7 +100,8 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
       }
 
       case "WITHDRAWAL_DETAILS": {
-        const { currency, bankCode, accountNumber, amount } = data;
+        const { currency, bankCode, accountNumber, amount, routingNumber } =
+          data;
         console.log({ data });
 
         console.log({ bankCode });
@@ -139,6 +140,8 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
                 accountNumber,
                 resolvedAccountName: accountName,
                 resolvedBankName: chosenBank.title,
+                routingNumber,
+                is_usd: true,
                 bankCode,
                 totalAmount: totalAmount.toFixed(2),
               },
@@ -157,7 +160,7 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
             }
             const accountName = await toronetService.resolveBankAccountNameNGN(
               accountNumber,
-              bankCode
+              bankCode,
             );
 
             if (!accountName)
@@ -184,6 +187,8 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
                 resolvedAccountName: accountName,
                 resolvedBankName: chosenBank.title,
                 bankCode,
+                routingNumber: "",
+                is_usd: false,
                 totalAmount: totalAmount.toFixed(2),
               },
             };
@@ -199,6 +204,7 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
           bankCode,
           accountName,
           accountNumber,
+          routingNumber,
           amount,
           pin,
           totalAmount,
@@ -209,7 +215,7 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
         const { user, wallet } = await userService.getUserToroWallet(
           phone,
           true,
-          true
+          true,
         );
 
         const isValidPin = await user.comparePin(pin);
@@ -247,7 +253,7 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
             }
 
             const balanceUSD = await toronetService.getBalanceUSD(
-              wallet.publicKey
+              wallet.publicKey,
             );
 
             if (+balanceUSD.balance < +amount) {
@@ -275,7 +281,7 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
                 userAddress: wallet.publicKey,
                 password: wallet.password,
                 bankName: chosenBank.title,
-                routingNo: chosenBank.id,
+                routingNo: routingNumber,
                 accountName,
                 accoountNo: accountNumber,
                 phoneNumber: phone,
@@ -290,7 +296,7 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
                       wallet.publicKey,
                       "0xbdb182ac6b38fd8f4581ab21d29a50287d47a93c",
                       chainpayeCharge.toString(),
-                      wallet.password
+                      wallet.password,
                     )
                     .catch((err) => console.log("Error sending fees", err));
                   const tx = await TransactionService.recordWithdrawal({
@@ -304,14 +310,14 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
                       accountName,
                       bankName: chosenBank.title,
                       accountNumber,
-                      routingNumber: chosenBank.id,
+                      routingNumber: routingNumber,
                     },
                   });
 
                   // Send receipt asynchronously
                   await sendTransactionReceipt(
                     (tx._id as Types.ObjectId).toString(),
-                    phone
+                    phone,
                   );
                 } else {
                   const tx = await TransactionService.recordWithdrawal({
@@ -326,23 +332,23 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
                       accountName,
                       bankName: chosenBank.title,
                       accountNumber,
-                      routingNumber: chosenBank.id,
+                      routingNumber: routingNumber,
                     },
                   });
                   whatsappBusinessService.sendNormalMessage(
                     withdrawalResp.message,
-                    phone
+                    phone,
                   );
 
                   // Send receipt asynchronously for failed withdrawal
                   await sendTransactionReceipt(
                     (tx._id as Types.ObjectId).toString(),
-                    phone
+                    phone,
                   );
                 }
               })
               .catch((error) =>
-                console.log("Error processing withdrawal", error)
+                console.log("Error processing withdrawal", error),
               );
 
             return {
@@ -366,7 +372,7 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
             }
 
             const balanceNGN = await toronetService.getBalanceNGN(
-              wallet.publicKey
+              wallet.publicKey,
             );
 
             if (+balanceNGN.balance < +amount) {
@@ -409,7 +415,7 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
                       wallet.publicKey,
                       "0xbdb182ac6b38fd8f4581ab21d29a50287d47a93c",
                       chainpayeCharge.toString(),
-                      wallet.password
+                      wallet.password,
                     )
                     .catch((err) => console.log("Error sending fees", err));
                   const tx = await TransactionService.recordWithdrawal({
@@ -435,7 +441,7 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
                   // Send receipt asynchronously
                   await sendTransactionReceipt(
                     (tx._id as Types.ObjectId).toString(),
-                    phone
+                    phone,
                   );
                 } else {
                   const tx = await TransactionService.recordWithdrawal({
@@ -455,18 +461,18 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
                   });
                   whatsappBusinessService.sendNormalMessage(
                     withdrawalResp.message,
-                    phone
+                    phone,
                   );
 
                   // Send receipt asynchronously for failed withdrawal
                   await sendTransactionReceipt(
                     (tx._id as Types.ObjectId).toString(),
-                    phone
+                    phone,
                   );
                 }
               })
               .catch((error) =>
-                console.log("Error processing withdrawal", error)
+                console.log("Error processing withdrawal", error),
               );
 
             return {
@@ -484,6 +490,6 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
 
   console.error("Unhandled request body:", decryptedBody);
   throw new Error(
-    "Unhandled endpoint request. Make sure you handle the request action & screen logged above."
+    "Unhandled endpoint request. Make sure you handle the request action & screen logged above.",
   );
 }

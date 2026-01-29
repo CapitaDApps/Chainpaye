@@ -1,21 +1,20 @@
-import { ClientSession, Document, mongo, Types } from "mongoose";
-import { Wallet } from "../models/Wallet";
-import { IUser, User } from "../models/User";
-import { ToronetService } from "./ToronetService";
-import { CoinType, CurrencyType } from "../types/toronetService.types";
-import { TransactionService } from "./TransactionService";
+import { mongo, Types } from "mongoose";
+import { toronetService, userService } from ".";
 import {
   Transaction,
   TransactionStatus,
   TransactionType,
 } from "../models/Transaction";
+import { User } from "../models/User";
+import { Wallet } from "../models/Wallet";
+import { CoinType, CurrencyType } from "../types/toronetService.types";
 import { sendTransferReceipts } from "../utils/sendReceipt";
-import { toronetService, userService } from ".";
+import { TransactionService } from "./TransactionService";
 
 export class WalletService {
   async addWallet(
     { userId, country }: { userId: string; country: string },
-    session: mongo.ClientSession
+    session: mongo.ClientSession,
   ): Promise<void> {
     const wallet = await Wallet.findOne({ userId });
 
@@ -30,7 +29,7 @@ export class WalletService {
             password: toronetWallet.password,
           },
         ],
-        { session }
+        { session },
       );
     }
   }
@@ -39,20 +38,34 @@ export class WalletService {
     from: string,
     to: string,
     amount: number,
-    currency: CurrencyType
+    currency: CurrencyType,
   ) {
+    console.log("WalletService.transfer called", {
+      from,
+      to,
+      amount,
+      currency,
+    });
     const user = await User.findOne({ whatsappNumber: from });
     if (!user) throw new Error(`User with phone number - [${from}] not found`);
+    console.log("Sender user found:", { userId: user._id, phone: from });
+
     const fromWallet = await Wallet.findOne({ userId: user.userId }).select(
-      "+password"
+      "+password",
     );
+
+    console.log("Sender wallet found:", { walletId: fromWallet?._id });
 
     if (!fromWallet)
       throw new Error(
-        `User with phone number - [${from}] does not have a wallet`
+        `User with phone number - [${from}] does not have a wallet`,
       );
 
     const toUser = await User.findOne({ whatsappNumber: to });
+    console.log("Recipient user search result:", {
+      toUserFound: !!toUser,
+      toPhone: to,
+    });
     if (!toUser)
       return {
         success: false,
@@ -61,39 +74,56 @@ export class WalletService {
         data: to,
       };
     const toWallet = await Wallet.findOne({ userId: toUser.userId }).select(
-      "+password"
+      "+password",
     );
+    console.log("Recipient wallet search result:", {
+      toWalletFound: !!toWallet,
+    });
     if (!toWallet)
       throw new Error(
-        `Could not find wallet for user with phone number - [${to}]`
+        `Could not find wallet for user with phone number - [${to}]`,
       );
 
     const senderFullName = `${user.firstName} ${user.lastName}`;
     const fullName = `${toUser.firstName} ${toUser.lastName}`;
 
-    switch (currency) {
+    switch (currency.toUpperCase()) {
       case "USD":
         const respUSD = await toronetService.getBalanceUSD(
-          fromWallet.publicKey
+          fromWallet.publicKey,
         );
 
         console.log({ respUSD });
 
         if (!respUSD.result) throw new Error("Error fetching USD balance");
 
-        if (respUSD.balance < amount)
+        if (respUSD.balance < amount) {
+          console.warn("Insufficient USD balance:", {
+            balance: respUSD.balance,
+            amount,
+            wallet: fromWallet.publicKey,
+          });
           return {
             success: false,
             type: "Insufficient balance",
             message: "Insufficient balance to make transfer",
           };
+        }
+
+        console.log("Initiating USD transfer...", {
+          amount,
+          from: fromWallet.publicKey,
+          to: toWallet.publicKey,
+        });
 
         const transferRespUSD = await toronetService.transferUSD(
           fromWallet.publicKey,
           toWallet.publicKey,
           amount.toString(),
-          fromWallet.password
+          fromWallet.password,
         );
+
+        console.log("USD Transfer response:", transferRespUSD);
 
         if (transferRespUSD.result) {
           const txResult = await TransactionService.recordTransfer({
@@ -106,12 +136,14 @@ export class WalletService {
             status: TransactionStatus.COMPLETED,
           });
 
+          console.log("USD Transaction recorded:", txResult);
+
           // Send receipts asynchronously
           sendTransferReceipts(
             (txResult.debit._id as Types.ObjectId).toString(),
             (txResult.credit._id as Types.ObjectId).toString(),
             from,
-            to
+            to,
           ).catch((err) => console.log("Error sending receipt", err));
 
           return {
@@ -132,12 +164,17 @@ export class WalletService {
             failureReason: transferRespUSD.message,
           });
 
+          console.error(
+            "USD Transfer failed, transaction recorded as FAILED:",
+            txResult,
+          );
+
           // Send receipts asynchronously for failed transaction
           sendTransferReceipts(
             (txResult.debit._id as Types.ObjectId).toString(),
             (txResult.credit._id as Types.ObjectId).toString(),
             from,
-            to
+            to,
           ).catch((err) => console.log("Error sending receipt", err));
 
           return {
@@ -149,24 +186,38 @@ export class WalletService {
 
       case "NGN":
         const respNGN = await toronetService.getBalanceNGN(
-          fromWallet.publicKey
+          fromWallet.publicKey,
         );
 
         if (!respNGN.result) throw new Error("Error fetching NGN balance");
 
-        if (+respNGN.balance < +amount)
+        if (+respNGN.balance < +amount) {
+          console.warn("Insufficient NGN balance:", {
+            balance: respNGN.balance,
+            amount,
+            wallet: fromWallet.publicKey,
+          });
           return {
             success: false,
             type: "Insufficient balance",
             message: "Insufficient balance to make transfer",
           };
+        }
+
+        console.log("Initiating NGN transfer...", {
+          amount,
+          from: fromWallet.publicKey,
+          to: toWallet.publicKey,
+        });
 
         const transferRespNGN = await toronetService.transferNGN(
           fromWallet.publicKey,
           toWallet.publicKey,
           amount.toString(),
-          fromWallet.password
+          fromWallet.password,
         );
+
+        console.log("NGN Transfer response:", transferRespNGN);
 
         if (transferRespNGN.result) {
           const txResult = await TransactionService.recordTransfer({
@@ -179,12 +230,14 @@ export class WalletService {
             status: TransactionStatus.COMPLETED,
           });
 
+          console.log("NGN Transaction recorded:", txResult);
+
           // Send receipts asynchronously
           sendTransferReceipts(
             (txResult.debit._id as Types.ObjectId).toString(),
             (txResult.credit._id as Types.ObjectId).toString(),
             from,
-            to
+            to,
           ).catch((err) => console.log("Error sending receipt", err));
 
           return {
@@ -205,12 +258,17 @@ export class WalletService {
             failureReason: transferRespNGN.message,
           });
 
+          console.error(
+            "NGN Transfer failed, transaction recorded as FAILED:",
+            txResult,
+          );
+
           // Send receipts asynchronously for failed transaction
           sendTransferReceipts(
             (txResult.debit._id as Types.ObjectId).toString(),
             (txResult.credit._id as Types.ObjectId).toString(),
             from,
-            to
+            to,
           ).catch((err) => console.log("Error sending receipt", err));
 
           return {
@@ -221,7 +279,8 @@ export class WalletService {
         }
 
       default:
-        break;
+        console.log("Unsupported currency:", currency);
+        throw new Error(`Unsupported currency: ${currency}`);
     }
   }
 
@@ -237,7 +296,7 @@ export class WalletService {
 
     if (!wallet)
       throw new Error(
-        `User with phone number - [+${phoneNumber}] does not have a wallet`
+        `User with phone number - [+${phoneNumber}] does not have a wallet`,
       );
 
     const data = await toronetService.initializeDeposit({
@@ -288,7 +347,7 @@ export class WalletService {
       fromUser: user._id as Types.ObjectId,
       fees: estimatedFees,
     }).catch((error) =>
-      console.log("Error recording crypto transaction", error)
+      console.log("Error recording crypto transaction", error),
     );
     return data;
   }
@@ -312,7 +371,7 @@ export class WalletService {
     }
 
     let statusResult = await toronetService.getTransactionStatus(
-      transaction.toronetTransactionId!
+      transaction.toronetTransactionId!,
     );
 
     let result: any;
@@ -320,17 +379,17 @@ export class WalletService {
     if (+statusResult.status == 0) {
       result = await toronetService.recordTransaction(
         transaction.toronetTransactionId!,
-        transaction.currency
+        transaction.currency,
       );
       if (result.result) {
         const st = await toronetService.getTransactionStatus(
-          transaction.toronetTransactionId!
+          transaction.toronetTransactionId!,
         );
         if (st.status === 2) {
           const data = st.data[0];
           await Transaction.updateOne(
             { toronetTransactionId: transactionId },
-            { amount: data.TX_Amount, totalAmount: data.TX_TotalAmount }
+            { amount: data.TX_Amount, totalAmount: data.TX_TotalAmount },
           );
         }
       }
@@ -378,7 +437,7 @@ export class WalletService {
     }
 
     let statusResult = await toronetService.getTransactionStatus(
-      transaction.toronetTransactionId!
+      transaction.toronetTransactionId!,
     );
 
     let result: any;
@@ -386,17 +445,17 @@ export class WalletService {
     if (+statusResult.status == 0) {
       result = await toronetService.recordCryptoTransaction(
         transaction.toronetTransactionId!,
-        transaction.currency
+        transaction.currency,
       );
       if (result.result) {
         const st = await toronetService.getTransactionStatus(
-          transaction.toronetTransactionId!
+          transaction.toronetTransactionId!,
         );
         if (st.status === 2) {
           const data = st.data[0];
           await Transaction.updateOne(
             { toronetTransactionId: transactionId },
-            { amount: data.TX_Amount, totalAmount: data.TX_TotalAmount }
+            { amount: data.TX_Amount, totalAmount: data.TX_TotalAmount },
           );
         }
       }

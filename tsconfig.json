@@ -10,7 +10,7 @@
     "module": "esnext",
     "moduleResolution": "node",
     "target": "esnext",
-    "lib": ["esnext", "dom"],
+    "lib": ["esnext"],
     "types": ["node"],
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
