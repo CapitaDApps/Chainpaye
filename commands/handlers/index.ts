@@ -16,7 +16,6 @@ export {
   handleDepositNotification,
   handlePinVerification,
   handleSpendCrypto,
-  handleTransactionConfirmation,
   isOfframpSessionActive,
   routeOfframpMessage,
   sendOfframpSuccessNotification,

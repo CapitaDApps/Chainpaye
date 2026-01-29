@@ -110,19 +110,6 @@
                 "helper-text": "Enter amount in NGN"
               },
               {
-                "type": "EmbeddedLink",
-                "text": "${data.error_message}",
-                "visible": "${data.error_message}",
-                "on-click-action": {
-                  "name": "navigate",
-                  "next": {
-                    "type": "screen",
-                    "name": "OFFRAMP_DETAILS"
-                  },
-                  "payload": {}
-                }
-              },
-              {
                 "type": "Footer",
                 "label": "Preview Withdrawal",
                 "on-click-action": {
@@ -172,6 +159,10 @@
         "recipient_name": {
           "type": "string",
           "__example__": "Alice Smith"
+        },
+        "rate": {
+          "type": "string",
+          "__example__": "₦1,520"
         }
       },
       "layout": {
@@ -183,27 +174,27 @@
           },
           {
             "type": "TextBody",
-            "text": "Recipient: ${data.recipient_name}"
+            "text": "`'Recipient: '${data.recipient_name}''`"
           },
           {
             "type": "TextBody",
-            "text": "Bank: ${data.bank_name}"
+            "text": "`'Bank: '${data.bank_name}''`"
           },
           {
             "type": "TextBody",
-            "text": "Account: ${data.account_number}"
+            "text": "`'Account: '${data.account_number}''`"
           },
           {
             "type": "TextBody",
-            "text": "Selling: ${data.sell_amount} ${data.currency}"
+            "text": "`'Selling: '${data.sell_amount}' NGN'`"
           },
           {
             "type": "TextBody",
-            "text": "Network: ${data.network}"
+            "text": "`'Network: '${data.network}''`"
           },
           {
             "type": "TextBody",
-            "text": "Rate: 1 ${data.currency} = ₦1,650"
+            "text": "`'Rate: 1 '${data.currency}' = '${data.rate}''`"
           },
           {
             "type": "Footer",
@@ -216,7 +207,8 @@
                 "network": "${data.network}",
                 "bank_name": "${data.bank_name}",
                 "bank_code": "${data.bank_code}",
-                "account_number": "${data.account_number}"
+                "account_number": "${data.account_number}",
+                "recipientName": "${data.recipient_name}"
               }
             }
           }
@@ -251,6 +243,10 @@
           "type": "string",
           "__example__": "0123456789"
         },
+        "recipientName": {
+          "type": "string",
+          "__example__": "Kelechi"
+        },
         "error_message": {
           "type": "string",
           "__example__": "Invalid PIN"
@@ -265,23 +261,15 @@
           },
           {
             "type": "TextBody",
-            "text": "${data.error_message}",
-            "visible": "${data.error_message != null}",
-            "style": {
-              "color": "#EF4444"
-            }
+            "text": "`'Selling: '${data.sell_amount}' NGN'`"
           },
           {
             "type": "TextBody",
-            "text": "Selling: ${data.sell_amount} ${data.currency}"
+            "text": "`'Network: '${data.network}''`"
           },
           {
             "type": "TextBody",
-            "text": "Network: ${data.network}"
-          },
-          {
-            "type": "TextBody",
-            "text": "Fee: 1.00 ${data.currency}"
+            "text": "`'Fee: 1.00 '${data.currency}''`"
           },
           {
             "type": "TextBody",
@@ -294,11 +282,11 @@
               {
                 "type": "TextInput",
                 "name": "pin",
-                "label": "4 Digit PIN",
+                "label": "4-6 Digit PIN",
                 "required": true,
                 "input-type": "password",
                 "min-chars": 4,
-                "max-chars": 4
+                "max-chars": 6
               },
               {
                 "type": "Footer",
@@ -312,7 +300,8 @@
                     "network": "${data.network}",
                     "bank_name": "${data.bank_name}",
                     "bank_code": "${data.bank_code}",
-                    "account_number": "${data.account_number}"
+                    "account_number": "${data.account_number}",
+                    "recipientName": "${data.recipientName}"
                   }
                 }
               }

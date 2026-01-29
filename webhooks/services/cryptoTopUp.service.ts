@@ -1,13 +1,45 @@
 import { sendOfframpSuccessNotification } from "../../commands/handlers/offrampHandler";
 import { userService } from "../../services";
-import { crossmintService } from "../../services/CrossmintService";
+import {
+  CrossmintBalance,
+  crossmintService,
+} from "../../services/CrossmintService";
+import { financialService } from "../../services/crypto-off-ramp/FinancialService";
 import { dexPayService } from "../../services/DexPayService";
 import { redisClient } from "../../services/redis";
+import { logger } from "../../utils/logger";
 
 type Network = "bsc" | "sol" | "eth" | "poly" | "trx" | "base";
 
+interface Bank {
+  id: string;
+  title: string;
+}
+
+interface DecryptedBody {
+  screen: string;
+  data: Record<string, unknown>;
+  version: string;
+  action: string;
+  flow_token: string;
+}
+
+// Data structures expected in data object
+interface OfframpData {
+  currency?: string;
+  network?: string;
+  sell_amount?: string;
+  bank_code?: string;
+  account_number?: string;
+  pin?: string;
+  recipientName?: string;
+  bank_name?: string;
+  error?: string;
+  [key: string]: unknown;
+}
+
 // Fallback banks in case API fails
-const FALLBACK_BANKS = [
+const FALLBACK_BANKS: Bank[] = [
   { id: "000014", title: "Access Bank" },
   { id: "000013", title: "GTBank" },
   { id: "000015", title: "Zenith Bank" },
@@ -15,14 +47,9 @@ const FALLBACK_BANKS = [
   { id: "090267", title: "Kuda Bank" },
 ];
 
-export const getCryptoTopUpScreen = async (decryptedBody: {
-  screen: string;
-  data: any;
-  version: string;
-  action: string;
-  flow_token: string;
-}) => {
-  const { screen, data, version, action, flow_token } = decryptedBody;
+export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
+  const { screen, data: rawData, action, flow_token } = decryptedBody;
+  const data = rawData as OfframpData;
 
   // handle health check request
   if (action === "ping") {
@@ -35,7 +62,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
 
   // handle error notification
   if (data?.error) {
-    console.warn("Received client error:", data);
+    logger.warn("Received client error: " + JSON.stringify(data));
     return {
       data: {
         status: "Error",
@@ -56,9 +83,12 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
       if (dexPayBanks && dexPayBanks.length > 0) {
         banks = dexPayBanks.map((b) => ({ id: b.code, title: b.name }));
       }
-      console.log("DEBUG: Fetched banks from DexPay API:", banks.length);
+      logger.info("DEBUG: Fetched banks from DexPay API: " + banks.length);
     } catch (error) {
-      console.error("DEBUG: Error fetching banks, using fallback:", error);
+      logger.error(
+        "DEBUG: Error fetching banks, using fallback: " +
+          (error as Error).message,
+      );
     }
 
     return {
@@ -105,7 +135,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
           !bank_code ||
           !account_number
         ) {
-          console.error("Missing required fields", data);
+          logger.error("Missing required fields " + JSON.stringify(data));
           // Fetch banks for error return
           let banks = FALLBACK_BANKS;
           try {
@@ -154,7 +184,9 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
             bankName = foundBank.name;
           }
         } catch (error) {
-          console.error("DEBUG: Error resolving bank name:", error);
+          logger.error(
+            "DEBUG: Error resolving bank name: " + (error as Error).message,
+          );
         }
 
         // Resolve recipient name from account number
@@ -167,8 +199,10 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
           if (resolvedAccount && resolvedAccount.accountName) {
             recipientName = resolvedAccount.accountName;
           }
-        } catch (error: any) {
-          console.error("DEBUG: Error resolving account name:", error);
+        } catch (error) {
+          logger.error(
+            "DEBUG: Error resolving account name: " + (error as Error).message,
+          );
           let banks = FALLBACK_BANKS;
           try {
             const dexPayBanks = await dexPayService.getBanks();
@@ -179,7 +213,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
             // Use fallback
           }
 
-          const errorMsg = error.message?.includes("not found")
+          const errorMsg = (error as Error).message?.includes("not found")
             ? "Account not found. Please check details."
             : "Could not verify account details.";
 
@@ -190,6 +224,52 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
               error_message: errorMsg,
             },
           };
+        }
+
+        // Get current exchange rate for display
+        // Map network to DexPay chain format
+        const chainMapping: Record<string, string> = {
+          sol: "solana",
+          bsc: "bep20",
+          eth: "ethereum",
+          poly: "polygon",
+          matic: "polygon",
+          trx: "tron",
+          base: "base",
+          arbitrum: "arbitrum",
+          hedera: "hedera",
+          apechain: "apechain",
+          lisk: "lisk",
+          trc20: "tron",
+          bep20: "bep20",
+          erc20: "ethereum",
+        };
+
+        const dexPayChain =
+          chainMapping[network.toLowerCase()] || network.toLowerCase();
+        let rateDisplay = "Current market rate"; // Fallback
+
+        try {
+          const rateData = await dexPayService.getCurrentRates(
+            currency,
+            dexPayChain,
+          );
+          if (rateData && rateData.rate > 0) {
+            // Format rate with comma separators and Naira symbol
+            rateDisplay = `₦${rateData.rate.toLocaleString("en-NG", {
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 2,
+            })}`;
+            logger.info(
+              `Fetched rate for ${currency} on ${dexPayChain}: ${rateDisplay}`,
+            );
+          }
+        } catch (error) {
+          // Log error but continue - rate will show fallback text
+          logger.error(
+            "DEBUG: Error fetching current rate: " + (error as Error).message,
+          );
+          // TODO! Rate fetching failed - consider if we should block the flow or continue with fallback
         }
 
         return {
@@ -203,6 +283,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
             account_number,
             recipient_name: recipientName,
             recipientName: recipientName, // Store for next step
+            rate: rateDisplay, // Dynamic rate from DexPay API
           },
         };
       }
@@ -232,6 +313,29 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
           recipientName,
         } = data;
 
+        // ============================================================
+        // STEP 0: VALIDATE INPUT DATA
+        // ============================================================
+        if (
+          !currency ||
+          !network ||
+          !sell_amount ||
+          !pin ||
+          !bank_code ||
+          !account_number
+        ) {
+          return {
+            screen: "OFFRAMP_CRYPTO_REVIEW",
+            data: {
+              ...data,
+              error_message: "Missing required transaction details.",
+            },
+          };
+        }
+
+        // ============================================================
+        // STEP 1: VALIDATE PIN
+        // ============================================================
         const user = await userService.getUser(phone, true);
         if (!user) {
           return {
@@ -254,13 +358,12 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
           };
         }
 
-        try {
-          // 1. NORMALIZE CHAIN NAMES
-          // Map frontend network codes to proper format
-          let dexPayChain = network.toLowerCase(); // Keep lowercase for DexPay
-          let crossmintChain = network.toLowerCase();
+        logger.info("[OFFRAMP] PIN validated successfully");
 
-          // Normalize chain names
+        try {
+          // ============================================================
+          // STEP 2: NORMALIZE CHAIN NAMES
+          // ============================================================
           const chainMapping: Record<
             string,
             { dexPay: string; crossmint: string }
@@ -276,6 +379,9 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
             hedera: { dexPay: "hedera", crossmint: "hedera" },
             apechain: { dexPay: "apechain", crossmint: "apechain" },
             lisk: { dexPay: "lisk", crossmint: "lisk" },
+            trc20: { dexPay: "tron", crossmint: "tron" },
+            bep20: { dexPay: "bep20", crossmint: "bsc" },
+            erc20: { dexPay: "ethereum", crossmint: "ethereum" },
           };
 
           const normalizedChain = chainMapping[network.toLowerCase()];
@@ -289,15 +395,17 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
             };
           }
 
-          dexPayChain = normalizedChain.dexPay;
-          crossmintChain = normalizedChain.crossmint;
+          const dexPayChain = normalizedChain.dexPay;
+          const crossmintChain = normalizedChain.crossmint;
+          const normalizedAsset = currency.toLowerCase();
 
-          console.log(
-            `Chain mapping: ${network} -> DexPay: ${dexPayChain}, Crossmint: ${crossmintChain}`,
+          logger.info(
+            `[OFFRAMP] Chain mapping: ${network} -> DexPay: ${dexPayChain}, Crossmint: ${crossmintChain}`,
           );
 
-          // 2. VERIFY ASSET-CHAIN COMBINATION
-          const normalizedAsset = currency.toLowerCase();
+          // ============================================================
+          // STEP 3: VERIFY ASSET-CHAIN COMBINATION
+          // ============================================================
           if (
             !dexPayService.isSupportedAssetChain(normalizedAsset, dexPayChain)
           ) {
@@ -310,9 +418,62 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
             };
           }
 
-          // 3. GET WALLET BALANCE FIRST
+          // ============================================================
+          // STEP 4: GET CURRENT EXCHANGE RATE
+          // ============================================================
+          const ngnAmount = parseFloat(sell_amount);
+          let nairaRate: number;
+
+          try {
+            const rateData = await dexPayService.getCurrentRates(
+              currency,
+              dexPayChain,
+            );
+            nairaRate = rateData.rate;
+            logger.info(
+              `[OFFRAMP] Current rate: 1 ${currency} = ₦${nairaRate}`,
+            );
+          } catch (rateError) {
+            logger.error(
+              "[OFFRAMP] Failed to fetch exchange rate: " +
+                (rateError as Error).message,
+            );
+            return {
+              screen: "OFFRAMP_CRYPTO_REVIEW",
+              data: {
+                ...data,
+                error_message:
+                  "Could not fetch current exchange rate. Please try again.",
+              },
+            };
+          }
+
+          // ============================================================
+          // STEP 5: CALCULATE TRANSFER AMOUNT USING FINANCIAL SERVICE
+          // This calculates: chainpayeFee, dexpayFee, totalFees, totalInUsd
+          // ============================================================
+          const financials = financialService.calculateTransactionFinancials(
+            ngnAmount,
+            nairaRate,
+          );
+
+          const totalCryptoRequired = financials.totalInUsd;
+
+          logger.info(`[OFFRAMP] Financial calculation:
+            - NGN Amount: ${ngnAmount}
+            - Naira Rate: ${nairaRate}
+            - Chainpaye Fee: ${financials.chainpayeFee} NGN
+            - DexPay Fee: ${financials.dexpayFee} NGN
+            - Total Fees: ${financials.totalFees} NGN
+            - Crypto Amount (totalInUsd): ${financials.totalInUsd} ${normalizedAsset.toUpperCase()}
+            - Total Required: ${totalCryptoRequired} ${normalizedAsset.toUpperCase()}
+          `);
+
+          // ============================================================
+          // STEP 6: GET WALLET BALANCE AND CHECK SUFFICIENCY
+          // ============================================================
           const chainType = crossmintService.getChainType(crossmintChain);
-          let balances: any[] = [];
+          let balances: CrossmintBalance[] = [];
 
           if (chainType === "solana") {
             balances = await crossmintService.getBalancesByChain(
@@ -328,12 +489,12 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
             );
           }
 
-          console.log(
-            `DEBUG: Balances for ${crossmintChain}:`,
-            JSON.stringify(balances, null, 2),
+          logger.info(
+            `[OFFRAMP] Balances for ${crossmintChain}: ` +
+              JSON.stringify(balances, null, 2),
           );
 
-          // Crossmint API returns 'symbol' for the token name (e.g., "usdc")
+          // Find balance for the selected asset
           const assetBalance = balances.find(
             (b) =>
               (b.symbol?.toLowerCase() || b.token?.toLowerCase()) ===
@@ -343,21 +504,25 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
             ? parseFloat(assetBalance.amount)
             : 0;
 
-          console.log(
-            `Current balance for ${normalizedAsset} on ${crossmintChain}: ${currentBalance}`,
+          logger.info(
+            `[OFFRAMP] Current balance: ${currentBalance} ${normalizedAsset.toUpperCase()}, Required: ${totalCryptoRequired} ${normalizedAsset.toUpperCase()}`,
           );
 
-          if (currentBalance === 0) {
+          // Check if user has sufficient balance
+          if (currentBalance < totalCryptoRequired) {
+            const shortfall = totalCryptoRequired - currentBalance;
             return {
               screen: "OFFRAMP_CRYPTO_REVIEW",
               data: {
                 ...data,
-                error_message: `No ${currency.toUpperCase()} balance found on ${network.toUpperCase()}. Please deposit first.`,
+                error_message: `Insufficient balance. You need ${totalCryptoRequired.toFixed(4)} ${currency.toUpperCase()} but have ${currentBalance.toFixed(4)}. Please deposit ${shortfall.toFixed(4)} more.`,
               },
             };
           }
 
-          // 4. RESOLVE ACCOUNT NAME (if missing)
+          // ============================================================
+          // STEP 7: RESOLVE ACCOUNT NAME (if missing)
+          // ============================================================
           let finalRecipientName = recipientName;
           if (
             !finalRecipientName ||
@@ -365,15 +530,20 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
             finalRecipientName === "Account Holder"
           ) {
             try {
-              console.log("Resolving account details for quote...");
+              logger.info("[OFFRAMP] Resolving account details...");
               const resolved = await dexPayService.resolveAccount(
                 account_number,
                 bank_code,
               );
               finalRecipientName = resolved.accountName;
-              console.log("Resolved account name:", finalRecipientName);
+              logger.info(
+                "[OFFRAMP] Resolved account name: " + finalRecipientName,
+              );
             } catch (resolveError) {
-              console.error("Could not resolve account name:", resolveError);
+              logger.error(
+                "[OFFRAMP] Could not resolve account name: " +
+                  (resolveError as Error).message,
+              );
               return {
                 screen: "OFFRAMP_CRYPTO_REVIEW",
                 data: {
@@ -385,116 +555,157 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
             }
           }
 
-          // Normalize name (remove extra spaces)
-          finalRecipientName = finalRecipientName.trim().replace(/\s+/g, " ");
+          finalRecipientName = finalRecipientName
+            ? finalRecipientName.trim().replace(/\s+/g, " ")
+            : "";
 
-          // 5. GET RECEIVING ADDRESS
+          // ============================================================
+          // STEP 8: GET RECEIVING ADDRESS (our main wallet)
+          // ============================================================
           const receivingAddress =
             dexPayService.getReceivingAddress(dexPayChain);
-          console.log(
-            `Receiving address for ${dexPayChain}: ${receivingAddress}`,
+          logger.info(
+            `[OFFRAMP] Receiving address for ${dexPayChain}: ${receivingAddress}`,
           );
 
-          // 6. CREATE QUOTE REQUEST
-          // DexPay API requires: fiatAmount as number, chain as uppercase
-          const ngnAmount = parseFloat(sell_amount);
+          // ============================================================
+          // STEP 9: TRANSFER CRYPTO FROM USER WALLET TO MAIN WALLET
+          // This MUST happen before getting quote
+          // ============================================================
+          logger.info(
+            `[OFFRAMP] Transferring ${totalCryptoRequired} ${normalizedAsset.toUpperCase()} to main wallet...`,
+          );
+
+          // Get user's wallet
+          const wallets = await crossmintService.getUserWallets(user.userId);
+          const wallet = wallets.find((w) => w.chainType === chainType);
+
+          if (!wallet) {
+            throw new Error(`No wallet found for chain ${chainType}`);
+          }
+
+          // Generate a unique idempotency key for this transfer
+          const transferIdempotencyKey = `offramp-transfer-${user.userId}-${Date.now()}`;
+
+          const transferResult = await crossmintService.transferTokens({
+            walletAddress: wallet.address,
+            token: `${chainType}:${normalizedAsset}`,
+            recipient: receivingAddress,
+            amount: totalCryptoRequired.toString(),
+            idempotencyKey: transferIdempotencyKey,
+          });
+
+          logger.info(
+            "[OFFRAMP] Transfer successful: " +
+              JSON.stringify(transferResult, null, 2),
+          );
+
+          // ============================================================
+          // STEP 10: GET QUOTE FROM DEXPAY
+          // Now that funds are in our main wallet, we can get a quote
+          // ============================================================
           const quoteRequest = {
-            fiatAmount: ngnAmount, // Must be a number, not string
-            asset: normalizedAsset.toUpperCase(), // USDC, USDT
-            chain: dexPayChain.toUpperCase(), // Must be uppercase: BASE, BSC, SOL, etc.
+            fiatAmount: ngnAmount,
+            asset: normalizedAsset.toUpperCase(),
+            chain: dexPayChain.toUpperCase(),
             type: "SELL" as const,
             bankCode: bank_code,
-            accountName: finalRecipientName,
+            accountName: finalRecipientName || "Beneficiary",
             accountNumber: account_number,
             receivingAddress: receivingAddress,
           };
 
-          console.log("Quote request:", JSON.stringify(quoteRequest, null, 2));
+          logger.info(
+            "[OFFRAMP] Quote request: " + JSON.stringify(quoteRequest, null, 2),
+          );
 
-          // 7. GET QUOTE
-          const quote = await dexPayService.getQuote(quoteRequest);
-          console.log("Quote received:", JSON.stringify(quote, null, 2));
-
-          // 8. CALCULATE TOTAL FEES
-          const fees = dexPayService.calculateFees(ngnAmount, quote.rate);
-          const feesInCrypto = fees.totalFees / quote.rate;
-          const networkFeeInCrypto = quote.fees?.networkFee || 0;
-          const totalCryptoRequired =
-            quote.cryptoAmount + feesInCrypto + networkFeeInCrypto;
-
-          console.log(`Fee calculation:
-      - NGN Amount: ${ngnAmount}
-      - Quote Rate: ${quote.rate}
-      - Crypto Amount: ${quote.cryptoAmount}
-      - Platform Fees: ${fees.totalFees} NGN (${feesInCrypto} ${normalizedAsset})
-      - Network Fee: ${networkFeeInCrypto} ${normalizedAsset}
-      - Total Required: ${totalCryptoRequired} ${normalizedAsset}
-      - Current Balance: ${currentBalance} ${normalizedAsset}
-    `);
-
-          // 9. CHECK IF SUFFICIENT BALANCE
-          if (currentBalance < totalCryptoRequired) {
-            const shortfall = totalCryptoRequired - currentBalance;
+          let quote;
+          try {
+            quote = await dexPayService.getQuote(quoteRequest);
+            logger.info(
+              "[OFFRAMP] Quote received: " + JSON.stringify(quote, null, 2),
+            );
+          } catch (quoteError) {
+            logger.error(
+              "[OFFRAMP] Failed to get quote: " + (quoteError as Error).message,
+            );
+            // TODO! Transfer was successful but quote failed - may need to handle refund
             return {
               screen: "OFFRAMP_CRYPTO_REVIEW",
               data: {
                 ...data,
-                error_message: `Insufficient balance. You need ${totalCryptoRequired.toFixed(6)} ${currency.toUpperCase()} but have ${currentBalance.toFixed(6)}. Please deposit ${shortfall.toFixed(6)} more ${currency.toUpperCase()}.`,
+                error_message:
+                  "Failed to create transaction quote. Your crypto has been transferred. Please contact support.",
               },
             };
           }
 
-          // 10. TRANSFER TOKENS
-          console.log(
-            `Transferring ${totalCryptoRequired} ${normalizedAsset} on ${crossmintChain}...`,
-          );
+          // ============================================================
+          // STEP 11: COMPLETE OFFRAMP USING QUOTE ID
+          // This processes the fiat payment to user's bank account
+          // ============================================================
+          logger.info(`[OFFRAMP] Completing offramp for quote ${quote.id}...`);
 
-          const transferResult = await crossmintService.transferTokens(
-            user.userId,
-            chainType,
-            normalizedAsset,
-            totalCryptoRequired.toString(),
-            receivingAddress,
-          );
+          let offrampResult;
+          try {
+            offrampResult = await dexPayService.completeOfframp(quote.id);
+            logger.info(
+              "[OFFRAMP] Offramp completed: " +
+                JSON.stringify(offrampResult, null, 2),
+            );
+          } catch (offrampError) {
+            logger.error(
+              "[OFFRAMP] Failed to complete offramp: " +
+                (offrampError as Error).message,
+            );
+            // TODO! Quote was created but when completion failed - may need manual intervention
+            return {
+              screen: "OFFRAMP_CRYPTO_REVIEW",
+              data: {
+                ...data,
+                error_message:
+                  "Failed to process bank transfer. Your transaction is pending. Please contact support.",
+              },
+            };
+          }
 
-          console.log(
-            "Transfer successful:",
-            JSON.stringify(transferResult, null, 2),
-          );
-
-          // 11. COMPLETE OFF-RAMP
-          console.log(`Completing offramp for quote ${quote.id}...`);
-          const offrampResult = await dexPayService.completeOfframp(quote.id);
-          console.log(
-            "Offramp completed:",
-            JSON.stringify(offrampResult, null, 2),
-          );
-
-          // 12. SEND SUCCESS NOTIFICATION (non-blocking)
+          // ============================================================
+          // STEP 12: SEND SUCCESS NOTIFICATION (non-blocking)
+          // ============================================================
           sendOfframpSuccessNotification(
             phone,
             ngnAmount,
-            quote.cryptoAmount,
-            currency,
-            bank_name,
+            financials.totalInUsd,
+            currency || "UNKNOWN",
+            bank_name || "UNKNOWN",
             finalRecipientName,
             quote.id,
           ).catch((err) =>
-            console.error("Error sending success notification:", err),
+            logger.error(
+              "[OFFRAMP] Error sending success notification: " +
+                (err as Error).message,
+            ),
           );
+
+          logger.info("[OFFRAMP] Transaction completed successfully!");
 
           return {
             screen: "OFFRAMP_SUCCESS",
             data: {},
           };
-        } catch (error: any) {
-          console.error("Error processing crypto offramp:", error);
-          console.error("Error stack:", error.stack);
+        } catch (error) {
+          logger.error(
+            "[OFFRAMP] Error processing crypto offramp: " +
+              (error as Error).message,
+          );
+          if ((error as Error).stack) {
+            logger.error("[OFFRAMP] Error stack: " + (error as Error).stack);
+          }
 
           let errorMessage =
-            error.message || "Transaction failed. Please try again.";
+            (error as Error).message || "Transaction failed. Please try again.";
 
-          // Better error messages
+          // User-friendly error messages
           if (errorMessage.toLowerCase().includes("no trade ad available")) {
             errorMessage =
               "Service temporarily unavailable. Please try a different amount or wait a few minutes.";
@@ -510,6 +721,13 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
             errorMessage = "Quote has expired. Please try again.";
           } else if (errorMessage.toLowerCase().includes("fiat amount")) {
             errorMessage = `Invalid amount. Please try a different amount between ₦1,000 and ₦5,000,000.`;
+          } else if (
+            errorMessage
+              .toLowerCase()
+              .includes("beneficiary_bank_not_available")
+          ) {
+            errorMessage =
+              "Selected bank is temporarily unavailable. Please try a different bank.";
           }
 
           return {
@@ -532,7 +750,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: {
     }
   }
 
-  console.error("Unhandled request body:", decryptedBody);
+  logger.error("Unhandled request body: " + JSON.stringify(decryptedBody));
   throw new Error(
     "Unhandled endpoint request. Make sure you handle the request action & screen logged above.",
   );

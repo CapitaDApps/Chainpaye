@@ -6,6 +6,7 @@ import { WhatsAppBusinessService } from "./WhatsAppBusinessService";
 
 import { crossmintService } from "./CrossmintService";
 import { dexPayService } from "./DexPayService";
+import { financialService } from "./crypto-off-ramp/FinancialService";
 
 const whatsappBusinessService = new WhatsAppBusinessService();
 const toronetService = new ToronetService();
@@ -16,6 +17,7 @@ const transactionService = TransactionService;
 export {
   crossmintService,
   dexPayService,
+  financialService,
   toronetService,
   transactionService,
   userService,

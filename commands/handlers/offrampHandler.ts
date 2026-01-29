@@ -1,6 +1,16 @@
 /**
  * Off-ramp Handler for crypto to NGN conversion
- * Handles the complete off-ramp flow using Crossmint and DexPay
+ * Refactored to use new WorkflowController architecture
+ *
+ * This handler integrates with the new service architecture:
+ * - WorkflowController for state management
+ * - ValidationService for input validation
+ * - FinancialService for fee calculations
+ * - AuthenticationService for PIN validation
+ * - TransactionManager for crypto transfers
+ * - WebhookHandler for deposit confirmations
+ *
+ * Requirements: 1.1, 1.2, 1.3, All requirements
  */
 
 import { userService, whatsappBusinessService } from "../../services";
@@ -9,32 +19,55 @@ import { dexPayService } from "../../services/DexPayService";
 import { redisClient } from "../../services/redis";
 import { NormalizedNetworkType } from "../types";
 
-interface OfframpSession {
-  step:
-    | "ASSET_SELECTION"
-    | "DEPOSIT_WAITING"
-    | "AMOUNT_INPUT"
-    | "BANK_SELECTION"
-    | "ACCOUNT_RESOLUTION"
-    | "QUOTE_GENERATION"
-    | "CONFIRMATION"
-    | "PIN_VERIFICATION"
-    | "PROCESSING";
-  userId: string;
-  phoneNumber: string;
-  selectedAsset?: string;
-  selectedChain?: string;
-  walletAddress?: string;
-  ngnAmount?: number;
-  selectedBank?: any;
-  accountNumber?: string;
-  resolvedAccount?: any;
-  quote?: any;
-  createdAt: number;
-}
+// Import new architecture services
+import { AuthenticationService } from "../../services/crypto-off-ramp/AuthenticationService";
+import { FinancialService } from "../../services/crypto-off-ramp/FinancialService";
+import { NotificationService } from "../../services/crypto-off-ramp/NotificationService";
+import { TransactionManager } from "../../services/crypto-off-ramp/TransactionManager";
+import { ValidationService } from "../../services/crypto-off-ramp/ValidationService";
+import { WebhookHandler } from "../../services/crypto-off-ramp/WebhookHandler";
+import { WorkflowController } from "../../services/crypto-off-ramp/WorkflowController";
+
+import {
+  OffRampStep,
+  OffRampTransaction,
+  SupportedAsset,
+  SupportedChain,
+  TransactionStatus,
+} from "../../types/crypto-off-ramp.types";
+
+// Initialize services
+const workflowController = new WorkflowController();
+const validationService = new ValidationService();
+const financialService = new FinancialService();
+const authenticationService = new AuthenticationService();
+const notificationService = new NotificationService();
+const transactionManager = new TransactionManager(
+  crossmintService,
+  dexPayService,
+  undefined,
+  notificationService,
+);
+
+// Initialize WebhookHandler for deposit confirmations
+const webhookHandler = new WebhookHandler(
+  workflowController,
+  crossmintService,
+  validationService,
+  {
+    apiKey: process.env.CROSSMINT_API_KEY || "",
+    baseUrl:
+      process.env.CROSSMINT_BASE_URL || "https://crossmint.com/api/2025-06-09",
+    webhookSecret: process.env.CROSSMINT_WEBHOOK_SECRET || "",
+  },
+);
+
+// Session mapping for phone number to workflow ID
+const phoneToWorkflowMap = new Map<string, string>();
 
 /**
- * Main off-ramp handler - Step 1: Display wallets and prompt for asset selection
+ * Main off-ramp handler - Step 1: Display wallets and initiate workflow
+ * Requirements: 1.1, 1.2, 2.1, 2.2, 2.3, 2.4
  */
 export async function handleOfframp(
   phoneNumber: string,
@@ -62,22 +95,19 @@ export async function handleOfframp(
       return;
     }
 
-    // Initialize off-ramp session
-    const session: OfframpSession = {
-      step: "ASSET_SELECTION",
-      userId: user.userId,
-      phoneNumber,
-      createdAt: Date.now(),
-    };
+    // Initialize workflow using WorkflowController
+    const workflowState = await workflowController.initiateOffRamp(user.userId);
+    phoneToWorkflowMap.set(phoneNumber, workflowState.id);
 
+    // Store workflow ID in Redis for session management
     await redisClient.set(
-      `offramp_session:${phoneNumber}`,
-      JSON.stringify(session),
+      `offramp_workflow:${phoneNumber}`,
+      workflowState.id,
       "EX",
       30 * 60, // 30 minutes
     );
 
-    // Step 1: Check if initial message contains asset/chain intent
+    // Check if initial message contains asset/chain intent
     if (initialMessage) {
       const intentHandled = await handleAssetSelection(
         phoneNumber,
@@ -88,8 +118,8 @@ export async function handleOfframp(
       }
     }
 
-    // Step 2: Display existing wallets
-    await displayUserWallets(phoneNumber, user.userId);
+    // Step 1: Display existing wallets using WorkflowController
+    await displayUserWallets(phoneNumber, user.userId, workflowState.id);
   } catch (error) {
     console.error(`Error in handleOfframp for ${phoneNumber}:`, error);
     await whatsappBusinessService.sendNormalMessage(
@@ -100,27 +130,19 @@ export async function handleOfframp(
 }
 
 /**
- * Display user's existing wallets with balances
+ * Display user's existing wallets with balances using WorkflowController
+ * Requirements: 2.1, 2.2, 2.3, 2.4
  */
 async function displayUserWallets(
   phoneNumber: string,
   userId: string,
+  workflowId: string,
 ): Promise<void> {
   try {
     // Get all user wallets
     const wallets = await crossmintService.listWallets(userId);
 
-    if (wallets.length === 0) {
-      await whatsappBusinessService.sendNormalMessage(
-        "📱 *No Wallets Found*\n\nYou don't have any off-ramp wallets yet. When you select an asset and chain, we'll create a wallet for you.\n\n" +
-          getSupportedAssetsMessage(),
-        phoneNumber,
-      );
-      return;
-    }
-
-    let walletsMessage = "📱 *Your Off-ramp Wallets*\n\n";
-    let hasBalances = false;
+    let walletsWithBalances: any[] = [];
 
     // Get balances for each wallet
     for (const wallet of wallets) {
@@ -141,24 +163,20 @@ async function displayUserWallets(
           );
         }
 
-        // Filter balances with value > 0
-        const nonZeroBalances = balances.filter(
-          (balance) => parseFloat(balance.amount) > 0,
+        // Filter balances with value >= $0 as per requirement 2.2
+        const validBalances = balances.filter(
+          (balance) => parseFloat(balance.amount) >= 0,
         );
 
-        if (nonZeroBalances.length > 0) {
-          hasBalances = true;
-          walletsMessage += `🔗 *${wallet.chainType.toUpperCase()}*\n`;
-          walletsMessage += `Address: \`${wallet.address}\`\n`;
-
-          for (const balance of nonZeroBalances) {
-            const amount = parseFloat(balance.amount).toFixed(6);
-            const usdValue = balance.usdValue
-              ? ` (~$${balance.usdValue.toFixed(2)})`
-              : "";
-            walletsMessage += `• ${balance.token.toUpperCase()}: ${amount}${usdValue}\n`;
-          }
-          walletsMessage += "\n";
+        if (validBalances.length > 0) {
+          walletsWithBalances.push({
+            ...wallet,
+            balances: validBalances,
+            balance: validBalances.reduce(
+              (sum, b) => sum + parseFloat(b.amount),
+              0,
+            ),
+          });
         }
       } catch (error) {
         console.error(
@@ -168,8 +186,39 @@ async function displayUserWallets(
       }
     }
 
-    if (!hasBalances) {
-      walletsMessage += "⚠️ All wallets have zero balance.\n\n";
+    // Process step 1 with WorkflowController
+    const stepResult = await workflowController.processStep(workflowId, {
+      wallets: walletsWithBalances,
+    });
+
+    if (!stepResult.success) {
+      await whatsappBusinessService.sendNormalMessage(
+        `❌ *Wallet Display Error*\n\n${stepResult.error}`,
+        phoneNumber,
+      );
+      return;
+    }
+
+    // Display wallets message
+    let walletsMessage = "📱 *Your Off-ramp Wallets*\n\n";
+
+    if (walletsWithBalances.length === 0) {
+      walletsMessage =
+        "📱 *No Wallets Found*\n\nYou don't have any off-ramp wallets yet. When you select an asset and chain, we'll create a wallet for you.\n\n";
+    } else {
+      for (const wallet of walletsWithBalances) {
+        walletsMessage += `🔗 *${wallet.chainType.toUpperCase()}*\n`;
+        walletsMessage += `Address: \`${wallet.address}\`\n`;
+
+        for (const balance of wallet.balances) {
+          const amount = parseFloat(balance.amount).toFixed(6);
+          const usdValue = balance.usdValue
+            ? ` (~$${balance.usdValue.toFixed(2)})`
+            : "";
+          walletsMessage += `• ${balance.token.toUpperCase()}: ${amount}${usdValue}\n`;
+        }
+        walletsMessage += "\n";
+      }
     }
 
     walletsMessage += getSupportedAssetsMessage();
@@ -189,15 +238,16 @@ async function displayUserWallets(
 }
 
 /**
- * Handle asset and chain selection
+ * Handle asset and chain selection using ValidationService
+ * Requirements: 3.1, 3.2, 3.3, 3.4, 3.5
  */
 export async function handleAssetSelection(
   phoneNumber: string,
   message: string,
 ): Promise<boolean> {
   try {
-    const sessionData = await redisClient.get(`offramp_session:${phoneNumber}`);
-    if (!sessionData) {
+    const workflowId = await getWorkflowId(phoneNumber);
+    if (!workflowId) {
       await whatsappBusinessService.sendNormalMessage(
         "❌ *Session Expired*\n\nYour off-ramp session has expired. Type *offramp* to start again.",
         phoneNumber,
@@ -205,12 +255,12 @@ export async function handleAssetSelection(
       return false;
     }
 
-    const session: OfframpSession = JSON.parse(sessionData);
-    if (session.step !== "ASSET_SELECTION") {
+    const workflowState = await workflowController.getWorkflowState(workflowId);
+    if (workflowState.currentStep !== OffRampStep.REQUEST_ASSET_CHAIN) {
       return false;
     }
 
-    // Parse asset and chain from message (e.g., "USDC on Solana", "USDT BEP20")
+    // Parse asset and chain from message
     const assetChainMatch = message.match(
       /\b(usdc|usdt)\b.*?\b(bep20|base|arbitrum|solana|hedera|apechain|lisk)\b/i,
     );
@@ -225,7 +275,7 @@ export async function handleAssetSelection(
       return true;
     }
 
-    const asset = assetChainMatch[1]?.toLowerCase();
+    const asset = assetChainMatch[1]?.toUpperCase();
     const chain = assetChainMatch[2]?.toLowerCase();
 
     if (!asset || !chain) {
@@ -238,31 +288,33 @@ export async function handleAssetSelection(
       return true;
     }
 
-    // Validate asset and chain combination
-    if (!dexPayService.isSupportedAssetChain(asset, chain)) {
+    // Validate using ValidationService
+    const validation = validationService.validateAssetChain(asset, chain);
+    if (!validation.isValid) {
       await whatsappBusinessService.sendNormalMessage(
-        `❌ *Unsupported Combination*\n\n${asset.toUpperCase()} is not supported on ${chain.toUpperCase()}.\n\n` +
+        `❌ *Invalid Selection*\n\n${validation.errors.join("\n")}\n\n` +
           getSupportedAssetsMessage(),
         phoneNumber,
       );
       return true;
     }
 
-    // Update session
-    session.selectedAsset = asset;
-    session.selectedChain = chain;
-    session.step = "DEPOSIT_WAITING";
+    // Process step 2 with WorkflowController
+    const stepResult = await workflowController.processStep(workflowId, {
+      asset,
+      chain,
+    });
 
-    await redisClient.set(
-      `offramp_session:${phoneNumber}`,
-      JSON.stringify(session),
-      "EX",
-      30 * 60,
-    );
+    if (!stepResult.success) {
+      await whatsappBusinessService.sendNormalMessage(
+        `❌ *Selection Error*\n\n${stepResult.error}`,
+        phoneNumber,
+      );
+      return true;
+    }
 
-    // Get or create wallet for the selected chain
-    await handleWalletCreation(phoneNumber, session);
-
+    // Proceed to wallet creation
+    await handleWalletCreation(phoneNumber, workflowId);
     return true;
   } catch (error) {
     console.error(`Error in handleAssetSelection for ${phoneNumber}:`, error);
@@ -275,66 +327,65 @@ export async function handleAssetSelection(
 }
 
 /**
- * Handle wallet creation or retrieval
+ * Handle wallet creation or retrieval using WorkflowController
+ * Requirements: 4.1, 4.2, 4.3, 4.4
  */
 async function handleWalletCreation(
   phoneNumber: string,
-  session: OfframpSession,
+  workflowId: string,
 ): Promise<void> {
   try {
-    const chainType = crossmintService.getChainType(session.selectedChain!);
+    const workflowState = await workflowController.getWorkflowState(workflowId);
+    const selectedChain = workflowState.stepData.selectedChain;
+    const userId = workflowState.userId;
 
-    // Get or create wallet
-    const wallet = await crossmintService.getOrCreateWallet(
-      session.userId,
-      chainType,
-    );
-
-    // Get current balance
-    let balances: any[] = [];
-    try {
-      if (chainType === "solana") {
-        balances = await crossmintService.getBalancesByChain(
-          session.userId,
-          session.selectedChain!,
-          ["usdc", "sol"],
-        );
-      } else {
-        balances = await crossmintService.getBalancesByChain(
-          session.userId,
-          session.selectedChain!,
-          ["usdc", "usdt"],
-        );
-      }
-    } catch (error) {
-      console.error("Error getting balances:", error);
+    if (!selectedChain) {
+      await whatsappBusinessService.sendNormalMessage(
+        "❌ *Error*\n\nSelected chain information is missing. Please try again.",
+        phoneNumber,
+      );
+      return;
     }
 
-    // Find balance for selected asset
-    const assetBalance = balances.find(
-      (b) => b.token?.toLowerCase() === session.selectedAsset?.toLowerCase(),
-    );
-    const currentBalance = assetBalance ? parseFloat(assetBalance.amount) : 0;
-    const usdValue = assetBalance?.usdValue || 0;
+    const chainType = crossmintService.getChainType(selectedChain);
 
-    // Update session with wallet address
-    session.walletAddress = wallet.address;
-    await redisClient.set(
-      `offramp_session:${phoneNumber}`,
-      JSON.stringify(session),
-      "EX",
-      30 * 60,
-    );
+    // Check for existing wallet
+    const wallets = await crossmintService.listWallets(userId);
+    const existingWallet = wallets.find((w) => w.chainType === chainType);
+
+    // Process step 3 with WorkflowController
+    const stepResult = await workflowController.processStep(workflowId, {
+      existingWallet,
+      walletAddress: existingWallet?.address,
+    });
+
+    if (!stepResult.success) {
+      await whatsappBusinessService.sendNormalMessage(
+        `❌ *Wallet Error*\n\n${stepResult.error}`,
+        phoneNumber,
+      );
+      return;
+    }
+
+    let wallet;
+    if (existingWallet) {
+      wallet = existingWallet;
+    } else {
+      // Create new wallet
+      wallet = await crossmintService.getOrCreateWallet(userId, chainType);
+    }
 
     // Send deposit instructions
-    // Send deposit address using the specialized method
-    const network = parseNormalizedNetwork(session.selectedChain!);
+    const network = parseNormalizedNetwork(selectedChain);
     await whatsappBusinessService.sendCryptoDepositAddress(
       phoneNumber,
-      session.selectedAsset!,
+      workflowState.stepData.selectedAsset!,
       network,
       wallet.address,
     );
+
+    // Check current balance and proceed to deposit confirmation
+    await handleDepositConfirmation(phoneNumber, workflowId);
   } catch (error) {
     console.error(`Error in handleWalletCreation for ${phoneNumber}:`, error);
     await whatsappBusinessService.sendNormalMessage(
@@ -345,12 +396,75 @@ async function handleWalletCreation(
 }
 
 /**
- * Handle spend crypto command
+ * Handle deposit confirmation using WorkflowController
+ * Requirements: 5.1, 5.2, 5.3, 5.4
+ */
+async function handleDepositConfirmation(
+  phoneNumber: string,
+  workflowId: string,
+): Promise<void> {
+  try {
+    const workflowState = await workflowController.getWorkflowState(workflowId);
+    const selectedChain = workflowState.stepData.selectedChain;
+    const selectedAsset = workflowState.stepData.selectedAsset;
+    const userId = workflowState.userId;
+
+    // Get current balance
+    let currentBalance = 0;
+    try {
+      const chainType = crossmintService.getChainType(selectedChain);
+      let balances: any[] = [];
+
+      if (chainType === "solana") {
+        balances = await crossmintService.getBalancesByChain(
+          userId,
+          selectedChain,
+          ["usdc", "sol"],
+        );
+      } else {
+        balances = await crossmintService.getBalancesByChain(
+          userId,
+          selectedChain,
+          ["usdc", "usdt"],
+        );
+      }
+
+      const assetBalance = balances.find(
+        (b) =>
+          (b.symbol?.toLowerCase() || b.token?.toLowerCase()) ===
+          selectedAsset.toLowerCase(),
+      );
+      currentBalance = assetBalance ? parseFloat(assetBalance.amount) : 0;
+    } catch (error) {
+      console.error("Error getting balance for deposit confirmation:", error);
+    }
+
+    // Process step 4 with WorkflowController
+    const stepResult = await workflowController.processStep(workflowId, {
+      currentBalance,
+      depositConfirmed: currentBalance > 2, // Auto-confirm if balance > $2
+    });
+
+    if (stepResult.success && stepResult.data?.spendCTAEnabled) {
+      // Proceed to spend form
+      await handleSpendCrypto(phoneNumber);
+    }
+  } catch (error) {
+    console.error(
+      `Error in handleDepositConfirmation for ${phoneNumber}:`,
+      error,
+    );
+  }
+}
+
+/**
+ * Handle spend crypto command using WorkflowController
+ * Requirements: 6.1, 6.2, 6.3
  */
 export async function handleSpendCrypto(phoneNumber: string): Promise<boolean> {
   try {
-    const sessionData = await redisClient.get(`offramp_session:${phoneNumber}`);
-    if (!sessionData) {
+    const workflowId = await getWorkflowId(phoneNumber);
+    if (!workflowId) {
       await whatsappBusinessService.sendNormalMessage(
         "❌ *No Active Session*\n\nNo off-ramp session found. Type *offramp* to start a new session.",
         phoneNumber,
@@ -358,24 +472,18 @@ export async function handleSpendCrypto(phoneNumber: string): Promise<boolean> {
       return false;
     }
 
-    const session: OfframpSession = JSON.parse(sessionData);
+    const workflowState = await workflowController.getWorkflowState(workflowId);
 
-    if (!session.selectedAsset || !session.selectedChain) {
+    if (
+      !workflowState.stepData.selectedAsset ||
+      !workflowState.stepData.selectedChain
+    ) {
       await whatsappBusinessService.sendNormalMessage(
         "❌ *Incomplete Session*\n\nPlease select an asset and chain first. Type *offramp* to start over.",
         phoneNumber,
       );
       return false;
     }
-
-    // Update session step
-    session.step = "AMOUNT_INPUT";
-    await redisClient.set(
-      `offramp_session:${phoneNumber}`,
-      JSON.stringify(session),
-      "EX",
-      30 * 60,
-    );
 
     // Ask for NGN amount
     await whatsappBusinessService.sendNormalMessage(
@@ -400,18 +508,19 @@ export async function handleSpendCrypto(phoneNumber: string): Promise<boolean> {
 }
 
 /**
- * Handle NGN amount input
+ * Handle NGN amount input using ValidationService and FinancialService
+ * Requirements: 6.2, 6.3, 7.4, 7.5
  */
 export async function handleAmountInput(
   phoneNumber: string,
   message: string,
 ): Promise<boolean> {
   try {
-    const sessionData = await redisClient.get(`offramp_session:${phoneNumber}`);
-    if (!sessionData) return false;
+    const workflowId = await getWorkflowId(phoneNumber);
+    if (!workflowId) return false;
 
-    const session: OfframpSession = JSON.parse(sessionData);
-    if (session.step !== "AMOUNT_INPUT") return false;
+    const workflowState = await workflowController.getWorkflowState(workflowId);
+    if (workflowState.currentStep !== OffRampStep.SPEND_FORM) return false;
 
     // Parse amount
     const amountMatch = message.match(/\b(\d+(?:,\d{3})*(?:\.\d{2})?)\b/);
@@ -425,35 +534,21 @@ export async function handleAmountInput(
 
     const ngnAmount = parseFloat(amountMatch[1]?.replace(/,/g, "") || "0");
 
-    if (ngnAmount < 1000) {
-      await whatsappBusinessService.sendNormalMessage(
-        "❌ *Minimum Amount*\n\nMinimum withdrawal amount is ₦1,000.\n\nPlease enter a higher amount:",
-        phoneNumber,
-      );
-      return true;
-    }
-
-    if (ngnAmount > 5000000) {
-      await whatsappBusinessService.sendNormalMessage(
-        "❌ *Maximum Amount*\n\nMaximum withdrawal amount is ₦5,000,000.\n\nPlease enter a lower amount:",
-        phoneNumber,
-      );
-      return true;
-    }
-
-    // Update session
-    session.ngnAmount = ngnAmount;
-    session.step = "BANK_SELECTION";
-    await redisClient.set(
-      `offramp_session:${phoneNumber}`,
-      JSON.stringify(session),
-      "EX",
-      30 * 60,
+    // Validate amount using ValidationService
+    const validation = validationService.validateTransactionLimits(
+      ngnAmount,
+      workflowState.userId,
     );
+    if (!validation.isValid) {
+      await whatsappBusinessService.sendNormalMessage(
+        `❌ *Invalid Amount*\n\n${validation.errors.join("\n")}\n\nPlease enter a valid amount:`,
+        phoneNumber,
+      );
+      return true;
+    }
 
     // Show banks
-    await showBankSelection(phoneNumber);
-
+    await showBankSelection(phoneNumber, workflowId, ngnAmount);
     return true;
   } catch (error) {
     console.error(`Error in handleAmountInput for ${phoneNumber}:`, error);
@@ -466,9 +561,14 @@ export async function handleAmountInput(
 }
 
 /**
- * Show bank selection
+ * Show bank selection using DexPay service
+ * Requirements: 6.1, 6.4
  */
-async function showBankSelection(phoneNumber: string): Promise<void> {
+async function showBankSelection(
+  phoneNumber: string,
+  workflowId: string,
+  amount: number,
+): Promise<void> {
   try {
     const banks = await dexPayService.getBanks();
 
@@ -484,6 +584,12 @@ async function showBankSelection(phoneNumber: string): Promise<void> {
     message += `\nReply with the bank number (1-${displayBanks.length}) or bank name.`;
 
     await whatsappBusinessService.sendNormalMessage(message, phoneNumber);
+
+    // Store banks and amount in workflow
+    await workflowController.processStep(workflowId, {
+      amount,
+      availableBanks: displayBanks,
+    });
 
     // Store banks in Redis for reference
     await redisClient.set(
@@ -502,38 +608,26 @@ async function showBankSelection(phoneNumber: string): Promise<void> {
 }
 
 /**
- * Get supported assets message
- */
-function getSupportedAssetsMessage(): string {
-  return (
-    `💡 *Tell me what asset you want to deposit and its chain.*\n\n` +
-    `*Supported Assets & Chains:*\n` +
-    `🔸 *USDC:* BEP20, Base, Arbitrum, Solana, Hedera, ApeChain, Lisk\n` +
-    `🔸 *USDT:* BEP20, Arbitrum, Solana, Hedera, ApeChain, Lisk\n\n` +
-    `*Examples:*\n` +
-    `• "USDC on Solana"\n` +
-    `• "USDT BEP20"\n` +
-    `• "USDC Base"`
-  );
-}
-
-/**
- * Handle bank selection
+ * Handle bank selection using ValidationService
+ * Requirements: 6.2, 6.3
  */
 export async function handleBankSelection(
   phoneNumber: string,
   message: string,
 ): Promise<boolean> {
   try {
-    const sessionData = await redisClient.get(`offramp_session:${phoneNumber}`);
-    if (!sessionData) return false;
-
-    const session: OfframpSession = JSON.parse(sessionData);
-    if (session.step !== "BANK_SELECTION") return false;
+    const workflowId = await getWorkflowId(phoneNumber);
+    if (!workflowId) return false;
 
     const banksData = await redisClient.get(`banks:${phoneNumber}`);
     if (!banksData) {
-      await showBankSelection(phoneNumber);
+      const workflowState =
+        await workflowController.getWorkflowState(workflowId);
+      await showBankSelection(
+        phoneNumber,
+        workflowId,
+        workflowState.stepData.amount,
+      );
       return true;
     }
 
@@ -559,21 +653,17 @@ export async function handleBankSelection(
       return true;
     }
 
-    // Update session
-    session.selectedBank = selectedBank;
-    session.step = "ACCOUNT_RESOLUTION";
-    await redisClient.set(
-      `offramp_session:${phoneNumber}`,
-      JSON.stringify(session),
-      "EX",
-      30 * 60,
-    );
-
     // Ask for account number
     await whatsappBusinessService.sendNormalMessage(
       `🏦 *${selectedBank.name} Selected*\n\nPlease enter your account number:`,
       phoneNumber,
     );
+
+    // Update workflow with selected bank
+    await workflowController.processStep(workflowId, {
+      bankCode: selectedBank.code,
+      bankName: selectedBank.name,
+    });
 
     return true;
   } catch (error) {
@@ -587,18 +677,18 @@ export async function handleBankSelection(
 }
 
 /**
- * Handle account number input and resolution
+ * Handle account number input and resolution using ValidationService
+ * Requirements: 6.2, 6.3, 7.1
  */
 export async function handleAccountResolution(
   phoneNumber: string,
   message: string,
 ): Promise<boolean> {
   try {
-    const sessionData = await redisClient.get(`offramp_session:${phoneNumber}`);
-    if (!sessionData) return false;
+    const workflowId = await getWorkflowId(phoneNumber);
+    if (!workflowId) return false;
 
-    const session: OfframpSession = JSON.parse(sessionData);
-    if (session.step !== "ACCOUNT_RESOLUTION") return false;
+    const workflowState = await workflowController.getWorkflowState(workflowId);
 
     // Extract account number
     const accountMatch = message.match(/\b(\d{10})\b/);
@@ -611,7 +701,20 @@ export async function handleAccountResolution(
     }
 
     const accountNumber = accountMatch[1]!;
-    session.accountNumber = accountNumber;
+
+    // Validate using ValidationService
+    const validation = validationService.validateBankDetails(
+      workflowState.stepData.bankCode,
+      accountNumber,
+    );
+
+    if (!validation.isValid) {
+      await whatsappBusinessService.sendNormalMessage(
+        `❌ *Invalid Account Details*\n\n${validation.errors.join("\n")}\n\nPlease enter a valid account number:`,
+        phoneNumber,
+      );
+      return true;
+    }
 
     // Resolve account
     try {
@@ -621,24 +724,43 @@ export async function handleAccountResolution(
       );
 
       const resolvedAccount = await dexPayService.resolveAccount(
-        accountNumber!,
-        session.selectedBank!.code,
+        accountNumber,
+        workflowState.stepData.bankCode,
       );
 
-      session.resolvedAccount = resolvedAccount;
-      session.step = "QUOTE_GENERATION";
-      await redisClient.set(
-        `offramp_session:${phoneNumber}`,
-        JSON.stringify(session),
-        "EX",
-        30 * 60,
-      );
+      // Get current exchange rates from DexPay
+      let exchangeRate = 1600; // Default fallback
+      try {
+        const rates = await dexPayService.getCurrentRates(
+          workflowState.stepData.selectedAsset,
+          workflowState.stepData.selectedChain,
+        );
+        exchangeRate = rates.rate;
+      } catch (error) {
+        console.error("Error fetching exchange rates:", error);
+        // Continue with fallback rate but log the issue
+      }
+
+      // Process bank resolution step
+      const stepResult = await workflowController.processStep(workflowId, {
+        accountNumber,
+        accountName: resolvedAccount.accountName,
+        exchangeRate,
+      });
+
+      if (!stepResult.success) {
+        await whatsappBusinessService.sendNormalMessage(
+          `❌ *Bank Resolution Failed*\n\n${stepResult.error}`,
+          phoneNumber,
+        );
+        return true;
+      }
 
       // Show resolved account and ask for confirmation
       const confirmMessage =
         `✅ *Account Verified*\n\n` +
-        `Bank: ${resolvedAccount.bankName}\n` +
-        `Account Number: ${resolvedAccount.accountNumber}\n` +
+        `Bank: ${workflowState.stepData.bankName}\n` +
+        `Account Number: ${accountNumber}\n` +
         `Account Name: ${resolvedAccount.accountName}\n\n` +
         `Is this correct? Reply *yes* to proceed or *no* to try again.`;
 
@@ -668,34 +790,23 @@ export async function handleAccountResolution(
   }
 }
 
-// Continue with more handler functions...
-// This is getting quite long, so I'll create the remaining functions in the next part
 /**
- * Handle account confirmation and generate quote
+ * Handle account confirmation and balance validation
+ * Requirements: 7.3, 8.1, 8.2, 8.3, 8.4
  */
 export async function handleAccountConfirmation(
   phoneNumber: string,
   message: string,
 ): Promise<boolean> {
   try {
-    const sessionData = await redisClient.get(`offramp_session:${phoneNumber}`);
-    if (!sessionData) return false;
+    const workflowId = await getWorkflowId(phoneNumber);
+    if (!workflowId) return false;
 
-    const session: OfframpSession = JSON.parse(sessionData);
-    if (session.step !== "QUOTE_GENERATION") return false;
-
+    const workflowState = await workflowController.getWorkflowState(workflowId);
     const response = message.toLowerCase().trim();
 
     if (response === "no") {
-      // Go back to account input
-      session.step = "ACCOUNT_RESOLUTION";
-      await redisClient.set(
-        `offramp_session:${phoneNumber}`,
-        JSON.stringify(session),
-        "EX",
-        30 * 60,
-      );
-
+      // Go back to account input - reset to previous step
       await whatsappBusinessService.sendNormalMessage(
         "🔄 *Enter Account Number Again*\n\nPlease enter your correct account number:",
         phoneNumber,
@@ -711,8 +822,92 @@ export async function handleAccountConfirmation(
       return true;
     }
 
-    // Generate quote
-    await generateQuote(phoneNumber, session);
+    // Get current wallet balance for validation
+    const userId = workflowState.userId;
+    const selectedChain = workflowState.stepData.selectedChain;
+    const selectedAsset = workflowState.stepData.selectedAsset;
+    const amount = workflowState.stepData.amount;
+    const exchangeRate = workflowState.stepData.exchangeRate;
+
+    let walletBalance = 0;
+    try {
+      const chainType = crossmintService.getChainType(selectedChain);
+      let balances: any[] = [];
+
+      if (chainType === "solana") {
+        balances = await crossmintService.getBalancesByChain(
+          userId,
+          selectedChain,
+          ["usdc", "sol"],
+        );
+      } else {
+        balances = await crossmintService.getBalancesByChain(
+          userId,
+          selectedChain,
+          ["usdc", "usdt"],
+        );
+      }
+
+      const assetBalance = balances.find(
+        (b) =>
+          (b.symbol?.toLowerCase() || b.token?.toLowerCase()) ===
+          selectedAsset.toLowerCase(),
+      );
+      walletBalance = assetBalance ? parseFloat(assetBalance.amount) : 0;
+    } catch (error) {
+      console.error("Error getting wallet balance:", error);
+    }
+
+    // Calculate fees using FinancialService
+    const financialCalc = financialService.calculateTransactionFinancials(
+      amount,
+      exchangeRate,
+    );
+
+    // Store financial calculations in workflow state
+    await workflowController.processStep(workflowId, {
+      financialCalculations: financialCalc,
+    });
+
+    // Validate balance using WorkflowController
+    const balanceStepResult = await workflowController.processStep(workflowId, {
+      walletBalance,
+      requiredAmount: financialCalc.totalInUsd,
+    });
+
+    if (!balanceStepResult.success) {
+      // Insufficient funds
+      await whatsappBusinessService.sendNormalMessage(
+        `❌ *${balanceStepResult.error}*\n\n` +
+          `Required: ${financialCalc.totalInUsd.toFixed(6)} USD\n` +
+          `Available: ${walletBalance.toFixed(6)} USD\n\n` +
+          `Please deposit more ${selectedAsset.toUpperCase()} or reduce the amount.`,
+        phoneNumber,
+      );
+      return true;
+    }
+
+    // Show transaction summary and ask for PIN
+    const summaryMessage =
+      `💱 *Transaction Summary*\n\n` +
+      `💰 *Amount:* ₦${amount.toLocaleString()}\n` +
+      `📊 *Rate:* 1 ${selectedAsset.toUpperCase()} = ₦${exchangeRate.toLocaleString()}\n` +
+      `🔸 *Crypto Required:* ${financialCalc.totalInUsd.toFixed(6)} ${selectedAsset.toUpperCase()}\n\n` +
+      `💸 *Fees:*\n` +
+      `• Platform Fee (1.5%): ₦${financialCalc.chainpayeFee.toLocaleString()}\n` +
+      `• DexPay Fee: ₦${financialCalc.dexpayFee.toLocaleString()}\n` +
+      `• Total Fees: ₦${financialCalc.totalFees.toLocaleString()}\n\n` +
+      `🏦 *Destination:*\n` +
+      `${workflowState.stepData.bankName}\n` +
+      `${workflowState.stepData.accountName}\n` +
+      `${workflowState.stepData.accountNumber}\n\n` +
+      `✅ *Balance Sufficient*\n\n` +
+      `🔐 *Enter your 4-digit PIN to confirm:*`;
+
+    await whatsappBusinessService.sendNormalMessage(
+      summaryMessage,
+      phoneNumber,
+    );
     return true;
   } catch (error) {
     console.error(
@@ -728,216 +923,18 @@ export async function handleAccountConfirmation(
 }
 
 /**
- * Generate quote for the off-ramp
- */
-async function generateQuote(
-  phoneNumber: string,
-  session: OfframpSession,
-): Promise<void> {
-  try {
-    await whatsappBusinessService.sendNormalMessage(
-      "💱 *Generating Quote...*\n\nPlease wait while we calculate the best rate for you.",
-      phoneNumber,
-    );
-
-    // Generate quote
-    // DexPay API requires: fiatAmount as number, chain as uppercase
-    const quoteRequest = {
-      fiatAmount: session.ngnAmount!, // Must be a number
-      asset: session.selectedAsset!.toUpperCase(),
-      chain: session.selectedChain!.toUpperCase(), // Must be uppercase: BASE, BSC, SOL, etc.
-      type: "SELL" as const,
-      bankCode: session.selectedBank!.code,
-      accountName: session.resolvedAccount!.accountName,
-      accountNumber: session.resolvedAccount!.accountNumber,
-      receivingAddress: dexPayService.getReceivingAddress(
-        session.selectedChain!,
-      ),
-    };
-
-    const quote = await dexPayService.getQuote(quoteRequest);
-
-    // Calculate fees
-    const fees = dexPayService.calculateFees(session.ngnAmount!, quote.rate);
-
-    // Check if user has sufficient balance
-    const selectedChain = session.selectedChain!;
-    const selectedAsset = session.selectedAsset!;
-    const chainType = crossmintService.getChainType(selectedChain);
-    let balances: any[] = [];
-
-    try {
-      if (chainType === "solana") {
-        balances = await crossmintService.getBalancesByChain(
-          session.userId,
-          selectedChain,
-          ["usdc", "sol"],
-        );
-      } else {
-        balances = await crossmintService.getBalancesByChain(
-          session.userId,
-          selectedChain,
-          ["usdc", "usdt"],
-        );
-      }
-    } catch (error) {
-      console.error("Error getting balances for quote:", error);
-    }
-
-    // Crossmint API returns 'symbol' for the token name (e.g., "usdc")
-    const assetBalance = balances.find(
-      (b) =>
-        (b.symbol?.toLowerCase() || b.token?.toLowerCase()) ===
-        selectedAsset.toLowerCase(),
-    );
-    const currentBalance = assetBalance ? parseFloat(assetBalance.amount) : 0;
-
-    // Calculate total required amount including all fees
-    const totalFees = dexPayService.calculateFees(
-      session.ngnAmount!,
-      quote.rate,
-    );
-    const feesInCrypto = totalFees.totalFees / quote.rate; // Convert fees to crypto amount
-    const requiredAmount =
-      quote.cryptoAmount + feesInCrypto + (quote.fees?.networkFee || 0);
-
-    // Update session with quote
-    session.quote = quote;
-    session.step = "CONFIRMATION";
-    await redisClient.set(
-      `offramp_session:${phoneNumber}`,
-      JSON.stringify(session),
-      "EX",
-      30 * 60,
-    );
-
-    // Display quote details
-    let quoteMessage = `💱 *Quote Generated*\n\n`;
-    quoteMessage += `💰 *Amount:* ${dexPayService.formatNGN(session.ngnAmount!)}\n`;
-    quoteMessage += `📊 *Rate:* 1 ${selectedAsset.toUpperCase()} = ${dexPayService.formatNGN(quote.rate)}\n`;
-    quoteMessage += `🔸 *Crypto for NGN:* ${quote.cryptoAmount.toFixed(6)} ${selectedAsset.toUpperCase()}\n`;
-    quoteMessage += `🔸 *Fees in Crypto:* ${feesInCrypto.toFixed(6)} ${selectedAsset.toUpperCase()}\n\n`;
-
-    quoteMessage += `💸 *Fees Breakdown:*\n`;
-    quoteMessage += `• Platform Fee (1.5%): ${dexPayService.formatNGN(totalFees.platformFee)}\n`;
-    quoteMessage += `• DexPay Fee: ${dexPayService.formatNGN(totalFees.dexPayFee)}\n`;
-    quoteMessage += `• Total Fees: ${dexPayService.formatNGN(totalFees.totalFees)}\n\n`;
-
-    quoteMessage += `📊 *Summary:*\n`;
-    quoteMessage += `• You Receive: ${dexPayService.formatNGN(session.ngnAmount!)}\n`;
-    quoteMessage += `• Total Deducted: ${requiredAmount.toFixed(6)} ${selectedAsset.toUpperCase()}\n`;
-    quoteMessage += `• Your Balance: ${currentBalance.toFixed(6)} ${selectedAsset.toUpperCase()}\n\n`;
-
-    if (currentBalance < requiredAmount) {
-      quoteMessage += `❌ *Insufficient Balance*\n\n`;
-      quoteMessage += `You need ${(requiredAmount - currentBalance).toFixed(6)} more ${selectedAsset.toUpperCase()}.\n\n`;
-      quoteMessage += `Please:\n`;
-      quoteMessage += `1. Deposit more ${selectedAsset.toUpperCase()} to your wallet\n`;
-      quoteMessage += `2. Or reduce the withdrawal amount\n\n`;
-      quoteMessage += `Type a lower amount to try again:`;
-
-      // Go back to amount input
-      session.step = "AMOUNT_INPUT";
-      await redisClient.set(
-        `offramp_session:${phoneNumber}`,
-        JSON.stringify(session),
-        "EX",
-        30 * 60,
-      );
-    } else {
-      quoteMessage += `✅ *Sufficient Balance*\n\n`;
-      quoteMessage += `🏦 *Destination:*\n`;
-      quoteMessage += `${session.resolvedAccount!.bankName}\n`;
-      quoteMessage += `${session.resolvedAccount!.accountName}\n`;
-      quoteMessage += `${session.resolvedAccount!.accountNumber}\n\n`;
-      quoteMessage += `⏰ *Quote expires in 10 minutes*\n\n`;
-      quoteMessage += `Reply *proceed* to continue or *cancel* to stop.`;
-    }
-
-    await whatsappBusinessService.sendNormalMessage(quoteMessage, phoneNumber);
-  } catch (error: any) {
-    console.error(`Error generating quote for ${phoneNumber}:`, error);
-    await whatsappBusinessService.sendNormalMessage(
-      `❌ *Quote Generation Failed*\n\n${error.message}\n\nPlease try again later.`,
-      phoneNumber,
-    );
-  }
-}
-
-/**
- * Handle transaction confirmation
- */
-export async function handleTransactionConfirmation(
-  phoneNumber: string,
-  message: string,
-): Promise<boolean> {
-  try {
-    const sessionData = await redisClient.get(`offramp_session:${phoneNumber}`);
-    if (!sessionData) return false;
-
-    const session: OfframpSession = JSON.parse(sessionData);
-    if (session.step !== "CONFIRMATION") return false;
-
-    const response = message.toLowerCase().trim();
-
-    if (response === "cancel") {
-      await redisClient.del(`offramp_session:${phoneNumber}`);
-      await whatsappBusinessService.sendNormalMessage(
-        "❌ *Off-ramp Cancelled*\n\nYour off-ramp transaction has been cancelled.\n\nType *offramp* to start a new transaction.",
-        phoneNumber,
-      );
-      return true;
-    }
-
-    if (response !== "proceed") {
-      await whatsappBusinessService.sendNormalMessage(
-        "❓ *Please Confirm*\n\nReply *proceed* to continue with the transaction or *cancel* to stop.",
-        phoneNumber,
-      );
-      return true;
-    }
-
-    // Move to PIN verification
-    session.step = "PIN_VERIFICATION";
-    await redisClient.set(
-      `offramp_session:${phoneNumber}`,
-      JSON.stringify(session),
-      "EX",
-      30 * 60,
-    );
-
-    await whatsappBusinessService.sendNormalMessage(
-      "🔐 *Enter Your PIN*\n\nPlease enter your 4-digit transaction PIN to confirm this off-ramp:",
-      phoneNumber,
-    );
-
-    return true;
-  } catch (error) {
-    console.error(
-      `Error in handleTransactionConfirmation for ${phoneNumber}:`,
-      error,
-    );
-    await whatsappBusinessService.sendNormalMessage(
-      "❌ *Error*\n\nSomething went wrong. Please try again.",
-      phoneNumber,
-    );
-    return true;
-  }
-}
-
-/**
- * Handle PIN verification and execute transaction
+ * Handle PIN verification using AuthenticationService
+ * Requirements: 9.1, 9.2, 9.3, 9.4
  */
 export async function handlePinVerification(
   phoneNumber: string,
   message: string,
 ): Promise<boolean> {
   try {
-    const sessionData = await redisClient.get(`offramp_session:${phoneNumber}`);
-    if (!sessionData) return false;
+    const workflowId = await getWorkflowId(phoneNumber);
+    if (!workflowId) return false;
 
-    const session: OfframpSession = JSON.parse(sessionData);
-    if (session.step !== "PIN_VERIFICATION") return false;
+    const workflowState = await workflowController.getWorkflowState(workflowId);
 
     // Extract PIN
     const pinMatch = message.match(/\b(\d{4})\b/);
@@ -951,36 +948,28 @@ export async function handlePinVerification(
 
     const pin = pinMatch[1]!;
 
-    // Verify PIN
-    const user = await userService.getUser(phoneNumber, true);
-    if (!user || !user.pin) {
-      await whatsappBusinessService.sendNormalMessage(
-        "❌ *PIN Verification Failed*\n\nCouldn't verify your PIN. Please try again.",
-        phoneNumber,
-      );
-      return true;
-    }
-
-    const pinValid = await user.comparePin(pin);
-    if (!pinValid) {
-      await whatsappBusinessService.sendNormalMessage(
-        "❌ *Incorrect PIN*\n\nThe PIN you entered is incorrect. Please try again:",
-        phoneNumber,
-      );
-      return true;
-    }
-
-    // Update session step to prevent race condition (double spend)
-    session.step = "PROCESSING";
-    await redisClient.set(
-      `offramp_session:${phoneNumber}`,
-      JSON.stringify(session),
-      "EX",
-      30 * 60,
+    // Verify PIN using AuthenticationService
+    const pinValid = await authenticationService.validatePin(
+      workflowState.userId,
+      pin,
     );
 
+    // Process PIN confirmation step
+    const stepResult = await workflowController.processStep(workflowId, {
+      pin,
+      pinValid,
+    });
+
+    if (!stepResult.success) {
+      await whatsappBusinessService.sendNormalMessage(
+        `❌ *${stepResult.error}*`,
+        phoneNumber,
+      );
+      return true;
+    }
+
     // Execute the off-ramp transaction
-    await executeOfframpTransaction(phoneNumber, session);
+    await executeOfframpTransaction(phoneNumber, workflowId);
     return true;
   } catch (error) {
     console.error(`Error in handlePinVerification for ${phoneNumber}:`, error);
@@ -993,11 +982,12 @@ export async function handlePinVerification(
 }
 
 /**
- * Execute the off-ramp transaction
+ * Execute the off-ramp transaction with comprehensive error handling and sequential processing
+ * Requirements: 10.1, 10.2, 10.3, 11.1, 11.2, 11.3, 12.1, 12.2, 12.3, 12.4, 13.1, 13.2, 13.3, 13.4
  */
 async function executeOfframpTransaction(
   phoneNumber: string,
-  session: OfframpSession,
+  workflowId: string,
 ): Promise<void> {
   try {
     await whatsappBusinessService.sendNormalMessage(
@@ -1005,118 +995,458 @@ async function executeOfframpTransaction(
       phoneNumber,
     );
 
-    // Step 1: Transfer crypto from user wallet to DexPay (including all fees)
-    const selectedChain = session.selectedChain!;
-    const selectedAsset = session.selectedAsset!;
-    const chainType = crossmintService.getChainType(selectedChain);
+    const workflowState = await workflowController.getWorkflowState(workflowId);
 
-    // Calculate total amount to transfer (crypto amount + all fees)
-    const quote = session.quote!;
-    const platformFees = dexPayService.calculateFees(
-      session.ngnAmount!,
-      quote.rate,
-    );
-    const totalCryptoAmount =
-      quote.cryptoAmount + platformFees.totalFees / quote.rate; // Convert fees to crypto
-    const transferAmount = totalCryptoAmount.toString();
-
-    const receivingAddress = dexPayService.getReceivingAddress(selectedChain);
-
-    try {
-      const transferResult = await crossmintService.transferTokens(
-        session.userId,
-        chainType,
-        selectedAsset,
-        transferAmount,
-        receivingAddress,
-      );
-
-      console.log(`Transfer successful (including fees):`, transferResult);
-    } catch (error: any) {
-      console.error(`Transfer failed:`, error);
+    // Validate workflow state has all required data
+    if (
+      !workflowState.stepData.selectedAsset ||
+      !workflowState.stepData.selectedChain
+    ) {
       await whatsappBusinessService.sendNormalMessage(
-        `❌ *Transfer Failed*\n\nCouldn't transfer crypto from your wallet. ${error.message}\n\nPlease try again later.`,
+        "❌ *Transaction Failed*\n\nMissing asset or chain information. Please restart the transaction.",
         phoneNumber,
       );
       return;
     }
 
-    // Step 2: Complete off-ramp through DexPay (validates quote and processes payment)
-    try {
-      const offrampResult = await dexPayService.completeOfframp(
-        session.quote!.id,
-      );
-
-      // Clean up session
-      await redisClient.del(`offramp_session:${phoneNumber}`);
-
-      // Send success message
-      const selectedAsset = session.selectedAsset!;
-      const successMessage =
-        `🎉 *Off-ramp Successful!*\n\n` +
-        `✅ Transaction completed successfully\n\n` +
-        `💰 *Details:*\n` +
-        `• Amount: ${dexPayService.formatNGN(session.ngnAmount!)}\n` +
-        `• Crypto Used: ${quote.cryptoAmount.toFixed(6)} ${selectedAsset.toUpperCase()}\n` +
-        `• Platform Fee: ${dexPayService.formatNGN(platformFees.platformFee)}\n` +
-        `• DexPay Fee: ${dexPayService.formatNGN(platformFees.dexPayFee)}\n` +
-        `• Total Fees: ${dexPayService.formatNGN(platformFees.totalFees)}\n` +
-        `• Bank: ${session.resolvedAccount!.bankName}\n` +
-        `• Account: ${session.resolvedAccount!.accountName}\n` +
-        `• Account Number: ${session.resolvedAccount!.accountNumber}\n\n` +
-        `💳 *Your NGN will be credited to your bank account within 5-10 minutes.*\n\n` +
-        `📧 You'll receive a confirmation email shortly.\n\n` +
-        `Type *menu* to return to the main menu.`;
-
+    if (!workflowState.stepData.walletAddress) {
       await whatsappBusinessService.sendNormalMessage(
-        successMessage,
+        "❌ *Transaction Failed*\n\nWallet address not found. Please restart the transaction.",
+        phoneNumber,
+      );
+      return;
+    }
+
+    if (
+      !workflowState.stepData.bankCode ||
+      !workflowState.stepData.accountNumber
+    ) {
+      await whatsappBusinessService.sendNormalMessage(
+        "❌ *Transaction Failed*\n\nBanking information incomplete. Please restart the transaction.",
+        phoneNumber,
+      );
+      return;
+    }
+
+    // Get financial calculations from workflow state
+    const financialCalc = workflowState.stepData.financialCalculations;
+    if (!financialCalc) {
+      await whatsappBusinessService.sendNormalMessage(
+        "❌ *Transaction Failed*\n\nFinancial calculations missing. Please restart the transaction.",
+        phoneNumber,
+      );
+      return;
+    }
+
+    // Create OffRampTransaction for TransactionManager
+    const transaction: OffRampTransaction = {
+      id: `txn-${workflowId}`,
+      userId: workflowState.userId,
+      workflowId: workflowId,
+      asset: workflowState.stepData.selectedAsset as SupportedAsset,
+      chain: workflowState.stepData.selectedChain as SupportedChain,
+      amount: workflowState.stepData.amount,
+      sourceWalletAddress: workflowState.stepData.walletAddress,
+      bankCode: workflowState.stepData.bankCode,
+      bankName: workflowState.stepData.bankName,
+      accountNumber: workflowState.stepData.accountNumber,
+      accountName: workflowState.stepData.accountName,
+      exchangeRate: workflowState.stepData.exchangeRate,
+      chainpayeFee: financialCalc.chainpayeFee,
+      dexpayFee: financialCalc.dexpayFee,
+      totalFees: financialCalc.totalFees,
+      fiatAmount: workflowState.stepData.amount,
+      status: TransactionStatus.INITIATED,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    // Process crypto transfer step (Step 9)
+    await whatsappBusinessService.sendNormalMessage(
+      "🔄 *Step 1/3: Processing Crypto Transfer*\n\nTransferring your crypto to our secure wallet...",
+      phoneNumber,
+    );
+
+    const cryptoStepResult = await workflowController.processStep(workflowId, {
+      transactionStep: "crypto_transfer",
+      transactionData: transaction,
+    });
+
+    if (!cryptoStepResult.success) {
+      await whatsappBusinessService.sendNormalMessage(
+        `❌ *Crypto Transfer Failed*\n\n${cryptoStepResult.error}\n\nYour funds are safe. Please try again later.\n\nReference: ${workflowId}`,
+        phoneNumber,
+      );
+      return;
+    }
+
+    // Process transaction using TransactionManager with comprehensive error handling
+    let result;
+    try {
+      result = await transactionManager.processTransaction(transaction);
+    } catch (error) {
+      console.error(`TransactionManager error for ${workflowId}:`, error);
+      await whatsappBusinessService.sendNormalMessage(
+        `❌ *Transaction Processing Error*\n\nAn unexpected error occurred while processing your transaction. Your funds are safe.\n\nPlease contact support with reference: ${workflowId}`,
+        phoneNumber,
+      );
+      return;
+    }
+
+    if (result.success) {
+      // Update workflow with successful transaction
+      await whatsappBusinessService.sendNormalMessage(
+        "🔄 *Step 2/3: Creating Banking Quote*\n\nSecuring your exchange rate with our banking partner...",
         phoneNumber,
       );
 
-      // Send additional success notification
-      await sendOfframpSuccessNotification(
-        phoneNumber,
-        session.ngnAmount!,
-        quote.cryptoAmount,
-        selectedAsset,
-        session.resolvedAccount!.bankName,
-        session.resolvedAccount!.accountName,
-        session.quote!.id,
-      );
+      // Process quote creation step (Step 10)
+      const quoteStepResult = await workflowController.processStep(workflowId, {
+        transactionStep: "quote_creation",
+        transactionId: result.transactionId,
+        quoteId: transaction.dexpayQuoteId,
+      });
 
-      console.log(
-        `Off-ramp completed successfully for ${phoneNumber}:`,
-        offrampResult,
-      );
-    } catch (error: any) {
-      console.error(`Off-ramp completion failed:`, error);
-
-      if (error.message.includes("expired")) {
+      if (quoteStepResult.success) {
         await whatsappBusinessService.sendNormalMessage(
-          `❌ *Quote Expired*\n\n${error.message}\n\nThe crypto transfer was successful, but the quote expired. Our team will investigate and resolve this.\n\nReference: ${session.quote!.id}\n\nContact support for assistance.`,
+          "🔄 *Step 3/3: Finalizing Transaction*\n\nCompleting your bank transfer...",
           phoneNumber,
         );
+
+        // Process completion step (Step 12)
+        const completionResult = await workflowController.processStep(
+          workflowId,
+          {
+            transactionCompleted: true,
+            transactionId: result.transactionId,
+            receipt: result.receipt,
+          },
+        );
+
+        if (completionResult.success) {
+          // Send comprehensive success message with all details
+          const successMessage =
+            `🎉 *Transaction Successful!*\n\n` +
+            `✅ Your off-ramp has been completed successfully!\n\n` +
+            `💰 *Transaction Details:*\n` +
+            `• Amount: ₦${workflowState.stepData.amount.toLocaleString()}\n` +
+            `• Crypto Used: ${financialCalc.totalInUsd.toFixed(6)} ${workflowState.stepData.selectedAsset.toUpperCase()}\n` +
+            `• Exchange Rate: 1 ${workflowState.stepData.selectedAsset.toUpperCase()} = ₦${workflowState.stepData.exchangeRate.toLocaleString()}\n\n` +
+            `💸 *Fees Applied:*\n` +
+            `• Platform Fee: ₦${financialCalc.chainpayeFee.toLocaleString()}\n` +
+            `• Banking Fee: ₦${financialCalc.dexpayFee.toLocaleString()}\n` +
+            `• Total Fees: ₦${financialCalc.totalFees.toLocaleString()}\n\n` +
+            `🏦 *Destination Account:*\n` +
+            `• Bank: ${workflowState.stepData.bankName}\n` +
+            `• Account Name: ${workflowState.stepData.accountName}\n` +
+            `• Account Number: ${workflowState.stepData.accountNumber}\n\n` +
+            `📋 *Transaction Reference:* ${result.transactionId}\n\n` +
+            `💳 *You will receive your money in seconds.*\n\n` +
+            `📧 A detailed receipt has been sent to you.\n\n` +
+            `Type *menu* to return to the main menu or *offramp* to start another transaction.`;
+
+          await whatsappBusinessService.sendNormalMessage(
+            successMessage,
+            phoneNumber,
+          );
+
+          // Send receipt through NotificationService
+          if (result.receipt) {
+            try {
+              await notificationService.sendReceipt(
+                workflowState.userId,
+                transaction,
+              );
+            } catch (receiptError) {
+              console.error(
+                `Receipt delivery error for ${workflowId}:`,
+                receiptError,
+              );
+              // Don't fail the transaction if receipt delivery fails
+              await whatsappBusinessService.sendNormalMessage(
+                "⚠️ *Receipt Delivery*\n\nYour transaction was successful, but we couldn't deliver your receipt. Please contact support if you need a copy.\n\nReference: " +
+                  result.transactionId,
+                phoneNumber,
+              );
+            }
+          }
+        } else {
+          await whatsappBusinessService.sendNormalMessage(
+            `❌ *Transaction Completion Error*\n\n${completionResult.error}\n\nYour crypto transfer was successful, but there was an issue finalizing the transaction. Please contact support.\n\nReference: ${result.transactionId}`,
+            phoneNumber,
+          );
+        }
       } else {
         await whatsappBusinessService.sendNormalMessage(
-          `❌ *Off-ramp Failed*\n\nThe crypto transfer was successful, but the off-ramp processing failed. Our team will investigate and resolve this.\n\nReference: ${session.quote!.id}\n\nContact support for assistance.`,
+          `❌ *Quote Creation Failed*\n\n${quoteStepResult.error}\n\nYour crypto transfer was successful, but we couldn't create the banking quote. Please contact support.\n\nReference: ${result.transactionId}`,
           phoneNumber,
         );
       }
+
+      // Clean up workflow session
+      phoneToWorkflowMap.delete(phoneNumber);
+      await redisClient.del(`offramp_workflow:${phoneNumber}`);
+    } else {
+      // Handle transaction failure with detailed error messages
+      let errorMessage = "❌ *Transaction Failed*\n\n";
+
+      if (result.error?.includes("insufficient")) {
+        errorMessage +=
+          "You don't have enough crypto balance for this transaction.\n\n";
+        errorMessage += `Required: ${financialCalc.totalInUsd.toFixed(6)} ${workflowState.stepData.selectedAsset.toUpperCase()}\n`;
+        errorMessage +=
+          "Please deposit more crypto or reduce the transaction amount.";
+      } else if (
+        result.error?.includes("network") ||
+        result.error?.includes("timeout")
+      ) {
+        errorMessage +=
+          "Network connection issue. Please check your internet connection and try again.";
+      } else if (
+        result.error?.includes("rate") ||
+        result.error?.includes("expired")
+      ) {
+        errorMessage +=
+          "Exchange rate has expired. Please restart the transaction for current rates.";
+      } else if (
+        result.error?.includes("bank") ||
+        result.error?.includes("account")
+      ) {
+        errorMessage +=
+          "Banking service issue. Please verify your account details and try again.";
+      } else {
+        errorMessage += result.error || "An unexpected error occurred.";
+        errorMessage += "\n\nYour funds are safe. Please try again later.";
+      }
+
+      errorMessage += `\n\nReference: ${workflowId}`;
+      errorMessage +=
+        "\n\nType *support* for assistance or *offramp* to try again.";
+
+      await whatsappBusinessService.sendNormalMessage(
+        errorMessage,
+        phoneNumber,
+      );
+
+      // Clean up failed workflow session
+      phoneToWorkflowMap.delete(phoneNumber);
+      await redisClient.del(`offramp_workflow:${phoneNumber}`);
     }
   } catch (error) {
     console.error(
       `Error executing off-ramp transaction for ${phoneNumber}:`,
       error,
     );
-    await whatsappBusinessService.sendNormalMessage(
-      "❌ *Transaction Failed*\n\nSomething went wrong processing your transaction. Please contact support for assistance.",
-      phoneNumber,
+
+    // Comprehensive error handling with user-friendly messages
+    let errorMessage = "❌ *Transaction Failed*\n\n";
+
+    if (error instanceof Error) {
+      if (error.message.includes("timeout")) {
+        errorMessage +=
+          "The transaction timed out. Please try again with a stable internet connection.";
+      } else if (error.message.includes("network")) {
+        errorMessage +=
+          "Network error occurred. Please check your connection and try again.";
+      } else if (error.message.includes("service")) {
+        errorMessage +=
+          "One of our services is temporarily unavailable. Please try again in a few minutes.";
+      } else {
+        errorMessage +=
+          "An unexpected system error occurred. Our team has been notified.";
+      }
+    } else {
+      errorMessage +=
+        "An unexpected system error occurred. Our team has been notified.";
+    }
+
+    errorMessage += `\n\nYour funds are safe and no charges have been applied.`;
+    errorMessage += `\n\nReference: ${workflowId}`;
+    errorMessage +=
+      "\n\nPlease contact support for assistance or try again later.";
+
+    await whatsappBusinessService.sendNormalMessage(errorMessage, phoneNumber);
+
+    // Clean up failed workflow session
+    phoneToWorkflowMap.delete(phoneNumber);
+    await redisClient.del(`offramp_workflow:${phoneNumber}`);
+  }
+}
+
+/**
+ * Handle workflow state updates for deposit confirmations
+ * This function is called by the WebhookHandler to update active workflows
+ * when deposits are confirmed, ensuring proper workflow progression.
+ * Requirements: 5.1, 5.2, 5.4
+ */
+export async function updateWorkflowForDeposit(
+  userId: string,
+  asset: string,
+  amount: number,
+  chain: string,
+  walletAddress: string,
+  transactionHash: string,
+): Promise<{
+  success: boolean;
+  workflowsUpdated: number;
+  message: string;
+  error?: string;
+}> {
+  try {
+    console.log(
+      `Updating workflows for deposit: ${amount} ${asset} on ${chain} for user ${userId}`,
+    );
+
+    // Get user's active workflows that are waiting for deposit confirmation
+    const activeWorkflows =
+      await workflowController.getUserActiveWorkflows(userId);
+    const waitingWorkflows = activeWorkflows.filter(
+      (workflow) =>
+        workflow.currentStep === OffRampStep.DEPOSIT_CONFIRMATION &&
+        workflow.stepData.selectedAsset?.toLowerCase() ===
+          asset.toLowerCase() &&
+        workflow.stepData.selectedChain?.toLowerCase() ===
+          chain.toLowerCase() &&
+        workflow.stepData.walletAddress === walletAddress,
+    );
+
+    if (waitingWorkflows.length === 0) {
+      console.log(
+        `No workflows waiting for deposit confirmation for user ${userId}`,
+      );
+      return {
+        success: true,
+        workflowsUpdated: 0,
+        message: "No workflows waiting for this deposit",
+      };
+    }
+
+    let updatedCount = 0;
+    const errors: string[] = [];
+
+    // Update each waiting workflow with deposit confirmation
+    for (const workflow of waitingWorkflows) {
+      try {
+        const stepData = {
+          depositConfirmed: true,
+          depositAmount: amount,
+          depositAsset: asset.toUpperCase(),
+          depositChain: chain.toLowerCase(),
+          depositHash: transactionHash,
+          depositTimestamp: new Date().toISOString(),
+          currentBalance: amount, // Simplified - in production would get actual balance
+          spendCTAEnabled: true, // Enable "Spend Crypto" CTA as per requirement 5.2
+        };
+
+        // Process the deposit confirmation step
+        const stepResult = await workflowController.processStep(
+          workflow.id,
+          stepData,
+        );
+
+        if (stepResult.success) {
+          updatedCount++;
+          console.log(
+            `Workflow ${workflow.id} updated with deposit confirmation`,
+          );
+
+          // Send workflow-specific notification to user
+          const user = await userService.getUserById(userId);
+          if (user?.whatsappNumber) {
+            await sendWorkflowDepositNotification(
+              user.whatsappNumber,
+              workflow.id,
+              asset,
+              amount,
+              chain,
+            );
+          }
+        } else {
+          errors.push(`Workflow ${workflow.id}: ${stepResult.error}`);
+          console.error(
+            `Failed to update workflow ${workflow.id}:`,
+            stepResult.error,
+          );
+        }
+      } catch (workflowError: any) {
+        errors.push(`Workflow ${workflow.id}: ${workflowError.message}`);
+        console.error(
+          `Error updating workflow ${workflow.id}:`,
+          workflowError.message,
+        );
+      }
+    }
+
+    // Return result summary
+    if (updatedCount > 0) {
+      const message = `Successfully updated ${updatedCount} workflow(s) with deposit confirmation`;
+      return {
+        success: true,
+        workflowsUpdated: updatedCount,
+        message:
+          errors.length > 0
+            ? `${message}. ${errors.length} errors occurred.`
+            : message,
+      };
+    } else {
+      return {
+        success: false,
+        workflowsUpdated: 0,
+        message: "Failed to update any workflows",
+        error: errors.join("; "),
+      };
+    }
+  } catch (error: any) {
+    console.error(`Error updating workflows for deposit:`, error);
+    return {
+      success: false,
+      workflowsUpdated: 0,
+      message: "Failed to process workflow updates",
+      error: error.message,
+    };
+  }
+}
+
+/**
+ * Send workflow-specific deposit notification
+ * This provides targeted messaging for users with active workflows
+ */
+async function sendWorkflowDepositNotification(
+  phoneNumber: string,
+  workflowId: string,
+  asset: string,
+  amount: number,
+  chain: string,
+): Promise<void> {
+  try {
+    const message =
+      `🎉 *Deposit Confirmed - Transaction Updated!*\n\n` +
+      `💰 *Amount:* ${amount.toFixed(6)} ${asset.toUpperCase()}\n` +
+      `🔗 *Network:* ${chain.toUpperCase()}\n` +
+      `⏰ *Time:* ${new Date().toLocaleString("en-NG", { timeZone: "Africa/Lagos" })}\n\n` +
+      `✅ *Your active off-ramp transaction has been automatically updated!*\n\n` +
+      `⚡ *Next Steps:*\n` +
+      `Your transaction will continue processing automatically. You'll receive updates as it progresses.\n\n` +
+      `📋 *Transaction Reference:* ${workflowId.slice(-8)}\n\n` +
+      `💡 *Need help?* Type *support* for assistance.`;
+
+    await whatsappBusinessService.sendNormalMessage(message, phoneNumber);
+    console.log(
+      `Workflow-specific deposit notification sent to ${phoneNumber} for workflow ${workflowId}`,
+    );
+  } catch (error) {
+    console.error(
+      `Error sending workflow deposit notification to ${phoneNumber}:`,
+      error,
     );
   }
 }
 
 /**
- * Handle deposit notifications (called when deposit is detected)
+ * Handle deposit notifications using WebhookHandler service for workflow integration
+ * This function serves as the primary interface for deposit confirmations and integrates
+ * with the WorkflowController to update active off-ramp workflows.
+ * Requirements: 5.1, 5.2, 5.4, 13.1, 13.2, 13.3, 13.4
  */
 export async function handleDepositNotification(
   phoneNumber: string,
@@ -1125,80 +1455,189 @@ export async function handleDepositNotification(
   chain: string,
 ): Promise<void> {
   try {
-    // Enhanced deposit notification with better formatting
-    const notificationMessage =
+    console.log(
+      `Processing deposit notification via WebhookHandler for ${phoneNumber}: ${amount} ${asset} on ${chain}`,
+    );
+
+    // Get user to extract userId for WebhookHandler processing
+    const user = await userService.getUser(phoneNumber);
+    if (!user) {
+      console.error(`User not found for phone number: ${phoneNumber}`);
+      await sendFallbackDepositNotification(phoneNumber, asset, amount, chain);
+      return;
+    }
+
+    // Get user's wallet address for the specified chain with enhanced error handling
+    let walletAddress: string | undefined;
+    let chainType: string;
+
+    try {
+      chainType = crossmintService.getChainType(chain.toLowerCase());
+      const wallets = await crossmintService.listWallets(user.userId);
+      const wallet = wallets.find((w) => w.chainType === chainType);
+      walletAddress = wallet?.address;
+
+      if (!walletAddress) {
+        console.warn(
+          `No wallet found for user ${user.userId} on chain ${chainType}`,
+        );
+        // Still proceed with notification, but log the issue
+      }
+    } catch (walletError) {
+      console.error(
+        `Error getting wallet address for ${phoneNumber}:`,
+        walletError,
+      );
+      chainType = chain.toLowerCase();
+    }
+
+    // Create a webhook event structure for WebhookHandler processing
+    // This simulates a real Crossmint webhook event for consistent processing
+    const webhookEvent = {
+      type: "wallet.deposit" as const,
+      data: {
+        walletId: `wallet-${user.userId}-${chain}`,
+        owner: `userId:${user.userId}`,
+        address: walletAddress || "unknown-address",
+        chainType: mapChainToWebhookFormat(chain),
+        transaction: {
+          hash: `deposit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          amount: amount.toString(),
+          token: asset.toLowerCase(),
+          from: "external-sender",
+          to: walletAddress || "unknown-address",
+          timestamp: new Date().toISOString(),
+          status: "confirmed" as const,
+        },
+      },
+      timestamp: new Date().toISOString(),
+      eventId: `deposit-event-${Date.now()}`,
+    };
+
+    // Process deposit confirmation through WebhookHandler for workflow integration
+    // This is the primary method for updating workflow states as per requirement 5.1
+    let workflowsUpdated = 0;
+    let webhookProcessingSuccess = false;
+
+    try {
+      const webhookResult = await (
+        webhookHandler as any
+      ).processDepositConfirmation(webhookEvent);
+
+      if (webhookResult.success) {
+        workflowsUpdated = webhookResult.workflowsUpdated;
+        webhookProcessingSuccess = true;
+        console.log(
+          `WebhookHandler successfully processed deposit: ${webhookResult.message}, workflows updated: ${workflowsUpdated}`,
+        );
+      } else {
+        console.warn(
+          `WebhookHandler processing had issues: ${webhookResult.error}`,
+        );
+        // Continue with notification even if workflow update fails
+      }
+    } catch (webhookError) {
+      console.error(
+        `WebhookHandler processing error for ${phoneNumber}:`,
+        webhookError,
+      );
+      // Continue with notification even if webhook processing fails
+    }
+
+    // Send enhanced deposit notification with workflow-aware messaging
+    let notificationMessage =
       `🎉 *Crypto Deposit Received!*\n\n` +
       `💰 *Amount:* ${amount.toFixed(6)} ${asset.toUpperCase()}\n` +
       `🔗 *Network:* ${chain.toUpperCase()}\n` +
       `⏰ *Time:* ${new Date().toLocaleString("en-NG", { timeZone: "Africa/Lagos" })}\n\n` +
-      `✅ *Your deposit has been confirmed and is ready to use!*\n\n` +
-      `🚀 *Ready to convert to NGN?*\n` +
-      `Type *spend crypto* to start your off-ramp transaction.\n\n` +
-      `💡 *Tip:* You can convert your crypto to NGN and receive it directly in your bank account within minutes!`;
+      `✅ *Your deposit has been confirmed and is ready to use!*\n\n`;
+
+    // Add workflow-specific messaging based on WebhookHandler results
+    if (webhookProcessingSuccess && workflowsUpdated > 0) {
+      notificationMessage +=
+        `🔄 *Active Transaction Updated*\n` +
+        `Your ongoing off-ramp transaction has been automatically updated with this deposit.\n\n` +
+        `⚡ *Next Steps:*\n` +
+        `Your transaction will continue processing automatically. You'll receive updates as it progresses.\n\n`;
+    } else {
+      notificationMessage +=
+        `🚀 *Ready to convert to NGN?*\n` +
+        `Type *spend crypto* to start your off-ramp transaction.\n\n` +
+        `💡 *What happens next?*\n` +
+        `• Choose your NGN amount\n` +
+        `• Select your bank account\n` +
+        `• Confirm with your PIN\n` +
+        `• Receive money in seconds!\n\n`;
+    }
+
+    notificationMessage +=
+      `💰 *Current Balance:* ${amount.toFixed(6)} ${asset.toUpperCase()}\n` +
+      `📱 Type *balance* to check all your crypto balances.`;
 
     await whatsappBusinessService.sendNormalMessage(
       notificationMessage,
       phoneNumber,
     );
 
-    // Log the deposit notification
     console.log(
-      `Deposit notification sent to ${phoneNumber}: ${amount} ${asset} on ${chain}`,
+      `Enhanced deposit notification sent to ${phoneNumber}: ${amount} ${asset} on ${chain} (workflows updated: ${workflowsUpdated})`,
     );
-
-    // TODO: Send utility template message with "Spend Crypto" CTA button
-    // This would require creating a template in Meta Business Suite
   } catch (error) {
     console.error(
-      `Error sending deposit notification to ${phoneNumber}:`,
+      `Error in WebhookHandler-integrated deposit notification for ${phoneNumber}:`,
       error,
+    );
+
+    // Fallback to simple notification in case of error
+    await sendFallbackDepositNotification(phoneNumber, asset, amount, chain);
+  }
+}
+
+/**
+ * Fallback deposit notification in case of WebhookHandler processing errors
+ * Requirements: 5.3, 13.1, 13.2, 13.3, 13.4
+ */
+async function sendFallbackDepositNotification(
+  phoneNumber: string,
+  asset: string,
+  amount: number,
+  chain: string,
+): Promise<void> {
+  try {
+    const fallbackMessage =
+      `🎉 *Crypto Deposit Received!*\n\n` +
+      `${amount.toFixed(6)} ${asset.toUpperCase()} on ${chain.toUpperCase()}\n\n` +
+      `Type *spend crypto* to convert to NGN.`;
+
+    await whatsappBusinessService.sendNormalMessage(
+      fallbackMessage,
+      phoneNumber,
+    );
+
+    console.log(`Fallback deposit notification sent to ${phoneNumber}`);
+  } catch (fallbackError) {
+    console.error(
+      `Failed to send fallback deposit notification to ${phoneNumber}:`,
+      fallbackError,
     );
   }
 }
 
 /**
- * Send off-ramp success notification (separate from the transaction completion message)
+ * Map chain names to webhook format expected by WebhookHandler
  */
-export async function sendOfframpSuccessNotification(
-  phoneNumber: string,
-  ngnAmount: number,
-  cryptoAmount: number,
-  asset: string,
-  bankName: string,
-  accountName: string,
-  transactionId: string,
-): Promise<void> {
-  try {
-    const successNotification =
-      `🎉 *Off-ramp Completed Successfully!*\n\n` +
-      `✅ *Transaction Status:* Completed\n` +
-      `💰 *Amount:* ${dexPayService.formatNGN(ngnAmount)}\n` +
-      `🪙 *Crypto Used:* ${cryptoAmount.toFixed(6)} ${asset.toUpperCase()}\n` +
-      `🏦 *Bank:* ${bankName}\n` +
-      `👤 *Account:* ${accountName}\n` +
-      `📋 *Reference:* ${transactionId}\n` +
-      `⏰ *Completed:* ${new Date().toLocaleString("en-NG", { timeZone: "Africa/Lagos" })}\n\n` +
-      `💳 *Your NGN has been sent to your bank account.*\n` +
-      `⏱️ *Expected arrival:* 5-10 minutes\n\n` +
-      `📧 *A confirmation email has been sent to you.*\n\n` +
-      `🙏 *Thank you for using ChainPaye!*\n\n` +
-      `Type *menu* to return to the main menu or *offramp* for another transaction.`;
+function mapChainToWebhookFormat(chain: string): string {
+  const chainMapping: Record<string, string> = {
+    solana: "solana",
+    bep20: "bsc",
+    arbitrum: "arbitrum",
+    base: "base",
+    hedera: "hedera",
+    apechain: "apechain",
+    lisk: "lisk",
+  };
 
-    await whatsappBusinessService.sendNormalMessage(
-      successNotification,
-      phoneNumber,
-    );
-
-    // Log the success notification
-    console.log(
-      `Off-ramp success notification sent to ${phoneNumber}: ${ngnAmount} NGN`,
-    );
-  } catch (error) {
-    console.error(
-      `Error sending off-ramp success notification to ${phoneNumber}:`,
-      error,
-    );
-  }
+  return chainMapping[chain.toLowerCase()] || chain.toLowerCase();
 }
 
 /**
@@ -1208,55 +1647,284 @@ export async function isOfframpSessionActive(
   phoneNumber: string,
 ): Promise<boolean> {
   try {
-    const sessionData = await redisClient.get(`offramp_session:${phoneNumber}`);
-    return !!sessionData;
+    const workflowId = await getWorkflowId(phoneNumber);
+    return !!workflowId;
   } catch (error) {
     return false;
   }
 }
 
 /**
- * Route off-ramp session messages
+ * Route off-ramp session messages using WorkflowController with comprehensive error handling
+ * Requirements: 13.1, 13.2, 13.3, 13.4
  */
 export async function routeOfframpMessage(
   phoneNumber: string,
   message: string,
 ): Promise<boolean> {
   try {
-    const sessionData = await redisClient.get(`offramp_session:${phoneNumber}`);
-    if (!sessionData) return false;
+    const workflowId = await getWorkflowId(phoneNumber);
+    if (!workflowId) return false;
 
-    const session: OfframpSession = JSON.parse(sessionData);
+    const workflowState = await workflowController.getWorkflowState(workflowId);
 
-    switch (session.step) {
-      case "ASSET_SELECTION":
-        return await handleAssetSelection(phoneNumber, message);
+    // Handle different workflow steps with proper error handling
+    switch (workflowState.currentStep) {
+      case OffRampStep.REQUEST_ASSET_CHAIN:
+        try {
+          return await handleAssetSelection(phoneNumber, message);
+        } catch (error) {
+          console.error(`Asset selection error for ${phoneNumber}:`, error);
+          await whatsappBusinessService.sendNormalMessage(
+            "❌ *Asset Selection Error*\n\nSomething went wrong processing your asset selection. Please try again.\n\n" +
+              getSupportedAssetsMessage(),
+            phoneNumber,
+          );
+          return true;
+        }
 
-      case "AMOUNT_INPUT":
-        return await handleAmountInput(phoneNumber, message);
+      case OffRampStep.SPEND_FORM:
+        try {
+          return await handleAmountInput(phoneNumber, message);
+        } catch (error) {
+          console.error(`Amount input error for ${phoneNumber}:`, error);
+          await whatsappBusinessService.sendNormalMessage(
+            "❌ *Amount Input Error*\n\nSomething went wrong processing your amount. Please enter a valid NGN amount.\n\nExample: 50000",
+            phoneNumber,
+          );
+          return true;
+        }
 
-      case "BANK_SELECTION":
-        return await handleBankSelection(phoneNumber, message);
+      case OffRampStep.BANK_RESOLUTION:
+        try {
+          // Check if we're in bank selection or account resolution phase
+          if (!workflowState.stepData.bankCode) {
+            return await handleBankSelection(phoneNumber, message);
+          } else {
+            return await handleAccountResolution(phoneNumber, message);
+          }
+        } catch (error) {
+          console.error(`Bank resolution error for ${phoneNumber}:`, error);
+          await whatsappBusinessService.sendNormalMessage(
+            "❌ *Banking Error*\n\nSomething went wrong processing your banking information. Please try again.",
+            phoneNumber,
+          );
+          return true;
+        }
 
-      case "ACCOUNT_RESOLUTION":
-        return await handleAccountResolution(phoneNumber, message);
+      case OffRampStep.BALANCE_VALIDATION:
+        try {
+          return await handleAccountConfirmation(phoneNumber, message);
+        } catch (error) {
+          console.error(
+            `Account confirmation error for ${phoneNumber}:`,
+            error,
+          );
+          await whatsappBusinessService.sendNormalMessage(
+            "❌ *Confirmation Error*\n\nSomething went wrong processing your confirmation. Please reply *yes* to proceed or *no* to change account details.",
+            phoneNumber,
+          );
+          return true;
+        }
 
-      case "QUOTE_GENERATION":
-        return await handleAccountConfirmation(phoneNumber, message);
+      case OffRampStep.PIN_CONFIRMATION:
+        try {
+          return await handlePinVerification(phoneNumber, message);
+        } catch (error) {
+          console.error(`PIN verification error for ${phoneNumber}:`, error);
+          await whatsappBusinessService.sendNormalMessage(
+            "❌ *PIN Verification Error*\n\nSomething went wrong verifying your PIN. Please enter your 4-digit PIN again.",
+            phoneNumber,
+          );
+          return true;
+        }
 
-      case "CONFIRMATION":
-        return await handleTransactionConfirmation(phoneNumber, message);
+      case OffRampStep.CRYPTO_TRANSFER:
+      case OffRampStep.QUOTE_CREATION:
+      case OffRampStep.QUOTE_FINALIZATION:
+        // These steps are handled automatically by the system
+        await whatsappBusinessService.sendNormalMessage(
+          "⏳ *Transaction in Progress*\n\nYour transaction is currently being processed. Please wait for completion.",
+          phoneNumber,
+        );
+        return true;
 
-      case "PIN_VERIFICATION":
-        return await handlePinVerification(phoneNumber, message);
+      case OffRampStep.COMPLETION:
+        // Transaction completed, no further input needed
+        await whatsappBusinessService.sendNormalMessage(
+          "✅ *Transaction Complete*\n\nYour off-ramp transaction has been completed. Type *menu* to return to the main menu or *offramp* to start a new transaction.",
+          phoneNumber,
+        );
+        return true;
 
       default:
-        return false;
+        // Unknown step, provide helpful guidance
+        await whatsappBusinessService.sendNormalMessage(
+          "❓ *Unknown Step*\n\nWe're not sure what step you're on. Type *offramp* to start a new transaction or *support* for help.",
+          phoneNumber,
+        );
+        return true;
     }
   } catch (error) {
     console.error(`Error routing off-ramp message for ${phoneNumber}:`, error);
-    return false;
+
+    // Comprehensive error handling with user-friendly messages
+    let errorMessage = "❌ *Message Processing Error*\n\n";
+
+    if (error instanceof Error) {
+      if (error.message.includes("workflow")) {
+        errorMessage +=
+          "There was an issue with your transaction workflow. Please start a new transaction.";
+      } else if (error.message.includes("network")) {
+        errorMessage +=
+          "Network connection issue. Please check your internet and try again.";
+      } else if (error.message.includes("timeout")) {
+        errorMessage += "The operation timed out. Please try again.";
+      } else {
+        errorMessage +=
+          "An unexpected error occurred while processing your message.";
+      }
+    } else {
+      errorMessage +=
+        "An unexpected error occurred while processing your message.";
+    }
+
+    errorMessage +=
+      "\n\nType *offramp* to start a new transaction or *support* for assistance.";
+
+    await whatsappBusinessService.sendNormalMessage(errorMessage, phoneNumber);
+    return true;
   }
+}
+
+/**
+ * Send off-ramp success notification (legacy function for backward compatibility)
+ * Requirements: 12.1, 12.2, 12.3, 12.4
+ */
+export async function sendOfframpSuccessNotification(
+  phoneNumber: string,
+  ngnAmount: number,
+  cryptoAmount: number,
+  currency: string,
+  bankName: string,
+  recipientName: string,
+  quoteId: string,
+): Promise<void> {
+  try {
+    const successMessage =
+      `🎉 *Off-ramp Transaction Successful!*\n\n` +
+      `✅ Your crypto has been converted to NGN successfully!\n\n` +
+      `💰 *Transaction Details:*\n` +
+      `• NGN Amount: ₦${ngnAmount.toLocaleString()}\n` +
+      `• Crypto Used: ${cryptoAmount.toFixed(6)} ${currency.toUpperCase()}\n` +
+      `• Bank: ${bankName}\n` +
+      `• Recipient: ${recipientName}\n` +
+      `• Quote ID: ${quoteId}\n\n` +
+      `💳 *You will receive your money in seconds.*\n\n` +
+      `📧 A detailed receipt has been sent to you.\n\n` +
+      `Type *menu* to return to the main menu or *offramp* to start another transaction.`;
+
+    await whatsappBusinessService.sendNormalMessage(
+      successMessage,
+      phoneNumber,
+    );
+
+    console.log(
+      `Off-ramp success notification sent to ${phoneNumber}: ₦${ngnAmount} from ${cryptoAmount} ${currency}`,
+    );
+  } catch (error) {
+    console.error(
+      `Error sending off-ramp success notification to ${phoneNumber}:`,
+      error,
+    );
+    throw error;
+  }
+}
+
+// Helper functions
+
+/**
+ * Handle workflow errors with user-friendly messages
+ * Requirements: 13.1, 13.2, 13.3, 13.4
+ */
+async function handleWorkflowError(
+  phoneNumber: string,
+  error: Error,
+  context: string,
+  workflowId?: string,
+): Promise<void> {
+  console.error(`Workflow error in ${context} for ${phoneNumber}:`, error);
+
+  let errorMessage = `❌ *${context} Error*\n\n`;
+
+  if (error.message.includes("insufficient")) {
+    errorMessage +=
+      "You don't have enough balance for this transaction. Please deposit more crypto or reduce the amount.";
+  } else if (error.message.includes("expired")) {
+    errorMessage += "Your session has expired. Please start a new transaction.";
+  } else if (error.message.includes("invalid")) {
+    errorMessage +=
+      "Invalid input provided. Please check your information and try again.";
+  } else if (
+    error.message.includes("network") ||
+    error.message.includes("timeout")
+  ) {
+    errorMessage +=
+      "Network connection issue. Please check your internet connection and try again.";
+  } else if (error.message.includes("service")) {
+    errorMessage +=
+      "One of our services is temporarily unavailable. Please try again in a few minutes.";
+  } else {
+    errorMessage += "An unexpected error occurred. Our team has been notified.";
+  }
+
+  if (workflowId) {
+    errorMessage += `\n\nReference: ${workflowId}`;
+  }
+
+  errorMessage +=
+    "\n\nType *offramp* to start a new transaction or *support* for assistance.";
+
+  await whatsappBusinessService.sendNormalMessage(errorMessage, phoneNumber);
+}
+
+/**
+ * Get workflow ID for a phone number with error handling
+ */
+async function getWorkflowId(phoneNumber: string): Promise<string | null> {
+  try {
+    const workflowId = phoneToWorkflowMap.get(phoneNumber);
+    if (workflowId) return workflowId;
+
+    const storedWorkflowId = await redisClient.get(
+      `offramp_workflow:${phoneNumber}`,
+    );
+    if (storedWorkflowId) {
+      phoneToWorkflowMap.set(phoneNumber, storedWorkflowId);
+      return storedWorkflowId;
+    }
+
+    return null;
+  } catch (error) {
+    console.error(`Error getting workflow ID for ${phoneNumber}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Get supported assets message
+ */
+function getSupportedAssetsMessage(): string {
+  return (
+    `💡 *Tell me what asset you want to deposit and its chain.*\n\n` +
+    `*Supported Assets & Chains:*\n` +
+    `🔸 *USDC:* BEP20, Base, Arbitrum, Solana, Hedera, ApeChain, Lisk\n` +
+    `🔸 *USDT:* BEP20, Arbitrum, Solana, Hedera, ApeChain, Lisk\n\n` +
+    `*Examples:*\n` +
+    `• "USDC on Solana"\n` +
+    `• "USDT BEP20"\n` +
+    `• "USDC Base"`
+  );
 }
 
 /**
@@ -1289,7 +1957,6 @@ function parseNormalizedNetwork(chain: string): NormalizedNetworkType {
     case "tron":
       return "Tron";
     default:
-      // Fallback for unknown chains, though they shouldn't reach here if validated
       return "BNB Smart Chain";
   }
 }

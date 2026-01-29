@@ -27,8 +27,11 @@ router.post("/generate-link", generateLinkFlow);
 router.post("/convert", conversionFlow);
 router.post("/offramp", cryptoTopupFlow);
 
-// Deposit notification webhooks
+// Enhanced deposit notification webhooks with WorkflowController integration
 router.post("/deposit-notification", handleCrossmintDepositWebhook);
 router.post("/test-deposit-notification", testDepositNotification);
+
+// Legacy webhook endpoint (for backward compatibility)
+router.post("/deposit-webhook", handleCrossmintDepositWebhook);
 
 export default router;
