@@ -370,18 +370,10 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           > = {
             sol: { dexPay: "solana", crossmint: "solana" },
             bsc: { dexPay: "bep20", crossmint: "bsc" },
-            eth: { dexPay: "ethereum", crossmint: "ethereum" },
-            poly: { dexPay: "polygon", crossmint: "polygon" },
-            matic: { dexPay: "polygon", crossmint: "polygon" },
-            trx: { dexPay: "tron", crossmint: "tron" },
             base: { dexPay: "base", crossmint: "base" },
             arbitrum: { dexPay: "arbitrum", crossmint: "arbitrum" },
-            hedera: { dexPay: "hedera", crossmint: "hedera" },
-            apechain: { dexPay: "apechain", crossmint: "apechain" },
-            lisk: { dexPay: "lisk", crossmint: "lisk" },
-            trc20: { dexPay: "tron", crossmint: "tron" },
+            // Aliases
             bep20: { dexPay: "bep20", crossmint: "bsc" },
-            erc20: { dexPay: "ethereum", crossmint: "ethereum" },
           };
 
           const normalizedChain = chainMapping[network.toLowerCase()];
@@ -390,33 +382,51 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
               screen: "OFFRAMP_CRYPTO_REVIEW",
               data: {
                 ...data,
-                error_message: `Unsupported network: ${network}`,
+                error_message: `Unsupported network: ${network}. Supported: BSC, SOL, BASE, ARBITRUM`,
+              },
+            };
+          }
+
+          // Validate Asset + Chain Combinations
+          const normalizedAsset = currency.toUpperCase(); // Ensure uppercase for comparison
+          const chainKey = network.toLowerCase();
+          // Note: chainKey might be 'sol', 'bsc', 'base', 'arbitrum' or aliases
+
+          let isSupportedCombination = false;
+
+          if (normalizedAsset === "USDC") {
+            // USDC supported on all 4 chains
+            if (
+              ["sol", "bsc", "base", "arbitrum", "bep20"].includes(chainKey)
+            ) {
+              isSupportedCombination = true;
+            }
+          } else if (normalizedAsset === "USDT") {
+            // USDT only supported on BSC and SOL
+            if (["sol", "bsc", "bep20"].includes(chainKey)) {
+              isSupportedCombination = true;
+            }
+          }
+
+          if (!isSupportedCombination) {
+            return {
+              screen: "OFFRAMP_CRYPTO_REVIEW",
+              data: {
+                ...data,
+                error_message: `${normalizedAsset} is not supported on ${network}. Supported: BSC (USDC/USDT), SOL (USDC/USDT), BASE (USDC), ARBITRUM (USDC)`,
               },
             };
           }
 
           const dexPayChain = normalizedChain.dexPay;
           const crossmintChain = normalizedChain.crossmint;
-          const normalizedAsset = currency.toLowerCase();
 
+          // ============================================================
+          // STEP 3: LOG MAPPING
+          // ============================================================
           logger.info(
             `[OFFRAMP] Chain mapping: ${network} -> DexPay: ${dexPayChain}, Crossmint: ${crossmintChain}`,
           );
-
-          // ============================================================
-          // STEP 3: VERIFY ASSET-CHAIN COMBINATION
-          // ============================================================
-          if (
-            !dexPayService.isSupportedAssetChain(normalizedAsset, dexPayChain)
-          ) {
-            return {
-              screen: "OFFRAMP_CRYPTO_REVIEW",
-              data: {
-                ...data,
-                error_message: `${currency.toUpperCase()} is not supported on ${dexPayChain.toUpperCase()}`,
-              },
-            };
-          }
 
           // ============================================================
           // STEP 4: GET CURRENT EXCHANGE RATE

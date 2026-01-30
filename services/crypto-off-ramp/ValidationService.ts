@@ -20,8 +20,8 @@ export class ValidationService implements IValidationService {
     SupportedAsset,
     SupportedChain[]
   > = {
-    USDC: ["bep20", "base", "arbitrum", "solana", "hedera", "apechain", "lisk"],
-    USDT: ["bep20", "arbitrum", "solana", "hedera", "apechain", "lisk"],
+    USDC: ["bep20", "base", "arbitrum", "solana"],
+    USDT: ["bep20", "solana"],
   };
 
   // Minimum balance threshold in USD

@@ -2019,8 +2019,8 @@ function getSupportedAssetsMessage(): string {
   return (
     `💡 *Tell me what asset you want to deposit and its chain.*\n\n` +
     `*Supported Assets & Chains:*\n` +
-    `🔸 *USDC:* BEP20, Base, Arbitrum, Solana, Hedera, ApeChain, Lisk\n` +
-    `🔸 *USDT:* BEP20, Arbitrum, Solana, Hedera, ApeChain, Lisk\n\n` +
+    `🔸 *USDC:* BSC (BEP20), Base, Arbitrum, Solana\n` +
+    `🔸 *USDT:* BSC (BEP20), Solana\n\n` +
     `*Examples:*\n` +
     `• "USDC on Solana"\n` +
     `• "USDT BEP20"\n` +
