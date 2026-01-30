@@ -300,7 +300,12 @@ async function displayUserWallets(
         const usdValue = balance.usdValue
           ? ` (~$${balance.usdValue.toFixed(2)})`
           : "";
-        walletsMessage += `• ${balance.token.toUpperCase()}: ${amount}${usdValue}\n`;
+        const tokenName = (
+          balance.symbol ||
+          balance.token ||
+          "UNKNOWN"
+        ).toUpperCase();
+        walletsMessage += `• ${tokenName}: ${amount}${usdValue}\n`;
       }
       walletsMessage += "\n";
     }
