@@ -36,15 +36,17 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Remove .git and .github
+        run: rm -rf .git .github .gitignore
+
       - name: Copy files via scp
-        uses: appleboy/scp-action@v0.1.4
+        uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.STAGEHOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.STAGEKEY }}
           source: "."
           target: "app/"
-          exclude: ".git,.github,node_modules"
           debug: true
 
       - name: Start up application with pm2
