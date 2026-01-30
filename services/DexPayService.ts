@@ -302,7 +302,17 @@ export class DexPayService implements IBankingManager, IDexPayService {
       });
 
       const quoteData = response.data;
-      const rate = quoteData.sell; // NGN per token
+
+      logger.info(
+        `[DEBUG] API Response for ${assetUpper} rate:`,
+        JSON.stringify(quoteData, null, 2),
+      );
+
+      // Check different possible locations for rate
+      const rate =
+        quoteData.sell ||
+        quoteData.rate ||
+        (typeof quoteData === "number" ? quoteData : undefined);
 
       logger.info(
         `Retrieved exchange rate for ${assetUpper} on ${chain}: ${rate} NGN per token`,
