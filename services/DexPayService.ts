@@ -289,28 +289,27 @@ export class DexPayService implements IBankingManager, IDexPayService {
    */
   async getCurrentRates(asset: string, chain: string): Promise<ExchangeRate> {
     try {
-      // DexPay doesn't have a dedicated rates endpoint, so we create a temporary quote to get rates
-      // This is a common pattern for getting current rates from quote-based APIs
-      const tempQuoteRequest = {
-        fiatAmount: 1000, // Use 1000 NGN as base amount for rate calculation
-        asset: asset.toUpperCase(),
-        chain: this.mapChainForDexPay(chain),
-      };
+      // DexPay API format: /rate/{asset}?fiatAmount=X&chain=Y
+      const assetUpper = asset.toUpperCase();
+      const mappedChain = this.mapChainForDexPay(chain);
 
-      const response = await axios.get(`${this.baseUrl}/rate`, {
+      const response = await axios.get(`${this.baseUrl}/rate/${assetUpper}`, {
         headers: this.getHeaders(),
-        params: tempQuoteRequest,
+        params: {
+          fiatAmount: 1000, // Use 1000 NGN as base amount for rate calculation
+          chain: mappedChain,
+        },
       });
 
       const quoteData = response.data;
       const rate = quoteData.sell; // NGN per token
 
       logger.info(
-        `Retrieved exchange rate for ${asset} on ${chain}: ${rate} NGN per token`,
+        `Retrieved exchange rate for ${assetUpper} on ${chain}: ${rate} NGN per token`,
       );
 
       return {
-        asset: asset.toUpperCase(),
+        asset: assetUpper,
         chain: chain.toLowerCase(),
         rate: rate,
         timestamp: new Date(),
