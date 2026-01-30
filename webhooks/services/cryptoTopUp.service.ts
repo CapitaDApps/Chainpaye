@@ -440,6 +440,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
               dexPayChain,
               ngnAmount,
             );
+
             nairaRate = rateData.rate;
             logger.info(
               `[OFFRAMP] Current rate: 1 ${currency} = ₦${nairaRate}`,

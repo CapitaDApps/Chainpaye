@@ -297,6 +297,10 @@ export class DexPayService implements IBankingManager, IDexPayService {
       const assetUpper = asset.toUpperCase();
       const mappedChain = this.mapChainForDexPay(chain);
 
+      logger.info(
+        `Fetching rates from DexPay for ${assetUpper} on ${mappedChain} using fiatAmount=${amount}`,
+      );
+
       const response = await axios.get(`${this.baseUrl}/rate/${assetUpper}`, {
         headers: this.getHeaders(),
         params: {
@@ -305,7 +309,11 @@ export class DexPayService implements IBankingManager, IDexPayService {
         },
       });
 
-      console.log({ response, data: response.data, data2: response.data.data });
+      console.log({
+        url: response.config.url,
+        data: response.data,
+        data2: response.data.data,
+      });
 
       const quoteData = response.data.data;
 

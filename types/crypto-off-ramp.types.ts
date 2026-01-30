@@ -276,7 +276,11 @@ export interface ICrossmintService {
 export interface IDexPayService {
   getSupportedBanks(): Promise<Bank[]>;
   resolveBank(bankCode: string, accountNumber: string): Promise<BankResolution>;
-  getCurrentRates(asset: string, chain: string): Promise<ExchangeRate>;
+  getCurrentRates(
+    asset: string,
+    chain: string,
+    amount?: number,
+  ): Promise<ExchangeRate>;
   createQuote(quoteRequest: QuoteRequest): Promise<Quote>;
   finalizeQuote(quoteId: string): Promise<QuoteResult>;
 }
@@ -331,7 +335,11 @@ export interface IWalletManager {
 export interface IBankingManager {
   getSupportedBanks(): Promise<Bank[]>;
   resolveBank(bankCode: string, accountNumber: string): Promise<BankResolution>;
-  getCurrentRates(asset: string, chain: string): Promise<ExchangeRate>;
+  getCurrentRates(
+    asset: string,
+    chain: string,
+    amount?: number,
+  ): Promise<ExchangeRate>;
   validateBankDetails(
     bankCode: string,
     accountNumber: string,
