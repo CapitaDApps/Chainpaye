@@ -287,7 +287,11 @@ export class DexPayService implements IBankingManager, IDexPayService {
    * Get current exchange rates (IBankingManager & IDexPayService interface)
    * Requirements: 7.2
    */
-  async getCurrentRates(asset: string, chain: string): Promise<ExchangeRate> {
+  async getCurrentRates(
+    asset: string,
+    chain: string,
+    amount: number = 1000,
+  ): Promise<ExchangeRate> {
     try {
       // DexPay API format: /rate/{asset}?fiatAmount=X&chain=Y
       const assetUpper = asset.toUpperCase();
@@ -296,7 +300,7 @@ export class DexPayService implements IBankingManager, IDexPayService {
       const response = await axios.get(`${this.baseUrl}/rate/${assetUpper}`, {
         headers: this.getHeaders(),
         params: {
-          fiatAmount: 1000, // Use 1000 NGN as base amount for rate calculation
+          fiatAmount: amount, // Use provided amount or default to 1000 NGN
           chain: mappedChain,
         },
       });

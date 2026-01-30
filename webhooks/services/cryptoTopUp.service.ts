@@ -438,6 +438,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             const rateData = await dexPayService.getCurrentRates(
               currency,
               dexPayChain,
+              ngnAmount,
             );
             nairaRate = rateData.rate;
             logger.info(
