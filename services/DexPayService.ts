@@ -301,9 +301,9 @@ export class DexPayService implements IBankingManager, IDexPayService {
         },
       });
 
-      console.log({ response });
+      console.log({ response, data: response.data, data2: response.data.data });
 
-      const quoteData = response.data;
+      const quoteData = response.data.data;
 
       logger.info(
         `[DEBUG] API Response for ${assetUpper} rate:`,
