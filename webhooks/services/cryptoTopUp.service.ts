@@ -231,28 +231,41 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
         const chainMapping: Record<string, string> = {
           sol: "solana",
           bsc: "bep20",
-          eth: "ethereum",
-          poly: "polygon",
-          matic: "polygon",
-          trx: "tron",
           base: "base",
           arbitrum: "arbitrum",
-          hedera: "hedera",
-          apechain: "apechain",
-          lisk: "lisk",
-          trc20: "tron",
+          // Aliases
           bep20: "bep20",
-          erc20: "ethereum",
         };
 
-        const dexPayChain =
-          chainMapping[network.toLowerCase()] || network.toLowerCase();
+        const dexPayChain = chainMapping[network.toLowerCase()];
+
+        if (!dexPayChain) {
+          let banks = FALLBACK_BANKS;
+          try {
+            const dexPayBanks = await dexPayService.getBanks();
+            if (dexPayBanks && dexPayBanks.length > 0) {
+              banks = dexPayBanks.map((b) => ({ id: b.code, title: b.name }));
+            }
+          } catch {
+            // Use fallback
+          }
+          return {
+            screen: "OFFRAMP_DETAILS",
+            data: {
+              banks: banks,
+              error_message: `Unsupported network: ${network}. Supported: BSC, SOL, BASE, ARBITRUM`,
+            },
+          };
+        }
+
+        const ngnAmount = parseFloat(sell_amount) || 1000;
         let rateDisplay = "Current market rate"; // Fallback
 
         try {
           const rateData = await dexPayService.getCurrentRates(
             currency,
             dexPayChain,
+            ngnAmount,
           );
           if (rateData && rateData.rate > 0) {
             // Format rate with comma separators and Naira symbol
