@@ -42,8 +42,10 @@ jobs:
           host: ${{ secrets.STAGEHOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.STAGEKEY }}
-          source: .
-          target: app/
+          source: "."
+          target: "app/"
+          exclude: ".git,.github,node_modules"
+          debug: true
 
       - name: Start up application with pm2
         uses: appleboy/ssh-action@v1.0.0
