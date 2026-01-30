@@ -301,6 +301,8 @@ export class DexPayService implements IBankingManager, IDexPayService {
         },
       });
 
+      console.log({ response });
+
       const quoteData = response.data;
 
       logger.info(
@@ -309,10 +311,18 @@ export class DexPayService implements IBankingManager, IDexPayService {
       );
 
       // Check different possible locations for rate
-      const rate =
-        quoteData.sell ||
-        quoteData.rate ||
-        (typeof quoteData === "number" ? quoteData : undefined);
+      // Check different possible locations for rate
+      let rate = quoteData.sell || quoteData.rate;
+
+      // Handle nested data structure if applicable (e.g. { data: { rate: ... } })
+      if (!rate && quoteData.data) {
+        rate = quoteData.data.rate || quoteData.data.sell;
+      }
+
+      // Handle direct number response
+      if (!rate && typeof quoteData === "number") {
+        rate = quoteData;
+      }
 
       logger.info(
         `Retrieved exchange rate for ${assetUpper} on ${chain}: ${rate} NGN per token`,
