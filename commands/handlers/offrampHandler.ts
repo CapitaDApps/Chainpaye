@@ -310,7 +310,7 @@ async function displayUserWallets(
       walletsMessage += "\n";
     }
 
-    walletsMessage += getSupportedAssetsMessage();
+    // walletsMessage += getSupportedAssetsMessage();
 
     await whatsappBusinessService.sendNormalMessage(
       walletsMessage,
