@@ -151,7 +151,29 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
       const balances: Balance[] = crossmintBalances
         .map((balance) => {
           const asset = (balance.symbol || balance.token || "").toUpperCase();
-          const amount = parseFloat(balance.amount) || 0;
+          // Crossmint API: 'amount' should be human-readable, 'rawAmount' is in smallest units
+          // However, in some cases the API may return raw amounts in 'amount' field
+          let amount = parseFloat(balance.amount) || 0;
+          const decimals = balance.decimals ?? 6;
+
+          // Log the raw API response for debugging
+          logger.debug(`[Balance Debug] Raw API response for ${asset}:`, {
+            amount: balance.amount,
+            rawAmount: balance.rawAmount,
+            decimals: balance.decimals,
+            parsedAmount: amount,
+          });
+
+          // Heuristic: If amount > 1 million and decimals > 0, it's likely raw
+          // For stablecoins (6 decimals), 1 million raw = 1 token
+          // For ETH-like (18 decimals), amounts are even larger
+          const rawThreshold = Math.pow(10, decimals);
+          if (amount >= rawThreshold && decimals > 0) {
+            logger.info(
+              `[Balance] Detected raw amount for ${asset}: ${amount}, converting with ${decimals} decimals`,
+            );
+            amount = amount / Math.pow(10, decimals);
+          }
           const usdValue = balance.usdValue || 0;
 
           // Validate balance data
