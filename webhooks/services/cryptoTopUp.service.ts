@@ -258,6 +258,42 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           };
         }
 
+        // Validate Asset + Chain Combinations
+        const normalizedAsset = currency.toUpperCase();
+        const chainKey = network.toLowerCase();
+        let isSupportedCombination = false;
+
+        if (normalizedAsset === "USDC") {
+          // USDC supported on all 4 chains
+          if (["sol", "bsc", "base", "arbitrum", "bep20"].includes(chainKey)) {
+            isSupportedCombination = true;
+          }
+        } else if (normalizedAsset === "USDT") {
+          // USDT only supported on BSC and SOL
+          if (["sol", "bsc", "bep20"].includes(chainKey)) {
+            isSupportedCombination = true;
+          }
+        }
+
+        if (!isSupportedCombination) {
+          let banks = FALLBACK_BANKS;
+          try {
+            const dexPayBanks = await dexPayService.getBanks();
+            if (dexPayBanks && dexPayBanks.length > 0) {
+              banks = dexPayBanks.map((b) => ({ id: b.code, title: b.name }));
+            }
+          } catch {
+            // Use fallback
+          }
+          return {
+            screen: "OFFRAMP_DETAILS",
+            data: {
+              banks: banks,
+              error_message: `${normalizedAsset} is not supported on ${network}. Supported: BSC (USDC/USDT), SOL (USDC/USDT), BASE (USDC), ARBITRUM (USDC)`,
+            },
+          };
+        }
+
         const ngnAmount = parseFloat(sell_amount) || 1000;
         let rateDisplay = "Current market rate"; // Fallback
 
