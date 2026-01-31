@@ -708,7 +708,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
 
           // Wait for 10 seconds to allow crypto transaction to settle
           logger.info("[OFFRAMP] Waiting 10s for crypto settlement...");
-          await new Promise((resolve) => setTimeout(resolve, 10000));
+          await new Promise((resolve) => setTimeout(resolve, 20000));
 
           const quoteRequest = {
             fiatAmount: ngnAmount,
