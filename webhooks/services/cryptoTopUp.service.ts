@@ -684,14 +684,32 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           });
 
           logger.info(
-            "[OFFRAMP] Transfer successful: " +
+            "[OFFRAMP] Transfer result: " +
               JSON.stringify(transferResult, null, 2),
           );
+
+          if (!transferResult.success) {
+            logger.error(
+              `[OFFRAMP] Transfer failed: ${transferResult.error || "Unknown error"}`,
+            );
+            return {
+              screen: "OFFRAMP_CRYPTO_REVIEW",
+              data: {
+                ...data,
+                error_message: `Transfer failed: ${transferResult.error || "Please try again."}`,
+              },
+            };
+          }
 
           // ============================================================
           // STEP 10: GET QUOTE FROM DEXPAY
           // Now that funds are in our main wallet, we can get a quote
           // ============================================================
+
+          // Wait for 10 seconds to allow crypto transaction to settle
+          logger.info("[OFFRAMP] Waiting 10s for crypto settlement...");
+          await new Promise((resolve) => setTimeout(resolve, 10000));
+
           const quoteRequest = {
             fiatAmount: ngnAmount,
             asset: normalizedAsset.toUpperCase(),
@@ -708,11 +726,23 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           );
 
           let quote;
+          let quoteId: string;
           try {
             quote = await dexPayService.getQuote(quoteRequest);
             logger.info(
               "[OFFRAMP] Quote received: " + JSON.stringify(quote, null, 2),
             );
+
+            // Extract ID safely handling potentially nested structure
+            // User JSON shows: { data: { id: "..." } }
+            // API type might imply: { id: "..." }
+            // We handle both
+            // @ts-ignore - handling dynamic response structure
+            quoteId = quote.id || (quote.data && quote.data.id);
+
+            if (!quoteId) {
+              throw new Error("Invalid quote response: missing ID");
+            }
           } catch (quoteError) {
             logger.error(
               "[OFFRAMP] Failed to get quote: " + (quoteError as Error).message,
@@ -732,11 +762,11 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           // STEP 11: COMPLETE OFFRAMP USING QUOTE ID
           // This processes the fiat payment to user's bank account
           // ============================================================
-          logger.info(`[OFFRAMP] Completing offramp for quote ${quote.id}...`);
+          logger.info(`[OFFRAMP] Completing offramp for quote ${quoteId}...`);
 
           let offrampResult;
           try {
-            offrampResult = await dexPayService.completeOfframp(quote.id);
+            offrampResult = await dexPayService.completeOfframp(quoteId);
             logger.info(
               "[OFFRAMP] Offramp completed: " +
                 JSON.stringify(offrampResult, null, 2),
@@ -767,7 +797,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             currency || "UNKNOWN",
             bank_name || "UNKNOWN",
             finalRecipientName,
-            quote.id,
+            quoteId,
           ).catch((err) =>
             logger.error(
               "[OFFRAMP] Error sending success notification: " +
