@@ -6,7 +6,7 @@
 
 import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
-import { toronetService, userService, walletService } from ".";
+import { dexPayService, toronetService, userService, walletService } from ".";
 import { NormalizedNetworkType } from "../commands/types";
 import { CONSTANTS } from "../config/constants";
 import { User } from "../models/User";
@@ -390,9 +390,9 @@ What would you like to sell?`;
     ];
 
     try {
-      const ngnBanks = await toronetService.getBankListNGN();
-      if (ngnBanks && ngnBanks.length > 0) {
-        banks = ngnBanks;
+      const dexPayBanks = await dexPayService.getBanks();
+      if (dexPayBanks && dexPayBanks.length > 0) {
+        banks = dexPayBanks.map((b) => ({ id: b.code, title: b.name }));
       }
       console.log("DEBUG: Fetched banks for offramp:", banks.length);
     } catch (error) {

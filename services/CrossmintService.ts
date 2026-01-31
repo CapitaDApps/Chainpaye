@@ -1192,7 +1192,7 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         const transferPayload = {
           amount,
           recipient: toAddress,
-          executionRoute: "direct",
+          transactionType: "direct",
           // Add idempotency key to prevent duplicate transfers
           idempotencyKey: currentIdempotencyKey,
           // Add metadata for off-ramp workflow tracking
