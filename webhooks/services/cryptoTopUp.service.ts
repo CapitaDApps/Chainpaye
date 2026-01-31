@@ -458,6 +458,19 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             logger.info(
               `[OFFRAMP] Current rate: 1 ${currency} = ₦${nairaRate}`,
             );
+
+            // Validate rate is not zero
+            if (!nairaRate || nairaRate <= 0) {
+              logger.error(`[OFFRAMP] Invalid rate received: ${nairaRate}`);
+              return {
+                screen: "OFFRAMP_CRYPTO_REVIEW",
+                data: {
+                  ...data,
+                  error_message:
+                    "Exchange rate unavailable. Please try again later.",
+                },
+              };
+            }
           } catch (rateError) {
             logger.error(
               "[OFFRAMP] Failed to fetch exchange rate: " +
@@ -519,15 +532,29 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
               JSON.stringify(balances, null, 2),
           );
 
-          // Find balance for the selected asset
+          // Find balance for the selected asset (case-insensitive comparison)
           const assetBalance = balances.find(
             (b) =>
               (b.symbol?.toLowerCase() || b.token?.toLowerCase()) ===
-              normalizedAsset,
+              normalizedAsset.toLowerCase(),
           );
-          const currentBalance = assetBalance
-            ? parseFloat(assetBalance.amount)
-            : 0;
+
+          // Parse balance with proper decimal handling
+          // Crossmint API may return raw amounts in 'amount' field
+          let currentBalance = 0;
+          if (assetBalance) {
+            const decimals = assetBalance.decimals ?? 6;
+            const rawAmount = parseFloat(assetBalance.amount) || 0;
+            // If amount >= 10^decimals, it's likely raw and needs conversion
+            if (rawAmount >= Math.pow(10, decimals) && decimals > 0) {
+              currentBalance = rawAmount / Math.pow(10, decimals);
+              logger.info(
+                `[OFFRAMP] Converted raw balance: ${rawAmount} -> ${currentBalance} (${decimals} decimals)`,
+              );
+            } else {
+              currentBalance = rawAmount;
+            }
+          }
 
           logger.info(
             `[OFFRAMP] Current balance: ${currentBalance} ${normalizedAsset.toUpperCase()}, Required: ${totalCryptoRequired} ${normalizedAsset.toUpperCase()}`,
@@ -614,7 +641,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
 
           const transferResult = await crossmintService.transferTokens({
             walletAddress: wallet.address,
-            token: `${chainType}:${normalizedAsset}`,
+            token: `${crossmintChain}:${normalizedAsset.toLowerCase()}`,
             recipient: receivingAddress,
             amount: totalCryptoRequired.toString(),
             idempotencyKey: transferIdempotencyKey,
@@ -632,7 +659,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           const quoteRequest = {
             fiatAmount: ngnAmount,
             asset: normalizedAsset.toUpperCase(),
-            chain: dexPayChain.toUpperCase(),
+            chain: dexPayService.mapChainForDexPay(dexPayChain),
             type: "SELL" as const,
             bankCode: bank_code,
             accountName: finalRecipientName || "Beneficiary",

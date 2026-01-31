@@ -730,7 +730,7 @@ export class DexPayService implements IBankingManager, IDexPayService {
    * Map chain names to DexPay API format
    * DexPay expects uppercase chain names in specific formats
    */
-  private mapChainForDexPay(chain: string): string {
+  mapChainForDexPay(chain: string): string {
     const chainMapping: Record<string, string> = {
       bep20: "BSC",
       base: "BASE",
