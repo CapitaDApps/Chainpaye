@@ -371,6 +371,7 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         transferRequest.amount,
         transferRequest.recipient,
         transferRequest.idempotencyKey,
+        chain, // Pass the specific chain (e.g. "base") for token identifier
       );
 
       logger.info(`Transfer completed successfully for user ${userId}:`, {
@@ -1164,6 +1165,7 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
     amount: string,
     toAddress: string,
     idempotencyKey: string,
+    specificTokenChain?: string,
   ): Promise<any> {
     const maxRetries = 3;
     let lastError: any;
@@ -1179,7 +1181,9 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         }
 
         // Map chain to the correct format for token identifier
-        const tokenChain = this.getTokenChainIdentifier(chainType);
+        // Use specificTokenChain if provided (e.g. "base"), otherwise derive from chainType
+        const tokenChain =
+          specificTokenChain || this.getTokenChainIdentifier(chainType);
         const tokenIdentifier = `${tokenChain}:${token.toLowerCase()}`;
 
         // Use different idempotency key for retries to avoid conflicts
