@@ -298,6 +298,18 @@ What can I do for you?
   }
 
   async sendTransferFlowById(to: string) {
+    const phone = to.startsWith("+") ? to : `+${to}`;
+    const user = await userService.getUser(phone);
+
+    if (!user || !user.isVerified) {
+      await this.sendNormalMessage(
+        "You need to complete KYC verification to transfer funds. Please complete the verification process below.",
+        to,
+      );
+      await this.sendKycFlowById(to);
+      return;
+    }
+
     const transferFlowId = WHATSAPP_CONFIG.FLOW_IDS.TRANSFER;
     const transferScreenInitId = "TRANSFER";
     await this.sendTextOnlyFlowById(to, transferFlowId, transferScreenInitId, {
@@ -330,6 +342,18 @@ What can I do for you?
   }
 
   async sendConvertFiatFlowById(to: string) {
+    const phone = to.startsWith("+") ? to : `+${to}`;
+    const user = await userService.getUser(phone);
+
+    if (!user || !user.isVerified) {
+      await this.sendNormalMessage(
+        "You need to complete KYC verification to convert funds. Please complete the verification process below.",
+        to,
+      );
+      await this.sendKycFlowById(to);
+      return;
+    }
+
     const convertFlowId = WHATSAPP_CONFIG.FLOW_IDS.CONVERT;
     const convertFlowScreen = "CONVERT_ENTRY";
     await this.sendTextOnlyFlowById(to, convertFlowId, convertFlowScreen, {
