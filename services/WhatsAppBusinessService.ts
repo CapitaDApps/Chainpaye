@@ -9,6 +9,7 @@ import { v4 as uuidv4 } from "uuid";
 import { dexPayService, toronetService, userService, walletService } from ".";
 import { NormalizedNetworkType } from "../commands/types";
 import { CONSTANTS } from "../config/constants";
+import { WHATSAPP_CONFIG } from "../config/whatsapp";
 import { User } from "../models/User";
 import { Wallet } from "../models/Wallet";
 import { redisClient } from "./redis";
@@ -245,7 +246,7 @@ export class WhatsAppBusinessService {
   }
 
   async sendIntroMessageByFlowId(to: string) {
-    const introFlowId = "1435834141223250";
+    const introFlowId = WHATSAPP_CONFIG.FLOW_IDS.INTRO;
     const introInitScreedId = "PERSONAL_INFO";
     const link =
       "https://chainpaye-public.s3.us-east-1.amazonaws.com/chainpaye-img.jpg";
@@ -287,7 +288,7 @@ What can I do for you?
   }
 
   async sendTopUpFlowById(to: string) {
-    const topUpFlowId = "1228982802532634";
+    const topUpFlowId = WHATSAPP_CONFIG.FLOW_IDS.TOPUP;
     const topUpScreenInitId = "TOPUP_WALLET";
     await this.sendTextOnlyFlowById(to, topUpFlowId, topUpScreenInitId, {
       header: "Top up Wallet",
@@ -297,7 +298,7 @@ What can I do for you?
   }
 
   async sendTransferFlowById(to: string) {
-    const transferFlowId = "647986641709614";
+    const transferFlowId = WHATSAPP_CONFIG.FLOW_IDS.TRANSFER;
     const transferScreenInitId = "TRANSFER";
     await this.sendTextOnlyFlowById(to, transferFlowId, transferScreenInitId, {
       header: "Transfer Money",
@@ -319,7 +320,7 @@ What can I do for you?
       return;
     }
 
-    const withdrawFlowId = "1373120947345936";
+    const withdrawFlowId = WHATSAPP_CONFIG.FLOW_IDS.WITHDRAWAL;
     const screenId = "WITHDRAWAL_CURRENCY";
     await this.sendTextOnlyFlowById(to, withdrawFlowId, screenId, {
       header: "Withdraw to Bank",
@@ -329,7 +330,7 @@ What can I do for you?
   }
 
   async sendConvertFiatFlowById(to: string) {
-    const convertFlowId = "2075686363268728";
+    const convertFlowId = WHATSAPP_CONFIG.FLOW_IDS.CONVERT;
     const convertFlowScreen = "CONVERT_ENTRY";
     await this.sendTextOnlyFlowById(to, convertFlowId, convertFlowScreen, {
       header: "Convert Fiat",
@@ -344,7 +345,7 @@ What can I do for you?
    */
   async sendKycFlowById(to: string) {
     // TODO: Replace with actual KYC flow ID after uploading to Meta Business Suite
-    const kycFlowId = "1615914016243315";
+    const kycFlowId = WHATSAPP_CONFIG.FLOW_IDS.KYC;
     const kycScreenId = "COUNTRY_SELECT";
     await this.sendTextOnlyFlowById(to, kycFlowId, kycScreenId, {
       header: "Verify Your Identity",
@@ -400,7 +401,7 @@ What would you like to sell?`;
     }
 
     // Start the flow with banks data
-    const cryptoTopUpFlowId = "1372714300817702";
+    const cryptoTopUpFlowId = WHATSAPP_CONFIG.FLOW_IDS.OFFRAMP;
     const cryptoTopUpScreenId = "OFFRAMP_DETAILS";
 
     await this.sendTextOnlyFlowWithDataById(
@@ -740,7 +741,7 @@ Our team is ready to assist you!`;
           return;
         }
 
-        const withdrawFlowId = "1654062222645036";
+        const withdrawFlowId = WHATSAPP_CONFIG.FLOW_IDS.WITHDRAWAL_BUTTON;
         const screenId = "WITHDRAWAL_CURRENCY";
         this.sendTextOnlyFlowById(to, withdrawFlowId, screenId, {
           header: "Withdraw to Bank",
