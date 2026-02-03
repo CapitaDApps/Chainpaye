@@ -452,6 +452,17 @@ What would you like to sell?`;
   async sendMyAccountInfo(to: string) {
     const phone = to.startsWith("+") ? to : `+${to}`;
     const { user, wallet } = await userService.getUserToroWallet(phone);
+
+    console.log("[sendMyAccountInfo] User data:", {
+      phone,
+      userId: user?.userId,
+      firstName: user?.firstName,
+      lastName: user?.lastName,
+      fullName: user?.fullName,
+      isVerified: user?.isVerified,
+      walletPublicKey: wallet?.publicKey,
+    });
+
     const [usdBalance, ngnBalance] = await Promise.all([
       toronetService.getBalanceUSD(wallet.publicKey),
       toronetService.getBalanceNGN(wallet.publicKey),
@@ -462,6 +473,14 @@ What would you like to sell?`;
     const displayName = user.isVerified
       ? `${user.firstName} ${user.lastName}`
       : user.fullName;
+
+    console.log("[sendMyAccountInfo] Display name calculation:", {
+      isVerified: user.isVerified,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      fullName: user.fullName,
+      calculatedDisplayName: displayName,
+    });
 
     // message should contain the user's account, number, name and balances
     let message = `👋 Hello ${displayName},
