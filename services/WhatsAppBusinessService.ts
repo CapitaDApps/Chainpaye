@@ -472,7 +472,9 @@ What would you like to sell?`;
 
     const displayName = user.isVerified
       ? `${user.firstName} ${user.lastName}`
-      : user.fullName;
+      : user.fullName ||
+        `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
+        "User";
 
     console.log("[sendMyAccountInfo] Display name calculation:", {
       isVerified: user.isVerified,
