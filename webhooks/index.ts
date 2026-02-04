@@ -101,7 +101,7 @@ async function replyingMessage(messageId: string) {
 }
 
 app.post("/webhook", verifyWebhookSignature, async (req, res) => {
-  console.log("Incoming webhook message:", JSON.stringify(req.body, null, 2));
+  // console.log("Incoming webhook message:", JSON.stringify(req.body, null, 2));
 
   const message = req.body.entry?.[0]?.changes[0]?.value?.messages?.[0];
   const contact = req.body.entry?.[0]?.changes?.[0]?.value?.contacts?.[0];
@@ -122,11 +122,20 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
           const isRegistered =
             user && (user.fullName || (user.firstName && user.lastName));
 
+          console.log({
+            isRegistered,
+            user,
+          });
+
           if (!isRegistered) {
             await replyingMessage(message.id);
             // New user or incomplete profile - send registration flow
             whatsappBusinessService.sendIntroMessageByFlowId(message.from);
           } else {
+            console.log({
+              message,
+              contact,
+            });
             // User has completed registration
             // Handle text messages
             if (message.type == "text" && message.text.body) {
