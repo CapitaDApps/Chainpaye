@@ -803,6 +803,30 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
       });
     }
 
+    // Optimization: If chain is "evm", query specific supported chains to avoid timeouts
+    if (chain === "evm") {
+      const supportedEvmChains = [
+        "base",
+        "bsc",
+        "arbitrum",
+        "polygon",
+        "optimism",
+        "ethereum",
+      ];
+
+      const allPrefixedTokens: string[] = [];
+      supportedEvmChains.forEach((c) => {
+        const chainPrefix = this.getTokenChainIdentifier(c);
+        tokens.forEach((t) => allPrefixedTokens.push(`${chainPrefix}:${t}`));
+      });
+
+      logger.info(
+        `Optimized EVM balance fetch for user ${userId}: Requesting ${allPrefixedTokens.length} specific tokens`,
+      );
+
+      return this.getWalletBalancesInternal(userId, "evm", allPrefixedTokens);
+    }
+
     const chainId = this.getChainIdentifier(chain);
     return this.getWalletBalancesInternal(userId, chainId, tokens);
   }
@@ -822,6 +846,7 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
           params: {
             tokens: tokens.join(","),
           },
+          timeout: 30000, // 30 second timeout to fail fast instead of waiting for Cloudflare 524
         },
       );
 
@@ -980,6 +1005,9 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
       hedera: "hedera",
       apechain: "apechain",
       lisk: "lisk",
+      polygon: "polygon",
+      optimism: "optimism",
+      ethereum: "ethereum",
     };
 
     return (
