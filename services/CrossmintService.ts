@@ -824,7 +824,52 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         `Optimized EVM balance fetch for user ${userId}: Requesting ${allPrefixedTokens.length} specific tokens`,
       );
 
-      return this.getWalletBalancesInternal(userId, "evm", allPrefixedTokens);
+      const rawBalances = await this.getWalletBalancesInternal(
+        userId,
+        "evm",
+        allPrefixedTokens,
+      );
+
+      // Aggregate balances by token (sum USDC across all chains, USDT across all chains, etc.)
+      const aggregatedMap = new Map<
+        string,
+        { amount: number; usdValue: number }
+      >();
+
+      for (const balance of rawBalances) {
+        // Extract token name from "chain:token" format (e.g., "base:usdc" -> "usdc")
+        const tokenVal = balance.token || balance.symbol || "";
+        const simpleToken = tokenVal.includes(":")
+          ? tokenVal.split(":")[1]?.toLowerCase()
+          : tokenVal.toLowerCase();
+
+        if (!simpleToken) continue;
+
+        const existing = aggregatedMap.get(simpleToken) || {
+          amount: 0,
+          usdValue: 0,
+        };
+        existing.amount += parseFloat(balance.amount) || 0;
+        existing.usdValue += balance.usdValue || 0;
+        aggregatedMap.set(simpleToken, existing);
+      }
+
+      // Convert back to CrossmintBalance array
+      const aggregatedBalances: CrossmintBalance[] = [];
+      aggregatedMap.forEach((data, tokenName) => {
+        aggregatedBalances.push({
+          token: tokenName,
+          symbol: tokenName.toUpperCase(),
+          amount: data.amount.toString(),
+          usdValue: data.usdValue,
+        } as CrossmintBalance);
+      });
+
+      logger.info(
+        `Aggregated EVM balances for user ${userId}: ${aggregatedBalances.length} tokens`,
+      );
+
+      return aggregatedBalances;
     }
 
     const chainId = this.getChainIdentifier(chain);
