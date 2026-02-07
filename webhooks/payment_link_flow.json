@@ -2,9 +2,9 @@
   "version": "7.2",
   "data_api_version": "3.0",
   "routing_model": {
-    "CREATE_LINK_DETAILS": ["SELECT_METHOD"],
-    "SELECT_METHOD": ["PIN"],
-    "PIN": ["LINK_CREATED"],
+    "CREATE_LINK_DETAILS": ["SELECT_METHODS"],
+    "SELECT_METHODS": ["REVIEW_AND_PIN"],
+    "REVIEW_AND_PIN": ["LINK_CREATED"],
     "LINK_CREATED": []
   },
   "screens": [
@@ -27,12 +27,12 @@
           },
           "__example__": [
             {
-              "id": "USD",
-              "title": "USD"
-            },
-            {
               "id": "NGN",
               "title": "NGN"
+            },
+            {
+              "id": "USD",
+              "title": "USD"
             }
           ]
         },
@@ -84,8 +84,7 @@
                 "label": "Description (Optional)",
                 "name": "description",
                 "required": false,
-                "input-type": "text",
-                "helper-text": "What is this payment for?"
+                "input-type": "text"
               },
               {
                 "type": "TextInput",
@@ -115,7 +114,7 @@
       }
     },
     {
-      "id": "SELECT_METHOD",
+      "id": "SELECT_METHODS",
       "title": "Select Payment Method",
       "data": {
         "title": {
@@ -155,16 +154,12 @@
             {
               "id": "bank",
               "title": "Bank Transfer"
-            },
-            {
-              "id": "card",
-              "title": "Card Payment"
             }
           ]
         },
         "error_message": {
           "type": "string",
-          "__example__": "Select a valid payment method."
+          "__example__": "Select only one payment method to continue."
         }
       },
       "layout": {
@@ -172,24 +167,15 @@
         "children": [
           {
             "type": "TextHeading",
-            "text": "Review Link Details"
-          },
-          {
-            "type": "TextBody",
-            "text": "Title: ${data.title}"
+            "text": "Payment Method"
           },
           {
             "type": "TextBody",
             "text": "Amount: ${data.amount} ${data.currency}"
           },
           {
-            "type": "TextBody",
-            "text": "${data.description}",
-            "visible": "${data.description != null && data.description != ''}"
-          },
-          {
             "type": "Form",
-            "name": "select_method_form",
+            "name": "select_methods_form",
             "children": [
               {
                 "type": "TextBody",
@@ -200,9 +186,9 @@
                 }
               },
               {
-                "type": "Dropdown",
-                "label": "Payment Method",
-                "name": "method",
+                "type": "CheckboxGroup",
+                "label": "Choose payment method",
+                "name": "methods",
                 "required": true,
                 "data-source": "${data.allowed_methods}"
               },
@@ -217,7 +203,7 @@
                     "currency": "${data.currency}",
                     "amount": "${data.amount}",
                     "successUrl": "${data.successUrl}",
-                    "method": "${form.method}"
+                    "methods": "${form.methods}"
                   }
                 }
               }
@@ -227,8 +213,8 @@
       }
     },
     {
-      "id": "PIN",
-      "title": "Authorize",
+      "id": "REVIEW_AND_PIN",
+      "title": "Review and Authorize",
       "data": {
         "title": {
           "type": "string",
@@ -268,7 +254,7 @@
         "children": [
           {
             "type": "Form",
-            "name": "pin_form",
+            "name": "review_pin_form",
             "children": [
               {
                 "type": "TextBody",
@@ -279,8 +265,25 @@
                 }
               },
               {
+                "type": "TextHeading",
+                "text": "Review Payment Link"
+              },
+              {
                 "type": "TextBody",
-                "text": "You are creating a ${data.paymentTypeLabel} link for ${data.amount} ${data.currency}."
+                "text": "Title: ${data.title}"
+              },
+              {
+                "type": "TextBody",
+                "text": "Amount: ${data.amount} ${data.currency}"
+              },
+              {
+                "type": "TextBody",
+                "text": "Method: ${data.paymentTypeLabel}"
+              },
+              {
+                "type": "TextBody",
+                "text": "${data.description}",
+                "visible": "${data.description != null && data.description != ''}"
               },
               {
                 "type": "TextInput",

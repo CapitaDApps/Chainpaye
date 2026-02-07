@@ -88,6 +88,42 @@ function normalizeMethod(value: unknown): PaymentMethod | null {
   return null;
 }
 
+function extractSelectedMethods(value: unknown): PaymentMethod[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => normalizeMethod(item))
+      .filter((item): item is PaymentMethod => !!item);
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((item) => normalizeMethod(item))
+          .filter((item): item is PaymentMethod => !!item);
+      }
+    } catch (_error) {
+      // not JSON, continue
+    }
+
+    if (trimmed.includes(",")) {
+      return trimmed
+        .split(",")
+        .map((item) => normalizeMethod(item))
+        .filter((item): item is PaymentMethod => !!item);
+    }
+
+    const single = normalizeMethod(trimmed);
+    return single ? [single] : [];
+  }
+
+  return [];
+}
+
 function getCurrencyConfig(currency: SupportedCurrency) {
   return CURRENCIES.find((item) => item.code === currency);
 }
@@ -329,7 +365,7 @@ export async function getGenerateLinkScreen(decryptedBody: {
 
         const methods = getAllowedMethods(currency);
         return {
-          screen: "SELECT_METHOD",
+          screen: "SELECT_METHODS",
           data: {
             title,
             description,
@@ -341,7 +377,7 @@ export async function getGenerateLinkScreen(decryptedBody: {
         };
       }
 
-      case "SELECT_METHOD": {
+      case "SELECT_METHODS": {
         const currency = normalizeCurrency(data?.currency);
         const title = typeof data?.title === "string" ? data.title.trim() : "";
         const description =
@@ -349,11 +385,13 @@ export async function getGenerateLinkScreen(decryptedBody: {
         const successUrl =
           typeof data?.successUrl === "string" ? data.successUrl.trim() : "";
         const amountValue = parseAmount(data?.amount);
-        const method = normalizeMethod(data?.method || data?.paymentType);
+        const selectedMethods = extractSelectedMethods(
+          data?.methods ?? data?.method ?? data?.paymentType,
+        );
 
-        if (!currency || !method) {
+        if (!currency) {
           return {
-            screen: "SELECT_METHOD",
+            screen: "SELECT_METHODS",
             data: {
               title,
               description,
@@ -363,6 +401,58 @@ export async function getGenerateLinkScreen(decryptedBody: {
                 : "",
               successUrl,
               allowed_methods: currency ? getAllowedMethods(currency) : [],
+              error_message: "Select a valid currency and payment method.",
+            },
+          };
+        }
+
+        if (selectedMethods.length === 0) {
+          return {
+            screen: "SELECT_METHODS",
+            data: {
+              title,
+              description,
+              currency,
+              amount: Number.isFinite(amountValue)
+                ? formatAmountToString(amountValue)
+                : "",
+              successUrl,
+              allowed_methods: getAllowedMethods(currency),
+              error_message: "Select a valid payment method.",
+            },
+          };
+        }
+
+        if (selectedMethods.length > 1) {
+          return {
+            screen: "SELECT_METHODS",
+            data: {
+              title,
+              description,
+              currency,
+              amount: Number.isFinite(amountValue)
+                ? formatAmountToString(amountValue)
+                : "",
+              successUrl,
+              allowed_methods: getAllowedMethods(currency),
+              error_message: "Select only one payment method to continue.",
+            },
+          };
+        }
+
+        const method = selectedMethods[0];
+        if (!method) {
+          return {
+            screen: "SELECT_METHODS",
+            data: {
+              title,
+              description,
+              currency,
+              amount: Number.isFinite(amountValue)
+                ? formatAmountToString(amountValue)
+                : "",
+              successUrl,
+              allowed_methods: getAllowedMethods(currency),
               error_message: "Select a valid payment method.",
             },
           };
@@ -373,7 +463,7 @@ export async function getGenerateLinkScreen(decryptedBody: {
         );
         if (!allowedMethods.includes(method)) {
           return {
-            screen: "SELECT_METHOD",
+            screen: "SELECT_METHODS",
             data: {
               title,
               description,
@@ -389,7 +479,7 @@ export async function getGenerateLinkScreen(decryptedBody: {
         }
 
         return {
-          screen: "PIN",
+          screen: "REVIEW_AND_PIN",
           data: {
             title,
             description,
@@ -404,7 +494,7 @@ export async function getGenerateLinkScreen(decryptedBody: {
         };
       }
 
-      case "PIN": {
+      case "REVIEW_AND_PIN": {
         const currency = normalizeCurrency(data?.currency);
         const paymentType = normalizeMethod(data?.paymentType);
         const amountValue = parseAmount(data?.amount);
@@ -417,7 +507,7 @@ export async function getGenerateLinkScreen(decryptedBody: {
 
         if (!pin) {
           return {
-            screen: "PIN",
+            screen: "REVIEW_AND_PIN",
             data: {
               title,
               description,
@@ -442,7 +532,7 @@ export async function getGenerateLinkScreen(decryptedBody: {
 
         if (!currency || !paymentType || !Number.isFinite(amountValue)) {
           return {
-            screen: "PIN",
+            screen: "REVIEW_AND_PIN",
             data: {
               title,
               description,
@@ -464,7 +554,7 @@ export async function getGenerateLinkScreen(decryptedBody: {
         );
         if (!allowedMethods.includes(paymentType)) {
           return {
-            screen: "PIN",
+            screen: "REVIEW_AND_PIN",
             data: {
               title,
               description,
@@ -481,7 +571,7 @@ export async function getGenerateLinkScreen(decryptedBody: {
         const isValidPin = await user.comparePin(pin);
         if (!isValidPin) {
           return {
-            screen: "PIN",
+            screen: "REVIEW_AND_PIN",
             data: {
               title,
               description,
@@ -497,7 +587,7 @@ export async function getGenerateLinkScreen(decryptedBody: {
 
         if (amountValue <= 0) {
           return {
-            screen: "PIN",
+            screen: "REVIEW_AND_PIN",
             data: {
               title,
               description,
@@ -514,7 +604,7 @@ export async function getGenerateLinkScreen(decryptedBody: {
         const config = getCurrencyConfig(currency);
         if (!config) {
           return {
-            screen: "PIN",
+            screen: "REVIEW_AND_PIN",
             data: {
               title,
               description,
@@ -534,7 +624,7 @@ export async function getGenerateLinkScreen(decryptedBody: {
 
         if (!wallet?.publicKey) {
           return {
-            screen: "PIN",
+            screen: "REVIEW_AND_PIN",
             data: {
               title,
               description,
@@ -585,7 +675,7 @@ export async function getGenerateLinkScreen(decryptedBody: {
             "Unable to create payment link right now. Please try again.";
 
           return {
-            screen: "PIN",
+            screen: "REVIEW_AND_PIN",
             data: {
               title,
               description,
@@ -607,7 +697,7 @@ export async function getGenerateLinkScreen(decryptedBody: {
 
         if (!linkUrl) {
           return {
-            screen: "PIN",
+            screen: "REVIEW_AND_PIN",
             data: {
               title,
               description,
