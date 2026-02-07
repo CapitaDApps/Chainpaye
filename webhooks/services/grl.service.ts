@@ -60,12 +60,18 @@ const METHOD_LABELS: Record<PaymentMethod, string> = {
 };
 
 const FLOW_ERROR_TEXT = "Session expired. Restart flow from a new message.";
-const DEFAULT_PAYMENT_LINK_API_BASE_URL = "https://your-api-domain.com/api/v1";
+const DEFAULT_PAYMENT_LINK_API_BASE_URL =
+  "https://chainpaye-backend.onrender.com/";
 
 function normalizeCurrency(value: unknown): SupportedCurrency | null {
   if (typeof value !== "string") return null;
   const normalized = value.trim().toUpperCase();
-  if (normalized === "NGN" || normalized === "USD" || normalized === "GBP" || normalized === "EUR") {
+  if (
+    normalized === "NGN" ||
+    normalized === "USD" ||
+    normalized === "GBP" ||
+    normalized === "EUR"
+  ) {
     return normalized;
   }
   return null;
@@ -137,7 +143,9 @@ function getShareableLink(
   return null;
 }
 
-async function createPaymentLink(payload: PaymentLinkCreatePayload): Promise<PaymentLinkApiData> {
+async function createPaymentLink(
+  payload: PaymentLinkCreatePayload,
+): Promise<PaymentLinkApiData> {
   const apiBaseUrl = getPaymentLinkApiBaseUrl();
   if (apiBaseUrl.includes("your-api-domain.com")) {
     throw new Error(
@@ -163,12 +171,18 @@ async function createPaymentLink(payload: PaymentLinkCreatePayload): Promise<Pay
     },
   );
 
+  console.log({ "Payment link API response:": response.data, payload });
+
   if (response.data?.success === false) {
-    throw new Error(response.data.message || "Payment link API rejected the request.");
+    throw new Error(
+      response.data.message || "Payment link API rejected the request.",
+    );
   }
 
   if (!response.data?.data) {
-    throw new Error(response.data?.message || "Invalid payment link API response.");
+    throw new Error(
+      response.data?.message || "Invalid payment link API response.",
+    );
   }
 
   return response.data.data;
@@ -350,7 +364,9 @@ export async function getGenerateLinkScreen(decryptedBody: {
           };
         }
 
-        const allowedMethods = getAllowedMethods(currency).map((item) => item.id);
+        const allowedMethods = getAllowedMethods(currency).map(
+          (item) => item.id,
+        );
         if (!allowedMethods.includes(method)) {
           return {
             screen: "SELECT_METHOD",
@@ -439,7 +455,9 @@ export async function getGenerateLinkScreen(decryptedBody: {
           };
         }
 
-        const allowedMethods = getAllowedMethods(currency).map((item) => item.id);
+        const allowedMethods = getAllowedMethods(currency).map(
+          (item) => item.id,
+        );
         if (!allowedMethods.includes(paymentType)) {
           return {
             screen: "PIN",
@@ -532,8 +550,12 @@ export async function getGenerateLinkScreen(decryptedBody: {
           createdLink = await createPaymentLink(payload);
         } catch (error) {
           const errorMessage =
-            (error as { response?: { data?: { message?: string } }; message?: string })
-              .response?.data?.message ||
+            (
+              error as {
+                response?: { data?: { message?: string } };
+                message?: string;
+              }
+            ).response?.data?.message ||
             (error as { message?: string }).message ||
             "Unable to create payment link right now. Please try again.";
 
@@ -569,7 +591,8 @@ export async function getGenerateLinkScreen(decryptedBody: {
               paymentType,
               paymentTypeLabel: METHOD_LABELS[paymentType],
               successUrl,
-              error_message: "Payment link created but link URL was not returned.",
+              error_message:
+                "Payment link created but link URL was not returned.",
             },
           };
         }
@@ -588,7 +611,10 @@ export async function getGenerateLinkScreen(decryptedBody: {
         whatsappBusinessService
           .sendNormalMessage(summaryMessage, userPhone)
           .catch((sendError) => {
-            console.log("Error sending payment link summary message", sendError);
+            console.log(
+              "Error sending payment link summary message",
+              sendError,
+            );
           });
 
         return {
@@ -611,6 +637,6 @@ export async function getGenerateLinkScreen(decryptedBody: {
 
   console.error("Unhandled request body:", decryptedBody);
   throw new Error(
-    "Unhandled endpoint request. Make sure you handle the request action & screen logged above."
+    "Unhandled endpoint request. Make sure you handle the request action & screen logged above.",
   );
 }
