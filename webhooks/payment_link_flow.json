@@ -35,10 +35,6 @@
               "title": "USD"
             }
           ]
-        },
-        "error_message": {
-          "type": "string",
-          "__example__": "Select a valid currency."
         }
       },
       "layout": {
@@ -48,14 +44,6 @@
             "type": "Form",
             "name": "create_link_form",
             "children": [
-              {
-                "type": "TextBody",
-                "text": "${data.error_message}",
-                "visible": "${data.error_message != null}",
-                "style": {
-                  "color": "#EF4444"
-                }
-              },
               {
                 "type": "TextInput",
                 "label": "Link Title",
@@ -81,18 +69,18 @@
               },
               {
                 "type": "TextInput",
-                "label": "Description (Optional)",
+                "label": "Description",
                 "name": "description",
                 "required": false,
                 "input-type": "text"
               },
               {
                 "type": "TextInput",
-                "label": "Success URL (Optional)",
+                "label": "Success URL",
                 "name": "successUrl",
                 "required": false,
                 "input-type": "text",
-                "helper-text": "Example: https://your-site.com/success"
+                "helper-text": "https://your-site.com/success"
               },
               {
                 "type": "Footer",
@@ -171,20 +159,12 @@
           },
           {
             "type": "TextBody",
-            "text": "Amount: ${data.amount} ${data.currency}"
+            "text": "`'Amount: '${data.amount}' '${data.currency}''`"
           },
           {
             "type": "Form",
             "name": "select_methods_form",
             "children": [
-              {
-                "type": "TextBody",
-                "text": "${data.error_message}",
-                "visible": "${data.error_message != null}",
-                "style": {
-                  "color": "#EF4444"
-                }
-              },
               {
                 "type": "CheckboxGroup",
                 "label": "Choose payment method",
@@ -257,33 +237,24 @@
             "name": "review_pin_form",
             "children": [
               {
-                "type": "TextBody",
-                "text": "${data.error_message}",
-                "visible": "${data.error_message != null}",
-                "style": {
-                  "color": "#EF4444"
-                }
-              },
-              {
                 "type": "TextHeading",
                 "text": "Review Payment Link"
               },
               {
                 "type": "TextBody",
-                "text": "Title: ${data.title}"
+                "text": "`'Title: '${data.title}''`"
               },
               {
                 "type": "TextBody",
-                "text": "Amount: ${data.amount} ${data.currency}"
+                "text": "`'Amount: '${data.amount}' '${data.currency}''`"
               },
               {
                 "type": "TextBody",
-                "text": "Method: ${data.paymentTypeLabel}"
+                "text": "`'Method: '${data.paymentTypeLabel}''`"
               },
               {
                 "type": "TextBody",
-                "text": "${data.description}",
-                "visible": "${data.description != null && data.description != ''}"
+                "text": "${data.description}"
               },
               {
                 "type": "TextInput",
@@ -354,24 +325,23 @@
           },
           {
             "type": "TextBody",
-            "text": "Title: ${data.title}"
+            "text": "`'Title: '${data.title}''`"
           },
           {
             "type": "TextBody",
-            "text": "Amount: ${data.amount} ${data.currency}"
+            "text": "`'Amount: '${data.amount}' '${data.currency}''`"
           },
           {
             "type": "TextBody",
-            "text": "Method: ${data.paymentTypeLabel}"
+            "text": "`'Method: '${data.paymentTypeLabel}''`"
           },
           {
             "type": "TextBody",
-            "text": "${data.description}",
-            "visible": "${data.description != null && data.description != ''}"
+            "text": "${data.description}"
           },
           {
             "type": "TextBody",
-            "text": "Link: ${data.link_url}"
+            "text": "`'Link: '${data.link_url}''`"
           },
           {
             "type": "Footer",

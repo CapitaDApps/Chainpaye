@@ -164,11 +164,14 @@ function getPaymentLinkApiBaseUrl(): string {
 }
 
 function getPaymentLinkApiTimeoutMs(): number {
-  const value = Number(process.env.PAYMENT_LINK_API_TIMEOUT_MS || 15000);
+  // Keep timeout below WhatsApp Flow response window to avoid client-side timeout/blank screens.
+  const defaultTimeout = 8000;
+  const maxSafeTimeout = 9000;
+  const value = Number(process.env.PAYMENT_LINK_API_TIMEOUT_MS || defaultTimeout);
   if (!Number.isFinite(value) || value <= 0) {
-    return 15000;
+    return defaultTimeout;
   }
-  return value;
+  return Math.min(value, maxSafeTimeout);
 }
 
 function getShareableLink(
@@ -664,7 +667,15 @@ export async function getGenerateLinkScreen(decryptedBody: {
         try {
           createdLink = await createPaymentLink(payload);
         } catch (error) {
-          const errorMessage =
+          console.error("Payment link creation failed", {
+            error,
+            flowToken: flow_token,
+            userPhone,
+            currency,
+            paymentType,
+          });
+
+          const rawErrorMessage =
             (
               error as {
                 response?: { data?: { message?: string } };
@@ -673,6 +684,13 @@ export async function getGenerateLinkScreen(decryptedBody: {
             ).response?.data?.message ||
             (error as { message?: string }).message ||
             "Unable to create payment link right now. Please try again.";
+
+          const isTimeout = /timeout|timed out|ECONNABORTED/i.test(
+            rawErrorMessage,
+          );
+          const errorMessage = isTimeout
+            ? "Request timed out while creating the link. Please tap Create Link again."
+            : rawErrorMessage;
 
           return {
             screen: "REVIEW_AND_PIN",
@@ -755,3 +773,5 @@ export async function getGenerateLinkScreen(decryptedBody: {
     "Unhandled endpoint request. Make sure you handle the request action & screen logged above.",
   );
 }
+
+
