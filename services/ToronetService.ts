@@ -23,6 +23,7 @@ export interface Bank {
 }
 
 type BalanceResult = { result: boolean; balance: number; message: string };
+type FiatVirtualWalletCurrency = "NGN" | "USD" | "EUR" | "GBP";
 type InitializeDepositReturn =
   | {
       result: boolean;
@@ -111,6 +112,18 @@ export class ToronetService {
   }
 
   async createVirtualWalletNGN(data: { address: string; fullName: string }) {
+    return this.createVirtualWallet({
+      address: data.address,
+      fullName: data.fullName,
+      currency: "NGN",
+    });
+  }
+
+  async createVirtualWallet(data: {
+    address: string;
+    fullName: string;
+    currency: FiatVirtualWalletCurrency;
+  }) {
     const body = {
       op: "generatevirtualwallet",
       params: [
@@ -124,7 +137,7 @@ export class ToronetService {
         },
         {
           name: "currency",
-          value: "NGN", //current options are USD, EUR, NGN - default
+          value: data.currency, //current options are USD, EUR, NGN - default
         },
       ],
     };
@@ -144,7 +157,42 @@ export class ToronetService {
       accountname: resp.data.accountname,
       newwallet: resp.data.newwallet,
       lastcheck: resp.data.lastcheck,
+      currency: data.currency,
     };
+  }
+
+  async ensureFiatVirtualWallets(data: {
+    address: string;
+    fullName: string;
+  }): Promise<void> {
+    const currencies: FiatVirtualWalletCurrency[] = ["NGN", "USD", "EUR", "GBP"];
+
+    const results = await Promise.allSettled(
+      currencies.map((currency) =>
+        this.createVirtualWallet({
+          address: data.address,
+          fullName: data.fullName,
+          currency,
+        }),
+      ),
+    );
+
+    const failed = results
+      .map((result, index) => ({ result, currency: currencies[index] }))
+      .filter(
+        (item): item is { result: PromiseRejectedResult; currency: FiatVirtualWalletCurrency } =>
+          item.result.status === "rejected",
+      );
+
+    if (failed.length > 0) {
+      console.warn(
+        "Some fiat virtual wallets could not be created",
+        failed.map((item) => ({
+          currency: item.currency,
+          reason: item.result.reason,
+        })),
+      );
+    }
   }
 
   async initializeDeposit({
@@ -661,6 +709,60 @@ export class ToronetService {
       balance: Number(data.balance),
       message: data.message,
     };
+  }
+
+  async getBalanceEUR(address: string): Promise<BalanceResult> {
+    const body = this.formBalanceBody(address);
+
+    try {
+      const resp = await axios({
+        method: "GET",
+        url: `${this.baseUrl}/currency/euro/`,
+        data: body,
+      });
+
+      const data = resp.data;
+
+      return {
+        result: data.result,
+        balance: Number(data.balance),
+        message: data.message,
+      };
+    } catch (error) {
+      console.error("Error fetching EUR balance", error);
+      return {
+        result: false,
+        balance: 0,
+        message: "Error fetching EUR balance",
+      };
+    }
+  }
+
+  async getBalanceGBP(address: string): Promise<BalanceResult> {
+    const body = this.formBalanceBody(address);
+
+    try {
+      const resp = await axios({
+        method: "GET",
+        url: `${this.baseUrl}/currency/pound/`,
+        data: body,
+      });
+
+      const data = resp.data;
+
+      return {
+        result: data.result,
+        balance: Number(data.balance),
+        message: data.message,
+      };
+    } catch (error) {
+      console.error("Error fetching GBP balance", error);
+      return {
+        result: false,
+        balance: 0,
+        message: "Error fetching GBP balance",
+      };
+    }
   }
 
   async transferTORO(

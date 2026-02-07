@@ -6,12 +6,11 @@
 
 import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
-import { dexPayService, toronetService, userService, walletService } from ".";
+import { dexPayService, toronetService, userService } from ".";
 import { NormalizedNetworkType } from "../commands/types";
 import { CONSTANTS } from "../config/constants";
 import { WHATSAPP_CONFIG } from "../config/whatsapp";
 import { User } from "../models/User";
-import { Wallet } from "../models/Wallet";
 import { redisClient } from "./redis";
 
 type ButtonPayloadType =
@@ -493,12 +492,12 @@ What would you like to sell?`;
       walletPublicKey: wallet?.publicKey,
     });
 
-    const [usdBalance, ngnBalance] = await Promise.all([
+    const [usdBalance, ngnBalance, eurBalance, gbpBalance] = await Promise.all([
       toronetService.getBalanceUSD(wallet.publicKey),
       toronetService.getBalanceNGN(wallet.publicKey),
+      toronetService.getBalanceEUR(wallet.publicKey),
+      toronetService.getBalanceGBP(wallet.publicKey),
     ]);
-
-    // message should contain the user's account, number, name and balances
 
     const displayName = user.isVerified
       ? `${user.firstName} ${user.lastName}`
@@ -514,14 +513,15 @@ What would you like to sell?`;
       calculatedDisplayName: displayName,
     });
 
-    // message should contain the user's account, number, name and balances
-    let message = `👋 Hello ${displayName},
+    let message = `Hello ${displayName},
 
 Account No: ${user.whatsappNumber.replace("+", "")}
 
 Available Balances:
-🇳🇬 NGN: ₦ ${ngnBalance.balance.toFixed(2)}
-🇺🇸 USD: $${usdBalance.balance.toFixed(2)}`;
+NGN: NGN ${ngnBalance.balance.toFixed(2)}
+USD: USD ${usdBalance.balance.toFixed(2)}
+EUR: EUR ${eurBalance.balance.toFixed(2)}
+GBP: GBP ${gbpBalance.balance.toFixed(2)}`;
 
     let accountnumber: string | null = null;
 
@@ -533,15 +533,15 @@ Available Balances:
 
       if (vw.result) {
         message += `\n\n
-*📥 FUND YOUR ACCOUNT*
+*FUND YOUR ACCOUNT*
 
 To top up your NGN balance, transfer to:
 
 Bank: FCMB
 Account Name: ${vw.accountname}
-(⚠️ NGN Deposits Only)
+(NGN Deposits Only)
 
-Copy the account number below 👇
+Copy the account number below
       `;
         accountnumber = vw.accountnumber;
       }
@@ -552,7 +552,6 @@ Copy the account number below 👇
       await this.sendNormalMessage(accountnumber, to);
     }
   }
-
   async sendSupportMessage(to: string) {
     const message = `🆘 *Need Help?*
 
@@ -760,51 +759,7 @@ Our team is ready to assist you!`;
   async handleButtonPayload(payload: ButtonPayloadType, to: string) {
     switch (payload) {
       case "My Account": {
-        const phone = to.startsWith("+") ? to : `+${to}`;
-        const user = await User.findOne({ whatsappNumber: phone });
-        if (!user) {
-          await this.sendTemplateIntroMessage(to);
-          return;
-        }
-        const wallet = await Wallet.findOne({ userId: user.userId });
-        if (!wallet) {
-          throw new Error(`Wallet for user - [${to}] not found`);
-        }
-
-        const [ngnBalance, usdBalance] = await Promise.all([
-          await walletService.ngnBalance(wallet.publicKey),
-          await walletService.usdBalance(wallet.publicKey),
-        ]);
-
-        const displayName = user.isVerified
-          ? `${user.firstName} ${user.lastName}`
-          : user.fullName;
-
-        const params = [
-          {
-            type: "text",
-            text: displayName,
-          },
-          {
-            type: "text",
-            text: `${user.whatsappNumber.replace("+", "")}`,
-          },
-          {
-            type: "text",
-            text: `${ngnBalance.balance.toLocaleString()}`,
-          },
-          {
-            type: "text",
-            text: `${usdBalance.balance.toLocaleString()}`,
-          },
-        ];
-
-        await this.sendTemplateInteractiveMessage(
-          "receivepayments",
-          to,
-          "en",
-          params,
-        );
+        await this.sendMyAccountInfo(to);
         break;
       }
 
@@ -846,3 +801,4 @@ Our team is ready to assist you!`;
     }
   }
 }
+

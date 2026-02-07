@@ -34,6 +34,21 @@ export class WalletService {
     }
   }
 
+  async ensureFiatVirtualWallets(userId: string, fullName: string): Promise<void> {
+    const wallet = await Wallet.findOne({ userId });
+    if (!wallet) {
+      console.warn(
+        `[ensureFiatVirtualWallets] Wallet not found for userId ${userId}`,
+      );
+      return;
+    }
+
+    await toronetService.ensureFiatVirtualWallets({
+      address: wallet.publicKey,
+      fullName,
+    });
+  }
+
   async transfer(
     from: string,
     to: string,
@@ -491,6 +506,16 @@ export class WalletService {
 
   async usdBalance(address: string) {
     const bal = await toronetService.getBalanceUSD(address);
+    return bal;
+  }
+
+  async eurBalance(address: string) {
+    const bal = await toronetService.getBalanceEUR(address);
+    return bal;
+  }
+
+  async gbpBalance(address: string) {
+    const bal = await toronetService.getBalanceGBP(address);
     return bal;
   }
 

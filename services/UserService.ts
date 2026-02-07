@@ -100,6 +100,15 @@ export class UserService {
             session,
           );
         });
+
+        try {
+          await walletService.ensureFiatVirtualWallets(userId, data.fullName);
+        } catch (walletProvisionError) {
+          console.error(
+            "Error creating fiat virtual wallets during user creation",
+            walletProvisionError,
+          );
+        }
       } catch (error) {
         console.log("Error creating user", error);
         throw error;

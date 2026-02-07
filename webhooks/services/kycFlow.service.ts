@@ -296,15 +296,17 @@ export const kycFlowScreen = async (decryptedBody: {
             // Don't fail the flow if message fails
           }
 
-          // Create virtual NGN wallet
+          // Ensure fiat virtual wallets (NGN, USD, EUR, GBP)
           try {
             const wallet = await Wallet.findOne({ userId: user.userId });
             if (wallet) {
-              await toronetService.createVirtualWalletNGN({
+              await toronetService.ensureFiatVirtualWallets({
                 address: wallet.publicKey,
                 fullName: `${firstName} ${lastName}`,
               });
-              console.log("DEBUG: Virtual NGN wallet created");
+              console.log(
+                "DEBUG: Fiat virtual wallets ensured (NGN, USD, EUR, GBP)",
+              );
             }
           } catch (walletError) {
             console.error("DEBUG: Error creating virtual wallet:", walletError);
