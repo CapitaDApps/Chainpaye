@@ -72,8 +72,8 @@ export interface ITransaction extends Document {
   failureReason?: string;
   hash?: string;
   // Fields for conversion transactions
-  fromCurrency?: "USD" | "NGN";
-  toCurrency?: "USD" | "NGN";
+  fromCurrency?: "USD" | "NGN" | "EUR" | "GBP";
+  toCurrency?: "USD" | "NGN" | "EUR" | "GBP";
   asset?: CoinType;
   fromAmount?: number;
   toAmount?: number;
@@ -149,6 +149,8 @@ const TransactionSchema: Schema = new Schema(
       enum: [
         "USD",
         "NGN",
+        "EUR",
+        "GBP",
         "USDCBASE",
         "USDTBSC",
         "USDCBSC",
@@ -190,12 +192,12 @@ const TransactionSchema: Schema = new Schema(
     // Fields for conversion transactions
     fromCurrency: {
       type: String,
-      enum: ["USD", "NGN"],
+      enum: ["USD", "NGN", "EUR", "GBP"],
       required: false,
     },
     toCurrency: {
       type: String,
-      enum: ["USD", "NGN"],
+      enum: ["USD", "NGN", "EUR", "GBP"],
       required: false,
     },
 

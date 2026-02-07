@@ -12,9 +12,41 @@
       "id": "CONVERT_ENTRY",
       "title": "Convert Currency",
       "data": {
+        "currencies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            }
+          },
+          "__example__": [
+            {
+              "id": "USD",
+              "title": "USD"
+            },
+            {
+              "id": "NGN",
+              "title": "NGN"
+            },
+            {
+              "id": "EUR",
+              "title": "EUR"
+            },
+            {
+              "id": "GBP",
+              "title": "GBP"
+            }
+          ]
+        },
         "error_message": {
           "type": "string",
-          "__example__": "Error"
+          "__example__": "Insufficient balance"
         }
       },
       "layout": {
@@ -25,44 +57,18 @@
             "name": "conversion_form",
             "children": [
               {
-                "type": "TextBody",
-                "text": "${data.error_message}",
-                "visible": "${data.error_message != null}",
-                "style": {
-                  "color": "#EF4444"
-                }
-              },
-              {
                 "type": "Dropdown",
                 "label": "From Currency",
                 "name": "fromCurrency",
                 "required": true,
-                "data-source": [
-                  {
-                    "id": "USD",
-                    "title": "USD"
-                  },
-                  {
-                    "id": "NGN",
-                    "title": "NGN"
-                  }
-                ]
+                "data-source": "${data.currencies}"
               },
               {
                 "type": "Dropdown",
                 "label": "To Currency",
                 "name": "toCurrency",
                 "required": true,
-                "data-source": [
-                  {
-                    "id": "USD",
-                    "title": "USD"
-                  },
-                  {
-                    "id": "NGN",
-                    "title": "NGN"
-                  }
-                ]
+                "data-source": "${data.currencies}"
               },
               {
                 "type": "TextInput",
@@ -103,15 +109,15 @@
         },
         "amountToPay": {
           "type": "string",
-          "__example__": "100"
+          "__example__": "100.00"
         },
         "amountToReceive": {
           "type": "string",
-          "__example__": "150000"
+          "__example__": "150000.00"
         },
         "exchangeRate": {
           "type": "string",
-          "__example__": "1500"
+          "__example__": "1500.00"
         }
       },
       "layout": {
@@ -127,7 +133,7 @@
           },
           {
             "type": "TextBody",
-            "text": "${data.amountToPay} ${data.fromCurrency}"
+            "text": "`''${data.amountToPay}' '${data.fromCurrency}''`"
           },
           {
             "type": "TextSubheading",
@@ -135,7 +141,7 @@
           },
           {
             "type": "TextBody",
-            "text": "1 ${data.fromCurrency} = ${data.exchangeRate} ${data.toCurrency}"
+            "text": "`'1 '${data.fromCurrency}' = '${data.exchangeRate}' '${data.toCurrency}''`"
           },
           {
             "type": "TextSubheading",
@@ -143,10 +149,7 @@
           },
           {
             "type": "TextBody",
-            "text": "${data.amountToReceive} ${data.toCurrency}",
-            "style": {
-              "fontWeight": "bold"
-            }
+            "text": "`''${data.amountToReceive}' '${data.toCurrency}''`"
           },
           {
             "type": "Footer",
@@ -182,15 +185,15 @@
         },
         "amountToPay": {
           "type": "string",
-          "__example__": "100"
+          "__example__": "100.00"
         },
         "amountToReceive": {
           "type": "string",
-          "__example__": "150000"
+          "__example__": "150000.00"
         },
         "error_message": {
           "type": "string",
-          "__example__": "Invalid PIN"
+          "__example__": "Invalid PIN."
         }
       },
       "layout": {
@@ -200,14 +203,6 @@
             "type": "Form",
             "name": "pin_form",
             "children": [
-              {
-                "type": "TextBody",
-                "text": "${data.error_message}",
-                "visible": "${data.error_message != null}",
-                "style": {
-                  "color": "#EF4444"
-                }
-              },
               {
                 "type": "TextBody",
                 "text": "Enter your PIN to confirm conversion of ${data.amountToPay} ${data.fromCurrency}."
@@ -249,11 +244,11 @@
         "children": [
           {
             "type": "TextHeading",
-            "text": "Conversion Successful"
+            "text": "Conversion Processing"
           },
           {
             "type": "TextBody",
-            "text": "Your conversion has been processed successfully. Your account balance has been updated."
+            "text": "Your conversion is being processed. You will receive confirmation shortly."
           },
           {
             "type": "Footer",
