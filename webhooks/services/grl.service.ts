@@ -162,6 +162,8 @@ async function createPaymentLink(
     headers.Authorization = `Bearer ${apiKey}`;
   }
 
+  console.log({ "Payment link API request:": payload, headers });
+
   const response = await axios.post<PaymentLinkApiResponse>(
     `${apiBaseUrl}/payment-links`,
     payload,
@@ -544,6 +546,8 @@ export async function getGenerateLinkScreen(decryptedBody: {
             whatsappNumber: user.whatsappNumber,
           },
         };
+
+        console.log({ payload });
 
         let createdLink: PaymentLinkApiData;
         try {
