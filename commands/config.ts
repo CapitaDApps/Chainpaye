@@ -350,6 +350,42 @@ const COMMANDS: Record<string, CommandConfig> = {
   },
 
   // ============================================================
+  // PAYMENT LINKS
+  // Create links to receive payments
+  // ============================================================
+  paymentLink: {
+    triggers: [
+      // Slash commands
+      "/paymentlink",
+      "/paymentlinks",
+      "/createlink",
+      "/getpaid",
+
+      // Payment link phrases
+      "payment link",
+      "payment links",
+      "create payment link",
+      "generate payment link",
+      "create link",
+      "generate link",
+      "request payment",
+      "get paid",
+      "invoice link",
+      "send payment link",
+      "collect payment",
+
+      // Natural language
+      "i want a payment link",
+      "i want to create a payment link",
+      "help me create a payment link",
+      "how do i create a payment link",
+      "create a link for payment",
+    ],
+    description: "Create a payment link to receive payments",
+    priority: 4,
+  },
+
+  // ============================================================
   // CURRENCY CONVERSION
   // Convert between fiat currencies
   // ============================================================

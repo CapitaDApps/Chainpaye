@@ -1,6 +1,4 @@
 import { Request, Response } from "express";
-import { userSetupScreen } from "../services/userSetup.service";
-import { getWithdrawalFlowScreen } from "../services/withdrawalFlow.service";
 import { getGenerateLinkScreen } from "../services/grl.service";
 import { flowMiddleware } from "../middlewares";
 

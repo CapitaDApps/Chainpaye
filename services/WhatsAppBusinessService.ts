@@ -363,6 +363,28 @@ What can I do for you?
     });
   }
 
+  async sendPaymentLinkFlowById(to: string) {
+    const paymentLinkFlowId = WHATSAPP_CONFIG.FLOW_IDS.PAYMENT_LINK;
+    const paymentLinkScreenId = "CREATE_LINK_DETAILS";
+
+    if (!paymentLinkFlowId) {
+      throw new Error(
+        "Missing WhatsApp payment link flow ID. Set WHATSAPP_PAYMENT_LINK_FLOW_ID (or staging equivalent).",
+      );
+    }
+
+    await this.sendTextOnlyFlowById(
+      to,
+      paymentLinkFlowId,
+      paymentLinkScreenId,
+      {
+        header: "Create Payment Link",
+        body: "Generate a secure payment link and share it with your customer to get paid faster.",
+        cta: "Create Link",
+      },
+    );
+  }
+
   /**
    * Send KYC verification flow to Nigerian users
    * This allows them to complete BVN verification
