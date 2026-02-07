@@ -373,7 +373,7 @@ What can I do for you?
       );
     }
 
-    await this.sendTextOnlyFlowById(
+    await this.sendTextOnlyFlowWithDataById(
       to,
       paymentLinkFlowId,
       paymentLinkScreenId,
@@ -381,6 +381,14 @@ What can I do for you?
         header: "Create Payment Link",
         body: "Generate a secure payment link and share it with your customer to get paid faster.",
         cta: "Create Link",
+      },
+      {
+        currencies: [
+          { id: "NGN", title: "NGN" },
+          { id: "USD", title: "USD" },
+          { id: "GBP", title: "GBP" },
+          { id: "EUR", title: "EUR" },
+        ],
       },
     );
   }
