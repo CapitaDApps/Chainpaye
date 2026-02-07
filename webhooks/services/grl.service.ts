@@ -1,5 +1,6 @@
 import axios from "axios";
 import { User } from "../../models/User";
+import { Wallet } from "../../models/Wallet";
 import { whatsappBusinessService } from "../../services";
 import { redisClient } from "../../services/redis";
 
@@ -17,6 +18,7 @@ interface PaymentLinkCreatePayload {
   name: string;
   amount: string;
   currency: SupportedCurrency;
+  address: string;
   token: string;
   selectedCurrency: SupportedCurrency;
   paymentType: PaymentMethod;
@@ -528,6 +530,24 @@ export async function getGenerateLinkScreen(decryptedBody: {
 
         const merchantId =
           process.env.PAYMENT_LINK_MERCHANT_ID?.trim() || user.userId;
+        const wallet = await Wallet.findOne({ userId: user.userId });
+
+        if (!wallet?.publicKey) {
+          return {
+            screen: "PIN",
+            data: {
+              title,
+              description,
+              currency,
+              amount: formatAmountToString(amountValue),
+              paymentType,
+              paymentTypeLabel: METHOD_LABELS[paymentType],
+              successUrl,
+              error_message:
+                "Unable to find your wallet address. Please contact support.",
+            },
+          };
+        }
 
         const payload: PaymentLinkCreatePayload = {
           merchantId,
@@ -535,7 +555,8 @@ export async function getGenerateLinkScreen(decryptedBody: {
           name: title,
           amount: formatAmountToString(amountValue),
           currency,
-          token: config.defaultToken,
+          address: wallet.publicKey,
+          token: currency,
           selectedCurrency: currency,
           paymentType,
           ...(description && { description }),
