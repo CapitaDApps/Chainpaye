@@ -1,5 +1,5 @@
 import { scheduleProcessDeposit } from "../../jobs/topUp/job";
-import { userService, walletService } from "../../services";
+import { userService, walletService, whatsappBusinessService } from "../../services";
 import { redisClient } from "../../services/redis";
 
 export const getTopUpScreen = async (decryptedBody: {
@@ -93,6 +93,30 @@ export const getTopUpScreen = async (decryptedBody: {
 
         switch (currency) {
           case "USD":
+            await redisClient.set(
+              `TOPUP_SUMMARY_${result.transactionId}`,
+              JSON.stringify({
+                amount: Number(data.amount).toLocaleString(),
+                currency,
+                accountName: result.accountName,
+                bankName: result.bankName,
+                accountNumber: `${result.accountNumber}`,
+                routingNO: `${result.routingNO}`,
+                is_usd,
+              }),
+              "EX",
+              86400,
+            );
+
+            whatsappBusinessService
+              .sendNormalMessage(
+                `Transaction ID: *${result.transactionId}*\n\nCopy this Transaction ID and share it with the payer.\nUse it as the payment description for the USD transfer.\n\nThen tap *Complete Deposit* in the flow to proceed.`,
+                userPhone,
+              )
+              .catch((error) =>
+                console.log("Error sending topup transaction-id instruction", error),
+              );
+
             return {
               screen: "BANK_DETAILS",
               data: {
@@ -107,6 +131,30 @@ export const getTopUpScreen = async (decryptedBody: {
               },
             };
           case "NGN":
+            await redisClient.set(
+              `TOPUP_SUMMARY_${result.transactionId}`,
+              JSON.stringify({
+                amount: Number(result.amount).toLocaleString(),
+                currency,
+                accountName: result.accountName,
+                bankName: result.bankName,
+                accountNumber: `${result.accountNumber}`,
+                routingNO: "",
+                is_usd,
+              }),
+              "EX",
+              86400,
+            );
+
+            whatsappBusinessService
+              .sendNormalMessage(
+                `Transaction ID: *${result.transactionId}*\n\nCopy this Transaction ID and share it with the payer.\nUse it as the payment description for the transfer.\n\nThen tap *Complete Deposit* in the flow to proceed.`,
+                userPhone,
+              )
+              .catch((error) =>
+                console.log("Error sending topup transaction-id instruction", error),
+              );
+
             return {
               screen: "BANK_DETAILS",
               data: {
@@ -134,6 +182,33 @@ export const getTopUpScreen = async (decryptedBody: {
               error_message: "Session expired. Restart flow a new message",
             },
           };
+        }
+
+        const summaryCache = await redisClient.get(`TOPUP_SUMMARY_${data.transactionId}`);
+        if (summaryCache) {
+          try {
+            const summary = JSON.parse(summaryCache);
+            const summaryMessage = [
+              "*Deposit Transaction Summary*",
+              "",
+              `Transaction ID: *${data.transactionId}*`,
+              `Amount: *${summary.amount} ${summary.currency}*`,
+              `Bank Name: *${summary.bankName}*`,
+              `Account Name: *${summary.accountName}*`,
+              `Account Number: *${summary.accountNumber}*`,
+              ...(summary.is_usd
+                ? [`Routing Number: *${summary.routingNO}*`]
+                : []),
+            ].join("\n");
+
+            whatsappBusinessService
+              .sendNormalMessage(summaryMessage, userPhone)
+              .catch((error) =>
+                console.log("Error sending topup summary message", error),
+              );
+          } catch (error) {
+            console.log("Error parsing topup summary cache", error);
+          }
         }
 
         scheduleProcessDeposit(data.transactionId);
