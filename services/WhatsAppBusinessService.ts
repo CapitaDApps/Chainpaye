@@ -355,11 +355,24 @@ What can I do for you?
 
     const convertFlowId = WHATSAPP_CONFIG.FLOW_IDS.CONVERT;
     const convertFlowScreen = "CONVERT_ENTRY";
-    await this.sendTextOnlyFlowById(to, convertFlowId, convertFlowScreen, {
-      header: "Convert Fiat",
-      body: "Convert your local currency to USD or NGN seamlessly.",
-      cta: "Start Conversion",
-    });
+    await this.sendTextOnlyFlowWithDataById(
+      to,
+      convertFlowId,
+      convertFlowScreen,
+      {
+        header: "Convert Fiat",
+        body: "Convert between NGN, USD, EUR, and GBP seamlessly.",
+        cta: "Start Conversion",
+      },
+      {
+        currencies: [
+          { id: "USD", title: "USD" },
+          { id: "NGN", title: "NGN" },
+          { id: "EUR", title: "EUR" },
+          { id: "GBP", title: "GBP" },
+        ],
+      },
+    );
   }
 
   async sendPaymentLinkFlowById(to: string) {
