@@ -35,6 +35,16 @@ function formatFixed2(value: number): string {
   return value.toFixed(2);
 }
 
+function formatExchangeRate(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return "0";
+
+  if (value >= 1) {
+    return value.toFixed(2);
+  }
+
+  return value.toFixed(8).replace(/\.?0+$/, "");
+}
+
 async function getBalanceByCurrency(
   walletAddress: string,
   currency: CurrencyType,
@@ -179,7 +189,7 @@ export async function getConversionFlowScreen(decryptedBody: {
             fromCurrency,
             toCurrency,
             amountToPay: formatFixed2(amountValue),
-            exchangeRate: formatFixed2(exchangeRate),
+            exchangeRate: formatExchangeRate(exchangeRate),
             amountToReceive: formatFixed2(amountToReceiveNumber),
           },
         };
