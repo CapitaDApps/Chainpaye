@@ -8,6 +8,7 @@ import {
 import { generateLinkFlow } from "../controllers/grl.controller";
 import { invoiceController } from "../controllers/invoice.controller";
 import { kycFlowController } from "../controllers/kyc.controller";
+import { paymentLinkSuccessWebhook } from "../controllers/paymentLinkWebhook.controller";
 import { setupPinFlow } from "../controllers/setupPinFlow.controller";
 import { topupFlow } from "../controllers/topUpFlow.controller";
 import { transferFlowController } from "../controllers/transferFlow.controller";
@@ -30,6 +31,7 @@ router.post("/offramp", cryptoTopupFlow);
 // Enhanced deposit notification webhooks with WorkflowController integration
 router.post("/deposit-notification", handleCrossmintDepositWebhook);
 router.post("/test-deposit-notification", testDepositNotification);
+router.post("/payment-link/success", paymentLinkSuccessWebhook);
 
 // Legacy webhook endpoint (for backward compatibility)
 router.post("/deposit-webhook", handleCrossmintDepositWebhook);

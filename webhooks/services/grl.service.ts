@@ -174,6 +174,17 @@ function getPaymentLinkApiTimeoutMs(): number {
   return Math.min(value, maxSafeTimeout);
 }
 
+function getPaymentLinkSuccessWebhookUrl(): string {
+  const configured = process.env.PAYMENT_LINK_SUCCESS_WEBHOOK_URL?.trim();
+  if (configured) return configured;
+
+  const appBaseUrl =
+    process.env.APP_BASE_URL?.trim() || process.env.WEBHOOK_BASE_URL?.trim();
+  if (!appBaseUrl) return "";
+
+  return `${appBaseUrl.replace(/\/+$/, "")}/flow/payment-link/success`;
+}
+
 function getShareableLink(
   apiData: PaymentLinkApiData,
   fallbackBaseUrl: string,
@@ -642,6 +653,10 @@ export async function getGenerateLinkScreen(decryptedBody: {
           };
         }
 
+        // Prefer internal webhook URL for payment success notifications.
+        // Keep flow-provided successUrl as a fallback for backward compatibility.
+        const resolvedSuccessUrl = getPaymentLinkSuccessWebhookUrl() || successUrl;
+
         const payload: PaymentLinkCreatePayload = {
           merchantId,
           userId: user.userId,
@@ -653,11 +668,13 @@ export async function getGenerateLinkScreen(decryptedBody: {
           selectedCurrency: currency,
           paymentType,
           ...(description && { description }),
-          ...(successUrl && { successUrl }),
+          ...(resolvedSuccessUrl && { successUrl: resolvedSuccessUrl }),
           metadata: {
             source: "whatsapp_flow",
             flowToken: flow_token,
             whatsappNumber: user.whatsappNumber,
+            ...(successUrl && { flowSuccessUrl: successUrl }),
+            ...(resolvedSuccessUrl && { webhookSuccessUrl: resolvedSuccessUrl }),
           },
         };
 
