@@ -81,7 +81,7 @@ export async function getConversionFlowScreen(decryptedBody: {
   }
 
   if (data?.error) {
-    console.warn("Received client error:", data);
+    console.warn("Received client error: ", data);
     return {
       data: {
         status: "Error",
@@ -111,7 +111,8 @@ export async function getConversionFlowScreen(decryptedBody: {
             screen: "CONVERT_ENTRY",
             data: {
               currencies: currencyOptions,
-              error_message: "Session expired. Restart flow from a new message.",
+              error_message:
+                "Session expired. Restart flow from a new message.",
             },
           };
         }
@@ -135,8 +136,7 @@ export async function getConversionFlowScreen(decryptedBody: {
             screen: "CONVERT_ENTRY",
             data: {
               currencies: currencyOptions,
-              error_message:
-                "From currency cannot be the same as To currency.",
+              error_message: "From currency cannot be the same as To currency.",
             },
           };
         }
@@ -151,9 +151,8 @@ export async function getConversionFlowScreen(decryptedBody: {
           };
         }
 
-        const { wallet: toronetWallet } = await userService.getUserToroWallet(
-          phone,
-        );
+        const { wallet: toronetWallet } =
+          await userService.getUserToroWallet(phone);
 
         const fromBalance = await getBalanceByCurrency(
           toronetWallet.publicKey,
@@ -201,7 +200,8 @@ export async function getConversionFlowScreen(decryptedBody: {
             screen: "CONVERT_ENTRY",
             data: {
               currencies: currencyOptions,
-              error_message: "Session expired. Restart flow from a new message.",
+              error_message:
+                "Session expired. Restart flow from a new message.",
             },
           };
         }
@@ -284,9 +284,11 @@ export async function getConversionFlowScreen(decryptedBody: {
           })
           .then((result) => {
             if (result.success) {
-              redisClient.del(quoteId).catch((err) =>
-                console.log("Error deleting conversion quote cache", err),
-              );
+              redisClient
+                .del(quoteId)
+                .catch((err) =>
+                  console.log("Error deleting conversion quote cache", err),
+                );
 
               if (result.transaction) {
                 sendTransactionReceipt(
@@ -297,9 +299,11 @@ export async function getConversionFlowScreen(decryptedBody: {
             }
           })
           .catch((error) => {
-            redisClient.del(quoteId).catch((err) =>
-              console.log("Error deleting conversion quote cache", err),
-            );
+            redisClient
+              .del(quoteId)
+              .catch((err) =>
+                console.log("Error deleting conversion quote cache", err),
+              );
             console.log("Error during conversion", error);
           });
 
