@@ -5,7 +5,6 @@ import handlebars from "handlebars";
 import { fileURLToPath } from "url";
 import { TransactionType, TransactionStatus } from "../models/Transaction";
 import { IUser } from "../models/User";
-import { toronetService } from "../services";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -56,11 +55,26 @@ type ReceiptData = StandardTransactionReceipt | ConversionReceipt;
  * Format currency amount with symbol
  */
 function formatAmount(amount: number, currency: string): string {
-  const symbol = currency === "USD" ? "$" : "₦";
-  return `${symbol}${amount.toLocaleString("en-US", {
+  const normalizedCurrency = (currency || "").toUpperCase();
+  const prefixByCurrency: Record<string, string> = {
+    USD: "$",
+    NGN: "NGN ",
+    EUR: "EUR ",
+    GBP: "GBP ",
+  };
+  const prefix =
+    prefixByCurrency[normalizedCurrency] || `${normalizedCurrency} `;
+
+  return `${prefix}${amount.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+}
+
+function formatExchangeRate(rate: number): string {
+  if (!Number.isFinite(rate) || rate <= 0) return "0";
+  if (rate >= 1) return rate.toFixed(2);
+  return rate.toFixed(8).replace(/\.?0+$/, "");
 }
 
 /**
@@ -128,15 +142,19 @@ export async function formatTransactionData(
       transaction.fromCurrency
     );
     const amountTo = formatAmount(transaction.toAmount, transaction.toCurrency);
-    // const exchangeRate = `1 ${transaction.fromCurrency} @ ${formatAmount(
-    //   transaction.toAmount / transaction.fromAmount,
-    //   transaction.toCurrency
-    // ).replace(/[^\d.,]/g, "")} ${transaction.toCurrency}`;
-    const nairaRate = await toronetService.getNairaToDollarExchangeRate();
-    const exchangeRate = `1 USD @ ${formatAmount(nairaRate, "NGN").replace(
-      /[^\d.,]/g,
-      ""
-    )} NGN`;
+    const fromAmountValue = Number(transaction.fromAmount);
+    const toAmountValue = Number(transaction.toAmount);
+    const computedRate =
+      Number.isFinite(fromAmountValue) &&
+      Number.isFinite(toAmountValue) &&
+      fromAmountValue > 0
+        ? toAmountValue / fromAmountValue
+        : NaN;
+    const exchangeRate = Number.isFinite(computedRate)
+      ? `1 ${transaction.fromCurrency} = ${formatExchangeRate(
+          computedRate
+        )} ${transaction.toCurrency}`
+      : "N/A";
 
     const conversionReceipt: ConversionReceipt = {
       isConversion: true,

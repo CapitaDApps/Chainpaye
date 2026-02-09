@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 import { nanoid } from "nanoid";
 import { walletService } from ".";
 import { User } from "../models/User";
-import { Wallet } from "../models/Wallet";
+import { StablecoinType, Wallet } from "../models/Wallet";
 import { getCountryCodeFromPhoneNumber } from "../utils/countryCodeMapping";
 
 type CreateUserType = {
@@ -53,6 +53,25 @@ export class UserService {
 
     if (!wallet)
       throw new Error(`Wallet for user - ${phoneNumber} was not found`);
+
+    const missingBalancePatch: Record<string, number> = {};
+    if (
+      typeof (wallet.balances as any)?.[StablecoinType.TORO_EUR] !== "number"
+    ) {
+      missingBalancePatch[`balances.${StablecoinType.TORO_EUR}`] = 0;
+    }
+    if (
+      typeof (wallet.balances as any)?.[StablecoinType.TORO_GBP] !== "number"
+    ) {
+      missingBalancePatch[`balances.${StablecoinType.TORO_GBP}`] = 0;
+    }
+    if (Object.keys(missingBalancePatch).length > 0) {
+      await Wallet.updateOne({ _id: wallet._id }, { $set: missingBalancePatch });
+      (wallet.balances as any)[StablecoinType.TORO_EUR] =
+        (wallet.balances as any)[StablecoinType.TORO_EUR] ?? 0;
+      (wallet.balances as any)[StablecoinType.TORO_GBP] =
+        (wallet.balances as any)[StablecoinType.TORO_GBP] ?? 0;
+    }
 
     return { wallet, user };
   }
