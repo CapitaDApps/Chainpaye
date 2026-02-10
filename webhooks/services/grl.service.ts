@@ -165,8 +165,8 @@ function getPaymentLinkApiBaseUrl(): string {
 
 function getPaymentLinkApiTimeoutMs(): number {
   // Keep timeout below WhatsApp Flow response window to avoid client-side timeout/blank screens.
-  const defaultTimeout = 12000;
-  const maxSafeTimeout = 15000;
+  const defaultTimeout = 8000;
+  const maxSafeTimeout = 9000;
   const value = Number(
     process.env.PAYMENT_LINK_API_TIMEOUT_MS || defaultTimeout,
   );
