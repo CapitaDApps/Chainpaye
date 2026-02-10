@@ -23,6 +23,7 @@ export interface Bank {
 }
 
 type BalanceResult = { result: boolean; balance: number; message: string };
+type FiatVirtualWalletCurrency = "NGN" | "USD" | "EUR" | "GBP";
 type InitializeDepositReturn =
   | {
       result: boolean;
@@ -111,6 +112,18 @@ export class ToronetService {
   }
 
   async createVirtualWalletNGN(data: { address: string; fullName: string }) {
+    return this.createVirtualWallet({
+      address: data.address,
+      fullName: data.fullName,
+      currency: "NGN",
+    });
+  }
+
+  async createVirtualWallet(data: {
+    address: string;
+    fullName: string;
+    currency: FiatVirtualWalletCurrency;
+  }) {
     const body = {
       op: "generatevirtualwallet",
       params: [
@@ -124,7 +137,7 @@ export class ToronetService {
         },
         {
           name: "currency",
-          value: "NGN", //current options are USD, EUR, NGN - default
+          value: data.currency, //current options are USD, EUR, NGN - default
         },
       ],
     };
@@ -144,7 +157,51 @@ export class ToronetService {
       accountname: resp.data.accountname,
       newwallet: resp.data.newwallet,
       lastcheck: resp.data.lastcheck,
+      currency: data.currency,
     };
+  }
+
+  async ensureFiatVirtualWallets(data: {
+    address: string;
+    fullName: string;
+  }): Promise<void> {
+    const currencies: FiatVirtualWalletCurrency[] = [
+      "NGN",
+      "USD",
+      "EUR",
+      "GBP",
+    ];
+
+    const results = await Promise.allSettled(
+      currencies.map((currency) =>
+        this.createVirtualWallet({
+          address: data.address,
+          fullName: data.fullName,
+          currency,
+        }),
+      ),
+    );
+
+    const failed = results
+      .map((result, index) => ({ result, currency: currencies[index] }))
+      .filter(
+        (
+          item,
+        ): item is {
+          result: PromiseRejectedResult;
+          currency: FiatVirtualWalletCurrency;
+        } => item.result.status === "rejected",
+      );
+
+    if (failed.length > 0) {
+      console.warn(
+        "Some fiat virtual wallets could not be created",
+        failed.map((item) => ({
+          currency: item.currency,
+          reason: item.result.reason,
+        })),
+      );
+    }
   }
 
   async initializeDeposit({
@@ -663,6 +720,60 @@ export class ToronetService {
     };
   }
 
+  async getBalanceEUR(address: string): Promise<BalanceResult> {
+    const body = this.formBalanceBody(address);
+
+    try {
+      const resp = await axios({
+        method: "GET",
+        url: `${this.baseUrl}/currency/euro/`,
+        data: body,
+      });
+
+      const data = resp.data;
+
+      return {
+        result: data.result,
+        balance: Number(data.balance),
+        message: data.message,
+      };
+    } catch (error) {
+      console.error("Error fetching EUR balance", error);
+      return {
+        result: false,
+        balance: 0,
+        message: "Error fetching EUR balance",
+      };
+    }
+  }
+
+  async getBalanceGBP(address: string): Promise<BalanceResult> {
+    const body = this.formBalanceBody(address);
+
+    try {
+      const resp = await axios({
+        method: "GET",
+        url: `${this.baseUrl}/currency/pound/`,
+        data: body,
+      });
+
+      const data = resp.data;
+
+      return {
+        result: data.result,
+        balance: Number(data.balance),
+        message: data.message,
+      };
+    } catch (error) {
+      console.error("Error fetching GBP balance", error);
+      return {
+        result: false,
+        balance: 0,
+        message: "Error fetching GBP balance",
+      };
+    }
+  }
+
   async transferTORO(
     from: string,
     to: string,
@@ -733,19 +844,12 @@ export class ToronetService {
     const decryptedPassword = this.decrypt(password);
     const body = this.formBuyToroBody(address, decryptedPassword, amount);
 
-    const nairaEndpoint = "/currency/naira/cl";
-    const dollarEndpoint = "/currency/dollar/cl";
-    let resp: AxiosResponse<any, any, {}>;
-    switch (currency) {
-      case "USD":
-        resp = await this.axiosInstance.post(dollarEndpoint, body);
-        return resp.data.result;
-      case "NGN":
-        resp = await this.axiosInstance.post(nairaEndpoint, body);
-        return resp.data.result;
-      default:
-        throw new Error("Unknown currency " + currency);
-    }
+    const endpoint = this.getFiatCurrencyEndpointPath(currency);
+    const resp: AxiosResponse<any, any, {}> = await this.axiosInstance.post(
+      endpoint,
+      body,
+    );
+    return resp.data.result;
   }
 
   // TODO: Implement Withdrawal NGN
@@ -1122,6 +1226,9 @@ export class ToronetService {
     user: Types.ObjectId; // Optional userId for recording transactions
   }) {
     if (from === to) throw new Error("You cannot convert to the same currency");
+    console.log("---- Conversion Start ----");
+    console.log("From:", from, "To:", to, "Amount:", amount);
+
     // Buy to TORO
     const buyBody = {
       op: "buytoro",
@@ -1131,6 +1238,8 @@ export class ToronetService {
         { name: "val", value: amount },
       ],
     };
+
+    console.log("Buy Body Params:", JSON.stringify(buyBody.params, null, 2));
 
     function getSellBody(amount: string, decryptedPassword: string) {
       return {
@@ -1154,6 +1263,11 @@ export class ToronetService {
       ],
     };
 
+    console.log(
+      "Calc Buy Body Params:",
+      JSON.stringify(calBuyBody.params, null, 2),
+    );
+
     function getCalcSellBody(amount: string) {
       return {
         op: "calculatesellresult",
@@ -1167,160 +1281,86 @@ export class ToronetService {
       };
     }
 
-    let toroReceivedAmount: string;
-    let buyTxHash: string;
-    let sellTxHash: string;
-    let convertedAmount: string;
+    const fromPath = this.getFiatCurrencyEndpointPath(from);
+    const toPath = this.getFiatCurrencyEndpointPath(to);
 
-    switch (from) {
-      case "NGN": {
-        const [calcResp, buyResp] = await Promise.all([
-          axios({
-            url: `${this.baseUrl}/currency/naira/cl`,
-            data: calBuyBody,
-            method: "GET",
-          }),
-          this.axiosInstance.post("/currency/naira/cl", buyBody),
-        ]);
+    const [calcBuyResp, buyResp] = await Promise.all([
+      axios({
+        url: `${this.baseUrl}${fromPath}`,
+        data: calBuyBody,
+        method: "GET",
+      }),
+      this.axiosInstance.post(fromPath, buyBody),
+    ]);
 
-        const calcData = calcResp.data;
-        const receivingToro = calcData.amount;
-        const buyRespData = buyResp.data;
-        if (buyRespData.result) {
-          toroReceivedAmount = receivingToro;
-          buyTxHash = buyRespData.transaction;
-        } else {
-          throw new Error(buyRespData.error);
-        }
-        break;
-      }
-      case "USD": {
-        const [calcResp, buyResp] = await Promise.all([
-          axios({
-            url: `${this.baseUrl}/currency/dollar/cl`,
-            data: calBuyBody,
-            method: "GET",
-          }),
-          this.axiosInstance.post("/currency/dollar/cl", buyBody),
-        ]);
+    const buyRespData = buyResp.data;
+    const calcBuyData = calcBuyResp.data;
 
-        const calcData = calcResp.data;
-        const receivingToro = calcData.amount;
-        const buyRespData = buyResp.data;
-        if (buyRespData.result) {
-          toroReceivedAmount = receivingToro;
-          buyTxHash = buyRespData.transaction;
-        } else {
-          throw new Error(buyRespData.error);
-        }
-        break;
-      }
-      default:
-        throw new Error(`Invalid currency passed - ${from}`);
+    console.log("Calc Buy Response:", JSON.stringify(calcBuyData, null, 2));
+    console.log("Buy Response:", JSON.stringify(buyRespData, null, 2));
+    if (!buyRespData.result) {
+      throw new Error(buyRespData.error || `Error converting from ${from}`);
     }
 
-    // SELL TORO from relative endpoint
-    switch (to) {
-      case "NGN": {
-        if (!toroReceivedAmount) throw new Error("Error converting to ngn");
-        const body = getSellBody(toroReceivedAmount, this.decrypt(password));
+    const toroReceivedAmount: string = calcBuyData.amount;
+    const buyTxHash: string = buyRespData.transaction;
 
-        const [calcResp, sellResp] = await Promise.all([
-          axios({
-            url: `${this.baseUrl}/currency/naira/cl`,
-            data: getCalcSellBody(toroReceivedAmount),
-            method: "GET",
-          }),
-          this.axiosInstance.post("/currency/naira/cl", body),
-        ]);
+    console.log("TORO Received Amount:", toroReceivedAmount);
 
-        const sellData = sellResp.data;
-        const calcRespData = calcResp.data;
-
-        if (sellData.result) {
-          sellTxHash = sellData.transaction;
-          convertedAmount = calcRespData.amount;
-
-          // Record conversion transaction if userId is provided
-          const transaction = await TransactionService.recordConversion({
-            refId: `CONV_${Date.now()}`,
-            toronetTxId: `${buyTxHash}_${sellTxHash}`,
-            status: TransactionStatus.COMPLETED as any,
-            fromUser: user,
-            fromCurrency: from,
-            toCurrency: to,
-            fromAmount: parseFloat(amount),
-            toAmount: parseFloat(convertedAmount),
-          });
-
-          // Return transaction in the result
-          return {
-            success: true,
-            fromAmount: amount,
-            fromCurrency: from,
-            toAmount: convertedAmount,
-            toCurrency: to,
-            transactionHashes: {
-              buy: buyTxHash,
-              sell: sellTxHash,
-            },
-            transaction,
-          };
-        } else {
-          throw new Error(sellData.error);
-        }
-      }
-      case "USD": {
-        if (!toroReceivedAmount) throw new Error("Error converting to usd");
-
-        const body = getSellBody(toroReceivedAmount, this.decrypt(password));
-
-        const [calcResp, sellResp] = await Promise.all([
-          axios({
-            url: `${this.baseUrl}/currency/dollar/cl`,
-            data: getCalcSellBody(toroReceivedAmount),
-            method: "GET",
-          }),
-          this.axiosInstance.post("/currency/dollar/cl", body),
-        ]);
-
-        const calcRespData = calcResp.data;
-        const sellData = sellResp.data;
-        convertedAmount = calcRespData.amount;
-
-        if (sellData.result) {
-          sellTxHash = sellData.transaction;
-
-          const transaction = await TransactionService.recordConversion({
-            refId: `CONV_${Date.now()}`,
-            toronetTxId: `${buyTxHash}_${sellTxHash}`,
-            status: TransactionStatus.COMPLETED,
-            fromUser: user,
-            fromCurrency: from,
-            toCurrency: to,
-            fromAmount: parseFloat(amount),
-            toAmount: parseFloat(convertedAmount),
-          });
-
-          return {
-            success: true,
-            fromAmount: amount,
-            fromCurrency: from,
-            toAmount: convertedAmount,
-            toCurrency: to,
-            transactionHashes: {
-              buy: buyTxHash,
-              sell: sellTxHash,
-            },
-            transaction,
-          };
-        } else {
-          throw new Error(sellData.error);
-        }
-      }
-      default:
-        throw new Error(`Invalid target currency passed - ${to}`);
+    if (!toroReceivedAmount) {
+      throw new Error(`Error calculating ${from} to TORO conversion`);
     }
+
+    const sellBody = getSellBody(toroReceivedAmount, this.decrypt(password));
+    console.log("Sell Body Params:", JSON.stringify(sellBody.params, null, 2));
+    const [calcSellResp, sellResp] = await Promise.all([
+      axios({
+        url: `${this.baseUrl}${toPath}`,
+        data: getCalcSellBody(toroReceivedAmount),
+        method: "GET",
+      }),
+      this.axiosInstance.post(toPath, sellBody),
+    ]);
+
+    const sellData = sellResp.data;
+    console.log(
+      "Calc Sell Response:",
+      JSON.stringify(calcSellResp.data, null, 2),
+    );
+    console.log("Sell Response:", JSON.stringify(sellData, null, 2));
+    if (!sellData.result) {
+      throw new Error(sellData.error || `Error converting to ${to}`);
+    }
+
+    const sellTxHash: string = sellData.transaction;
+    const convertedAmount: string = calcSellResp.data.amount;
+    if (!convertedAmount) {
+      throw new Error(`Error calculating TORO to ${to} conversion`);
+    }
+
+    const transaction = await TransactionService.recordConversion({
+      refId: `CONV_${Date.now()}`,
+      toronetTxId: `${buyTxHash}_${sellTxHash}`,
+      status: TransactionStatus.COMPLETED,
+      fromUser: user,
+      fromCurrency: from,
+      toCurrency: to,
+      fromAmount: parseFloat(amount),
+      toAmount: parseFloat(convertedAmount),
+    });
+
+    return {
+      success: true,
+      fromAmount: amount,
+      fromCurrency: from,
+      toAmount: convertedAmount,
+      toCurrency: to,
+      transactionHashes: {
+        buy: buyTxHash,
+        sell: sellTxHash,
+      },
+      transaction,
+    };
   }
 
   async simulateConversion({
@@ -1336,6 +1376,9 @@ export class ToronetService {
   }) {
     if (from === to) throw new Error("You cannot convert to the same currency");
 
+    console.log("---- Simulation Start ----");
+    console.log("From:", from, "To:", to, "Amount:", amount);
+
     const calBuyBody = {
       op: "calculatebuyresult",
       params: [
@@ -1346,6 +1389,11 @@ export class ToronetService {
         { name: "val", value: amount },
       ],
     };
+
+    console.log(
+      "Calc Buy Body Params:",
+      JSON.stringify(calBuyBody.params, null, 2),
+    );
 
     const calSellBody = (toroAmount: string) => ({
       op: "calculatesellresult",
@@ -1358,87 +1406,43 @@ export class ToronetService {
       ],
     });
 
-    let toroReceivedAmount: string;
+    const fromPath = this.getFiatCurrencyEndpointPath(from);
+    const toPath = this.getFiatCurrencyEndpointPath(to);
 
-    // Calculate how much TORO will be received from the source currency
-    switch (from) {
-      case "NGN": {
-        const calcResp = await axios({
-          url: `${this.baseUrl}/currency/naira/cl`,
-          data: calBuyBody,
-          method: "GET",
-        });
-        const calcData = calcResp.data;
-        if (calcData.result) {
-          toroReceivedAmount = calcData.amount;
-        } else {
-          throw new Error(
-            calcData.error || "Error calculating NGN to TORO conversion",
-          );
-        }
-        break;
-      }
-      case "USD": {
-        const calcResp = await axios({
-          url: `${this.baseUrl}/currency/dollar/cl`,
-          data: calBuyBody,
-          method: "GET",
-        });
-        const calcData = calcResp.data;
-        if (calcData.result) {
-          toroReceivedAmount = calcData.amount;
-        } else {
-          throw new Error(
-            calcData.error || "Error calculating USD to TORO conversion",
-          );
-        }
-        break;
-      }
-      default:
-        throw new Error(`Invalid source currency passed - ${from}`);
+    const calcBuyResp = await axios({
+      url: `${this.baseUrl}${fromPath}`,
+      data: calBuyBody,
+      method: "GET",
+    });
+    const calcBuyData = calcBuyResp.data;
+    console.log("Calc Buy Response:", JSON.stringify(calcBuyData, null, 2));
+    if (!calcBuyData.result) {
+      throw new Error(
+        calcBuyData.error || `Error calculating ${from} to TORO conversion`,
+      );
+    }
+    const toroReceivedAmount: string = calcBuyData.amount;
+    console.log("TORO Received Amount:", toroReceivedAmount);
+    if (!toroReceivedAmount) {
+      throw new Error(`Error calculating ${from} to TORO conversion`);
     }
 
-    // Calculate how much target currency will be received from TORO
-    let finalAmount: string;
-    switch (to) {
-      case "NGN": {
-        if (!toroReceivedAmount)
-          throw new Error("Error calculating TORO to NGN conversion");
-        const calcResp = await axios({
-          url: `${this.baseUrl}/currency/naira/cl`,
-          data: calSellBody(toroReceivedAmount),
-          method: "GET",
-        });
-        const calcData = calcResp.data;
-        if (calcData.result) {
-          finalAmount = calcData.amount;
-        } else {
-          throw new Error(
-            calcData.error || "Error calculating TORO to NGN conversion",
-          );
-        }
-        break;
-      }
-      case "USD": {
-        if (!toroReceivedAmount)
-          throw new Error("Error calculating TORO to USD conversion");
-        const calcResp = await axios({
-          url: `${this.baseUrl}/currency/dollar/cl`,
-          data: calSellBody(toroReceivedAmount),
-          method: "GET",
-        });
-        const calcData = calcResp.data;
-        if (calcData.result) {
-          finalAmount = calcData.amount;
-        } else {
-          throw new Error(
-            calcData.error || "Error calculating TORO to USD conversion",
-          );
-        }
-        break;
-      }
-      default:
-        throw new Error(`Invalid target currency passed - ${to}`);
+    const calcSellResp = await axios({
+      url: `${this.baseUrl}${toPath}`,
+      data: calSellBody(toroReceivedAmount),
+      method: "GET",
+    });
+    const calcSellData = calcSellResp.data;
+    console.log("Calc Sell Response:", JSON.stringify(calcSellData, null, 2));
+    if (!calcSellData.result) {
+      throw new Error(
+        calcSellData.error || `Error calculating TORO to ${to} conversion`,
+      );
+    }
+
+    const finalAmount: string = calcSellData.amount;
+    if (!finalAmount) {
+      throw new Error(`Error calculating TORO to ${to} conversion`);
     }
 
     return {
@@ -1458,7 +1462,7 @@ export class ToronetService {
       data: { op: "getexchangerate", params: [] },
     });
     const data = resp.data;
-    console.log({ conversionData: data });
+    console.log("Exchange Rate Response:", JSON.stringify(data, null, 2));
 
     if (data.result) {
       const toroNairaRatio = parseFloat(data.exchangerate);
@@ -1533,6 +1537,21 @@ export class ToronetService {
         { name: "val", value: amount },
       ],
     };
+  }
+
+  private getFiatCurrencyEndpointPath(currency: CurrencyType): string {
+    switch (currency) {
+      case "NGN":
+        return "/currency/naira/cl";
+      case "USD":
+        return "/currency/dollar/cl";
+      case "EUR":
+        return "/currency/euro/cl";
+      case "GBP":
+        return "/currency/pound/cl";
+      default:
+        throw new Error(`Invalid currency passed - ${currency}`);
+    }
   }
 
   private formBalanceBody(address: string) {

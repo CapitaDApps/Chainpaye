@@ -17,7 +17,7 @@ export interface IUser extends Document {
   fullName: string; // Set during onboarding, used for wallet creation
   email?: string;
   country: string;
-  currency: "USD" | "NGN";
+  currency: "USD" | "NGN" | "EUR" | "GBP";
   isVerified: boolean;
   verificationCode?: string;
   verificationCodeExpires?: Date;
@@ -83,10 +83,12 @@ const UserSchema: Schema = new Schema(
     currency: {
       type: String,
       required: true,
-      enum: ["USD", "NGN"],
+      enum: ["USD", "NGN", "EUR", "GBP"],
       default: function () {
         // Default currency based on country
-        return this.country === "US" ? "USD" : "NGN";
+        if (this.country === "US") return "USD";
+        if (this.country === "GB") return "GBP";
+        return "NGN";
       },
     },
     isVerified: {

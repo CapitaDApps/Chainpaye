@@ -5,6 +5,7 @@ import {
   handleAccountInfo,
   handleConversion,
   handleOfframp,
+  handlePaymentLink,
   handleSupport,
   handleTopUp,
   handleTransactionHistory,
@@ -188,6 +189,10 @@ export async function commandRouteHandler(from: string, message: string) {
 
     case "offramp":
       await handleOfframp(from, message);
+      break;
+
+    case "paymentLink":
+      await handlePaymentLink(from);
       break;
 
     case "kyc":

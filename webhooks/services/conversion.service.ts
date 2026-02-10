@@ -1,7 +1,134 @@
 import { Types } from "mongoose";
+import {
+  toronetService,
+  userService,
+  whatsappBusinessService,
+} from "../../services";
 import { redisClient } from "../../services/redis";
 import { sendTransactionReceipt } from "../../utils/sendReceipt";
-import { toronetService, userService } from "../../services";
+import { CurrencyType } from "../../types/toronetService.types";
+
+const SUPPORTED_CURRENCIES: CurrencyType[] = ["USD", "NGN", "EUR", "GBP"];
+
+const currencyOptions = SUPPORTED_CURRENCIES.map((currency) => ({
+  id: currency,
+  title: currency,
+}));
+
+function normalizeCurrency(value: unknown): CurrencyType | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toUpperCase();
+  if (
+    normalized === "USD" ||
+    normalized === "NGN" ||
+    normalized === "EUR" ||
+    normalized === "GBP"
+  ) {
+    return normalized;
+  }
+  return null;
+}
+
+function parsePositiveAmount(value: unknown): number {
+  if (typeof value === "number") return value;
+  if (typeof value === "string") return Number(value.replace(/,/g, "").trim());
+  return NaN;
+}
+
+function formatFixed2(value: number): string {
+  return value.toFixed(2);
+}
+
+function formatExchangeRate(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return "0";
+
+  if (value >= 1) {
+    return value.toFixed(2);
+  }
+
+  return value.toFixed(8).replace(/\.?0+$/, "");
+}
+
+function buildUserFullName(user: {
+  fullName?: string;
+  firstName?: string;
+  lastName?: string;
+}): string {
+  const byFullName = (user.fullName || "").trim();
+  if (byFullName) return byFullName;
+
+  const bySplitName = `${user.firstName || ""} ${user.lastName || ""}`.trim();
+  if (bySplitName) return bySplitName;
+
+  return "Chainpaye User";
+}
+
+async function ensureEurGbpWalletsForConversion(params: {
+  address: string;
+  fullName: string;
+  currencies: CurrencyType[];
+}) {
+  const targetCurrencies = Array.from(
+    new Set(
+      params.currencies.filter(
+        (currency): currency is Extract<CurrencyType, "EUR" | "GBP"> =>
+          currency === "EUR" || currency === "GBP",
+      ),
+    ),
+  );
+
+  for (const currency of targetCurrencies) {
+    const balanceResult =
+      currency === "EUR"
+        ? await toronetService.getBalanceEUR(params.address)
+        : await toronetService.getBalanceGBP(params.address);
+
+    if (balanceResult.result) continue;
+
+    const createResult = await toronetService.createVirtualWallet({
+      address: params.address,
+      fullName: params.fullName,
+      currency,
+    });
+
+    if (!createResult.result) {
+      throw new Error(`Unable to initialize ${currency} wallet for conversion.`);
+    }
+  }
+}
+
+async function sendConversionProcessingMessageOnce(
+  phone: string,
+  flowToken: string,
+) {
+  const processingMessageCacheKey = `CONV_PROCESSING_MSG_${flowToken}`;
+  const alreadySent = await redisClient.get(processingMessageCacheKey);
+  if (alreadySent) return;
+
+  await whatsappBusinessService.sendNormalMessage(
+    "Your conversion request is being processed. You will receive confirmation shortly.",
+    phone,
+  );
+  await redisClient.set(processingMessageCacheKey, "1", "EX", 300);
+}
+
+async function getBalanceByCurrency(
+  walletAddress: string,
+  currency: CurrencyType,
+): Promise<number> {
+  switch (currency) {
+    case "USD":
+      return (await toronetService.getBalanceUSD(walletAddress)).balance;
+    case "NGN":
+      return (await toronetService.getBalanceNGN(walletAddress)).balance;
+    case "EUR":
+      return (await toronetService.getBalanceEUR(walletAddress)).balance;
+    case "GBP":
+      return (await toronetService.getBalanceGBP(walletAddress)).balance;
+    default:
+      return 0;
+  }
+}
 
 export async function getConversionFlowScreen(decryptedBody: {
   screen: string;
@@ -10,9 +137,8 @@ export async function getConversionFlowScreen(decryptedBody: {
   action: string;
   flow_token: string;
 }) {
-  const { screen, data, version, action, flow_token } = decryptedBody;
+  const { screen, data, action, flow_token } = decryptedBody;
 
-  // handle health check request
   if (action === "ping") {
     return {
       data: {
@@ -21,9 +147,8 @@ export async function getConversionFlowScreen(decryptedBody: {
     };
   }
 
-  // handle error notification
   if (data?.error) {
-    console.warn("Received client error:", data);
+    console.warn("Received client error: ", data);
     return {
       data: {
         status: "Error",
@@ -33,16 +158,15 @@ export async function getConversionFlowScreen(decryptedBody: {
   }
 
   const userPhone = await redisClient.get(flow_token);
-  // const userPhone = "+2348110236998";
-
   const phone = userPhone?.startsWith("+") ? userPhone : `+${userPhone}`;
   const quoteId = `QUOTE_${phone}`;
-  // handle initial request when opening the flow
 
   if (action === "INIT") {
     return {
       screen: "CONVERT_ENTRY",
-      data: {},
+      data: {
+        currencies: currencyOptions,
+      },
     };
   }
 
@@ -53,41 +177,23 @@ export async function getConversionFlowScreen(decryptedBody: {
           return {
             screen: "CONVERT_ENTRY",
             data: {
-              error_message: "Session expired. Restart flow a new message",
+              currencies: currencyOptions,
+              error_message:
+                "Session expired. Restart flow from a new message.",
             },
           };
         }
 
-        const { wallet: toronetWallet } = await userService.getUserToroWallet(
-          phone
-        );
+        const fromCurrency = normalizeCurrency(data?.fromCurrency);
+        const toCurrency = normalizeCurrency(data?.toCurrency);
+        const amountValue = parsePositiveAmount(data?.amount);
 
-        const [usdBalanceResult, ngnBalanceResult] = await Promise.all([
-          toronetService.getBalanceUSD(toronetWallet.publicKey),
-          toronetService.getBalanceNGN(toronetWallet.publicKey),
-        ]);
-
-        const usdBalance = usdBalanceResult.balance;
-        const ngnBalance = ngnBalanceResult.balance;
-
-        const { fromCurrency, toCurrency, amount } = data;
-
-        console.log({ data, usdBalance, ngnBalance });
-
-        if (fromCurrency == "USD" && amount > usdBalance) {
+        if (!fromCurrency || !toCurrency) {
           return {
             screen: "CONVERT_ENTRY",
             data: {
-              error_message: "Insufficient balance for conversion",
-            },
-          };
-        }
-
-        if (fromCurrency == "NGN" && amount > ngnBalance) {
-          return {
-            screen: "CONVERT_ENTRY",
-            data: {
-              error_message: "Insufficient balance for conversion",
+              currencies: currencyOptions,
+              error_message: "Select valid currencies to continue.",
             },
           };
         }
@@ -96,99 +202,261 @@ export async function getConversionFlowScreen(decryptedBody: {
           return {
             screen: "CONVERT_ENTRY",
             data: {
-              error_message: "From curreny cannot be equal to To currency",
+              currencies: currencyOptions,
+              error_message: "From currency cannot be the same as To currency.",
             },
           };
         }
 
-        const [nairaExchangeRate, simulationResult] = await Promise.all([
-          toronetService.getNairaToDollarExchangeRate(),
-          toronetService.simulateConversion({
-            from: fromCurrency,
-            to: toCurrency,
-            amount,
+        if (!Number.isFinite(amountValue) || amountValue <= 0) {
+          return {
+            screen: "CONVERT_ENTRY",
+            data: {
+              currencies: currencyOptions,
+              error_message: "Enter a valid amount greater than 0.",
+            },
+          };
+        }
+
+        const { wallet: toronetWallet, user } =
+          await userService.getUserToroWallet(phone);
+
+        try {
+          await ensureEurGbpWalletsForConversion({
             address: toronetWallet.publicKey,
-          }),
-        ]).catch((err) => {
-          redisClient.del(quoteId);
-          throw err;
+            fullName: buildUserFullName(user),
+            currencies: [fromCurrency, toCurrency],
+          });
+        } catch (error) {
+          console.log("Error ensuring EUR/GBP wallets for conversion quote", {
+            phone,
+            fromCurrency,
+            toCurrency,
+            error,
+          });
+          return {
+            screen: "CONVERT_ENTRY",
+            data: {
+              currencies: currencyOptions,
+              error_message:
+                "Could not prepare selected wallet for conversion. Please try again.",
+            },
+          };
+        }
+
+        const fromBalance = await getBalanceByCurrency(
+          toronetWallet.publicKey,
+          fromCurrency,
+        );
+        if (amountValue > fromBalance) {
+          return {
+            screen: "CONVERT_ENTRY",
+            data: {
+              currencies: currencyOptions,
+              error_message: "Insufficient balance for conversion.",
+            },
+          };
+        }
+
+        const simulationResult = await toronetService.simulateConversion({
+          from: fromCurrency,
+          to: toCurrency,
+          amount: formatFixed2(amountValue),
+          address: toronetWallet.publicKey,
         });
+
+        const amountToReceiveNumber = Number(simulationResult.toAmount);
+        if (!Number.isFinite(amountToReceiveNumber)) {
+          throw new Error("Could not calculate conversion quote.");
+        }
+
+        const exchangeRate = amountToReceiveNumber / amountValue;
 
         return {
           screen: "CONVERT_QUOTE",
           data: {
             fromCurrency,
             toCurrency,
-            amountToPay: amount,
-            exchangeRate: nairaExchangeRate.toFixed(2),
-            amountToReceive: parseFloat(
-              parseFloat(simulationResult.toAmount).toFixed(2)
-            ).toLocaleString(),
+            amountToPay: formatFixed2(amountValue),
+            exchangeRate: formatExchangeRate(exchangeRate),
+            amountToReceive: formatFixed2(amountToReceiveNumber),
           },
         };
       }
 
       case "PIN": {
-        const { fromCurrency, amountToReceive, amountToPay, toCurrency, pin } =
-          data;
-
-        const [user, { wallet: userToroWallet }] = await Promise.all([
-          userService.getUser(phone, true),
-          userService.getUserToroWallet(phone, true),
-        ]);
-
-        if (!user)
-          throw new Error(
-            `user with phone number - [${phone}] does not exists`
-          );
-        const validPin = await user.comparePin(pin);
-
-        if (!validPin) {
+        if (!userPhone) {
           return {
-            screen: "PIN",
+            screen: "CONVERT_ENTRY",
             data: {
-              error_message: "Invalid pin",
+              currencies: currencyOptions,
+              error_message:
+                "Session expired. Restart flow from a new message.",
             },
           };
         }
 
-        toronetService
-          .convertToAndFro({
+        const fromCurrency = normalizeCurrency(data?.fromCurrency);
+        const toCurrency = normalizeCurrency(data?.toCurrency);
+        const amountToPayValue = parsePositiveAmount(data?.amountToPay);
+        const amountToReceiveValue = parsePositiveAmount(data?.amountToReceive);
+        const pin = typeof data?.pin === "string" ? data.pin.trim() : "";
+
+        if (
+          !fromCurrency ||
+          !toCurrency ||
+          !Number.isFinite(amountToPayValue) ||
+          amountToPayValue <= 0 ||
+          !Number.isFinite(amountToReceiveValue) ||
+          amountToReceiveValue <= 0
+        ) {
+          return {
+            screen: "PIN",
+            data: {
+              fromCurrency: fromCurrency || "",
+              toCurrency: toCurrency || "",
+              amountToPay: Number.isFinite(amountToPayValue)
+                ? formatFixed2(amountToPayValue)
+                : "",
+              amountToReceive: Number.isFinite(amountToReceiveValue)
+                ? formatFixed2(amountToReceiveValue)
+                : "",
+              error_message:
+                "Invalid conversion data. Please restart conversion.",
+            },
+          };
+        }
+
+        if (!pin) {
+          return {
+            screen: "PIN",
+            data: {
+              fromCurrency,
+              toCurrency,
+              amountToPay: formatFixed2(amountToPayValue),
+              amountToReceive: formatFixed2(amountToReceiveValue),
+              error_message: "Please enter your PIN.",
+            },
+          };
+        }
+
+        const { user, wallet: userToroWallet } = await userService.getUserToroWallet(
+          phone,
+          true,
+          true,
+        );
+
+        if (!user) {
+          throw new Error(`user with phone number - [${phone}] does not exist`);
+        }
+
+        const validPin = await user.comparePin(pin);
+        if (!validPin) {
+          return {
+            screen: "PIN",
+            data: {
+              fromCurrency,
+              toCurrency,
+              amountToPay: formatFixed2(amountToPayValue),
+              amountToReceive: formatFixed2(amountToReceiveValue),
+              error_message: "Invalid PIN.",
+            },
+          };
+        }
+
+        try {
+          await ensureEurGbpWalletsForConversion({
+            address: userToroWallet.publicKey,
+            fullName: buildUserFullName(user),
+            currencies: [fromCurrency, toCurrency],
+          });
+        } catch (error) {
+          console.log("Error ensuring EUR/GBP wallets before conversion", {
+            phone,
+            fromCurrency,
+            toCurrency,
+            error,
+          });
+          return {
+            screen: "PIN",
+            data: {
+              fromCurrency,
+              toCurrency,
+              amountToPay: formatFixed2(amountToPayValue),
+              amountToReceive: formatFixed2(amountToReceiveValue),
+              error_message:
+                "Could not prepare selected wallet for conversion. Please try again.",
+            },
+          };
+        }
+
+        try {
+          const result = await toronetService.convertToAndFro({
             from: fromCurrency,
             to: toCurrency,
-            amount: amountToPay,
+            amount: formatFixed2(amountToPayValue),
             password: userToroWallet.password,
             address: userToroWallet.publicKey,
             user: user._id as Types.ObjectId,
-          })
-          .then((result) => {
-            if (result.success) {
-              redisClient.del(quoteId);
-              // whatsappBusinessService.sendNormalMessage(
-              //   `Conversion of ${amountToPay} ${fromCurrency} to ${toCurrency} was successful. You have received ${toCurrency} ${result.toAmount}`,
-              //   phone
-              // );
-
-              // Send receipt asynchronously
-              if (result.transaction) {
-                sendTransactionReceipt(
-                  (result.transaction._id as Types.ObjectId).toString(),
-                  phone
-                ).catch((err) => console.log("Error sending receipt", err));
-              }
-            }
-          })
-          .catch((error) => {
-            redisClient.del(quoteId);
-            console.log("Error during conversion", error);
-            throw error;
           });
+
+          if (result.success) {
+            redisClient
+              .del(quoteId)
+              .catch((err) =>
+                console.log("Error deleting conversion quote cache", err),
+              );
+
+            if (result.transaction) {
+              sendTransactionReceipt(
+                (result.transaction._id as Types.ObjectId).toString(),
+                phone,
+              ).catch((err) => console.log("Error sending receipt", err));
+            }
+          }
+        } catch (error) {
+          redisClient
+            .del(quoteId)
+            .catch((err) =>
+              console.log("Error deleting conversion quote cache", err),
+            );
+
+          const errorMessage =
+            error instanceof Error && error.message
+              ? error.message
+              : "Conversion failed. Please try again.";
+
+          console.log("Error during conversion", error);
+
+          return {
+            screen: "PIN",
+            data: {
+              fromCurrency,
+              toCurrency,
+              amountToPay: formatFixed2(amountToPayValue),
+              amountToReceive: formatFixed2(amountToReceiveValue),
+              error_message: errorMessage,
+            },
+          };
+        }
+
+        sendConversionProcessingMessageOnce(phone, flow_token).catch((err) =>
+          console.log("Error sending conversion processing message", err),
+        );
 
         return {
           screen: "PROCESSING",
           data: {},
         };
       }
+
+      default:
+        break;
     }
   }
+
+  console.error("Unhandled request body:", decryptedBody);
+  throw new Error(
+    "Unhandled endpoint request. Make sure you handle the request action & screen logged above.",
+  );
 }

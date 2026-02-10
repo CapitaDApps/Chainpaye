@@ -6,7 +6,7 @@ import {
   TransactionType,
 } from "../models/Transaction";
 import { User } from "../models/User";
-import { Wallet } from "../models/Wallet";
+import { StablecoinType, Wallet } from "../models/Wallet";
 import { CoinType, CurrencyType } from "../types/toronetService.types";
 import { sendTransferReceipts } from "../utils/sendReceipt";
 import { TransactionService } from "./TransactionService";
@@ -16,22 +16,60 @@ export class WalletService {
     { userId, country }: { userId: string; country: string },
     session: mongo.ClientSession,
   ): Promise<void> {
-    const wallet = await Wallet.findOne({ userId });
+    const wallet = await Wallet.findOne({ userId }).session(session);
 
-    if (!wallet) {
-      const toronetWallet = await toronetService.createWallet();
-      console.log({ toronetWallet });
-      await Wallet.create(
-        [
-          {
-            userId,
-            publicKey: toronetWallet.walletAddress,
-            password: toronetWallet.password,
-          },
-        ],
-        { session },
-      );
+    if (wallet) {
+      const patch: Record<string, number> = {};
+      if (
+        typeof (wallet.balances as any)?.[StablecoinType.TORO_EUR] !== "number"
+      ) {
+        patch[`balances.${StablecoinType.TORO_EUR}`] = 0;
+      }
+      if (
+        typeof (wallet.balances as any)?.[StablecoinType.TORO_GBP] !== "number"
+      ) {
+        patch[`balances.${StablecoinType.TORO_GBP}`] = 0;
+      }
+
+      if (Object.keys(patch).length > 0) {
+        await Wallet.updateOne({ _id: wallet._id }, { $set: patch }, { session });
+      }
+      return;
     }
+
+    const toronetWallet = await toronetService.createWallet();
+    console.log({ toronetWallet });
+    await Wallet.create(
+      [
+        {
+          userId,
+          publicKey: toronetWallet.walletAddress,
+          password: toronetWallet.password,
+          balances: {
+            [StablecoinType.TORO_USD]: 0,
+            [StablecoinType.TORO_NGN]: 0,
+            [StablecoinType.TORO_EUR]: 0,
+            [StablecoinType.TORO_GBP]: 0,
+          },
+        },
+      ],
+      { session },
+    );
+  }
+
+  async ensureFiatVirtualWallets(userId: string, fullName: string): Promise<void> {
+    const wallet = await Wallet.findOne({ userId });
+    if (!wallet) {
+      console.warn(
+        `[ensureFiatVirtualWallets] Wallet not found for userId ${userId}`,
+      );
+      return;
+    }
+
+    await toronetService.ensureFiatVirtualWallets({
+      address: wallet.publicKey,
+      fullName,
+    });
   }
 
   async transfer(
@@ -491,6 +529,16 @@ export class WalletService {
 
   async usdBalance(address: string) {
     const bal = await toronetService.getBalanceUSD(address);
+    return bal;
+  }
+
+  async eurBalance(address: string) {
+    const bal = await toronetService.getBalanceEUR(address);
+    return bal;
+  }
+
+  async gbpBalance(address: string) {
+    const bal = await toronetService.getBalanceGBP(address);
     return bal;
   }
 

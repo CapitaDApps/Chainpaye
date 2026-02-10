@@ -350,6 +350,42 @@ const COMMANDS: Record<string, CommandConfig> = {
   },
 
   // ============================================================
+  // PAYMENT LINKS
+  // Create links to receive payments
+  // ============================================================
+  paymentLink: {
+    triggers: [
+      // Slash commands
+      "/paymentlink",
+      "/paymentlinks",
+      "/createlink",
+      "/getpaid",
+
+      // Payment link phrases
+      "payment link",
+      "payment links",
+      "create payment link",
+      "generate payment link",
+      "create link",
+      "generate link",
+      "request payment",
+      "get paid",
+      "invoice link",
+      "send payment link",
+      "collect payment",
+
+      // Natural language
+      "i want a payment link",
+      "i want to create a payment link",
+      "help me create a payment link",
+      "how do i create a payment link",
+      "create a link for payment",
+    ],
+    description: "Create a payment link to receive payments",
+    priority: 4,
+  },
+
+  // ============================================================
   // CURRENCY CONVERSION
   // Convert between fiat currencies
   // ============================================================
@@ -386,6 +422,26 @@ const COMMANDS: Record<string, CommandConfig> = {
       "gbp to ngn",
       "pound to naira",
       "euro to naira",
+      "eur to usd",
+      "usd to eur",
+      "gbp to usd",
+      "usd to gbp",
+      "eur to gbp",
+      "gbp to eur",
+      "eur to dollar",
+      "dollar to eur",
+      "gbp to dollar",
+      "dollar to gbp",
+      "pound to dollar",
+      "dollar to pound",
+      "euro to dollar",
+      "dollar to euro",
+      "naira to euro",
+      "naira to pound",
+      "ngn to eur",
+      "ngn to gbp",
+      "eur to naira",
+      "gbp to naira",
 
       // Natural language
       "i want to convert",

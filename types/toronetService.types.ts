@@ -8,7 +8,7 @@ export type KycDataType = {
   address: string;
 };
 
-export type CurrencyType = "USD" | "NGN";
+export type CurrencyType = "USD" | "NGN" | "EUR" | "GBP";
 export type CoinType =
   | "USDCBASE"
   | "USDTBSC"
