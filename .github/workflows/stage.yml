@@ -3,8 +3,8 @@ name: deploy-cicd
 on:
   push:
     branches:
-      - "stage"
-      # - "staging"
+      # - "stage"
+      - "staging"
 
 jobs:
   typecheck:
