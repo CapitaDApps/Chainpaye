@@ -1,5 +1,9 @@
 import { Types } from "mongoose";
-import { toronetService, userService } from "../../services";
+import {
+  toronetService,
+  userService,
+  whatsappBusinessService,
+} from "../../services";
 import { redisClient } from "../../services/redis";
 import { sendTransactionReceipt } from "../../utils/sendReceipt";
 import { CurrencyType } from "../../types/toronetService.types";
@@ -43,6 +47,69 @@ function formatExchangeRate(value: number): string {
   }
 
   return value.toFixed(8).replace(/\.?0+$/, "");
+}
+
+function buildUserFullName(user: {
+  fullName?: string;
+  firstName?: string;
+  lastName?: string;
+}): string {
+  const byFullName = (user.fullName || "").trim();
+  if (byFullName) return byFullName;
+
+  const bySplitName = `${user.firstName || ""} ${user.lastName || ""}`.trim();
+  if (bySplitName) return bySplitName;
+
+  return "Chainpaye User";
+}
+
+async function ensureEurGbpWalletsForConversion(params: {
+  address: string;
+  fullName: string;
+  currencies: CurrencyType[];
+}) {
+  const targetCurrencies = Array.from(
+    new Set(
+      params.currencies.filter(
+        (currency): currency is Extract<CurrencyType, "EUR" | "GBP"> =>
+          currency === "EUR" || currency === "GBP",
+      ),
+    ),
+  );
+
+  for (const currency of targetCurrencies) {
+    const balanceResult =
+      currency === "EUR"
+        ? await toronetService.getBalanceEUR(params.address)
+        : await toronetService.getBalanceGBP(params.address);
+
+    if (balanceResult.result) continue;
+
+    const createResult = await toronetService.createVirtualWallet({
+      address: params.address,
+      fullName: params.fullName,
+      currency,
+    });
+
+    if (!createResult.result) {
+      throw new Error(`Unable to initialize ${currency} wallet for conversion.`);
+    }
+  }
+}
+
+async function sendConversionProcessingMessageOnce(
+  phone: string,
+  flowToken: string,
+) {
+  const processingMessageCacheKey = `CONV_PROCESSING_MSG_${flowToken}`;
+  const alreadySent = await redisClient.get(processingMessageCacheKey);
+  if (alreadySent) return;
+
+  await whatsappBusinessService.sendNormalMessage(
+    "Your conversion request is being processed. You will receive confirmation shortly.",
+    phone,
+  );
+  await redisClient.set(processingMessageCacheKey, "1", "EX", 300);
 }
 
 async function getBalanceByCurrency(
@@ -151,8 +218,31 @@ export async function getConversionFlowScreen(decryptedBody: {
           };
         }
 
-        const { wallet: toronetWallet } =
+        const { wallet: toronetWallet, user } =
           await userService.getUserToroWallet(phone);
+
+        try {
+          await ensureEurGbpWalletsForConversion({
+            address: toronetWallet.publicKey,
+            fullName: buildUserFullName(user),
+            currencies: [fromCurrency, toCurrency],
+          });
+        } catch (error) {
+          console.log("Error ensuring EUR/GBP wallets for conversion quote", {
+            phone,
+            fromCurrency,
+            toCurrency,
+            error,
+          });
+          return {
+            screen: "CONVERT_ENTRY",
+            data: {
+              currencies: currencyOptions,
+              error_message:
+                "Could not prepare selected wallet for conversion. Please try again.",
+            },
+          };
+        }
 
         const fromBalance = await getBalanceByCurrency(
           toronetWallet.publicKey,
@@ -250,10 +340,11 @@ export async function getConversionFlowScreen(decryptedBody: {
           };
         }
 
-        const [user, { wallet: userToroWallet }] = await Promise.all([
-          userService.getUser(phone, true),
-          userService.getUserToroWallet(phone, true),
-        ]);
+        const { user, wallet: userToroWallet } = await userService.getUserToroWallet(
+          phone,
+          true,
+          true,
+        );
 
         if (!user) {
           throw new Error(`user with phone number - [${phone}] does not exist`);
@@ -269,6 +360,32 @@ export async function getConversionFlowScreen(decryptedBody: {
               amountToPay: formatFixed2(amountToPayValue),
               amountToReceive: formatFixed2(amountToReceiveValue),
               error_message: "Invalid PIN.",
+            },
+          };
+        }
+
+        try {
+          await ensureEurGbpWalletsForConversion({
+            address: userToroWallet.publicKey,
+            fullName: buildUserFullName(user),
+            currencies: [fromCurrency, toCurrency],
+          });
+        } catch (error) {
+          console.log("Error ensuring EUR/GBP wallets before conversion", {
+            phone,
+            fromCurrency,
+            toCurrency,
+            error,
+          });
+          return {
+            screen: "PIN",
+            data: {
+              fromCurrency,
+              toCurrency,
+              amountToPay: formatFixed2(amountToPayValue),
+              amountToReceive: formatFixed2(amountToReceiveValue),
+              error_message:
+                "Could not prepare selected wallet for conversion. Please try again.",
             },
           };
         }
@@ -306,6 +423,10 @@ export async function getConversionFlowScreen(decryptedBody: {
               );
             console.log("Error during conversion", error);
           });
+
+        sendConversionProcessingMessageOnce(phone, flow_token).catch((err) =>
+          console.log("Error sending conversion processing message", err),
+        );
 
         return {
           screen: "PROCESSING",
