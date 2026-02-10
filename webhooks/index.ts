@@ -46,6 +46,33 @@ const {
   BUSINESS_PHONE_NUMBER_ID,
 } = process.env;
 
+const DEFAULT_STAGING_ALLOWED_WHATSAPP_NUMBERS = [
+  "+2347035428475",
+  "+2347016505681",
+];
+
+function normalizePhoneNumber(value: string): string {
+  const digitsOnly = value.replace(/\D/g, "");
+  return digitsOnly ? `+${digitsOnly}` : "";
+}
+
+function isStagingEnvironment(): boolean {
+  const port = (process.env.PORT || "").trim();
+  return port === "3001";
+}
+
+function getStagingAllowedWhatsappNumbers(): Set<string> {
+  const envList = process.env.STAGING_ALLOWED_WHATSAPP_NUMBERS;
+  const values = envList
+    ? envList
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : DEFAULT_STAGING_ALLOWED_WHATSAPP_NUMBERS;
+
+  return new Set(values.map((item) => normalizePhoneNumber(item)));
+}
+
 // Route for GET requests (webhook verification - no rate limiting needed)
 app.get("/webhook", (req, res) => {
   const {
@@ -109,6 +136,22 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
   if (message) {
     await readMessage(message.id);
     try {
+      if (isStagingEnvironment()) {
+        const allowedNumbers = getStagingAllowedWhatsappNumbers();
+        const incomingNumber = normalizePhoneNumber(
+          contact?.wa_id || message.from || "",
+        );
+
+        if (!allowedNumbers.has(incomingNumber)) {
+          await replyingMessage(message.id);
+          await whatsappBusinessService.sendNormalMessage(
+            "Access restricted: this Chainpaye number is currently for approved staging testers only. Your number is not yet authorized.\n\nPlease contact support for access, or message our main Chainpaye number: +1 (318) 394-7303.",
+            message.from,
+          );
+          return res.sendStatus(200);
+        }
+      }
+
       // mark incoming message as read
 
       if (contact) {
