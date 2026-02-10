@@ -390,39 +390,55 @@ export async function getConversionFlowScreen(decryptedBody: {
           };
         }
 
-        toronetService
-          .convertToAndFro({
+        try {
+          const result = await toronetService.convertToAndFro({
             from: fromCurrency,
             to: toCurrency,
             amount: formatFixed2(amountToPayValue),
             password: userToroWallet.password,
             address: userToroWallet.publicKey,
             user: user._id as Types.ObjectId,
-          })
-          .then((result) => {
-            if (result.success) {
-              redisClient
-                .del(quoteId)
-                .catch((err) =>
-                  console.log("Error deleting conversion quote cache", err),
-                );
+          });
 
-              if (result.transaction) {
-                sendTransactionReceipt(
-                  (result.transaction._id as Types.ObjectId).toString(),
-                  phone,
-                ).catch((err) => console.log("Error sending receipt", err));
-              }
-            }
-          })
-          .catch((error) => {
+          if (result.success) {
             redisClient
               .del(quoteId)
               .catch((err) =>
                 console.log("Error deleting conversion quote cache", err),
               );
-            console.log("Error during conversion", error);
-          });
+
+            if (result.transaction) {
+              sendTransactionReceipt(
+                (result.transaction._id as Types.ObjectId).toString(),
+                phone,
+              ).catch((err) => console.log("Error sending receipt", err));
+            }
+          }
+        } catch (error) {
+          redisClient
+            .del(quoteId)
+            .catch((err) =>
+              console.log("Error deleting conversion quote cache", err),
+            );
+
+          const errorMessage =
+            error instanceof Error && error.message
+              ? error.message
+              : "Conversion failed. Please try again.";
+
+          console.log("Error during conversion", error);
+
+          return {
+            screen: "PIN",
+            data: {
+              fromCurrency,
+              toCurrency,
+              amountToPay: formatFixed2(amountToPayValue),
+              amountToReceive: formatFixed2(amountToReceiveValue),
+              error_message: errorMessage,
+            },
+          };
+        }
 
         sendConversionProcessingMessageOnce(phone, flow_token).catch((err) =>
           console.log("Error sending conversion processing message", err),
