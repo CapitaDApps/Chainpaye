@@ -165,9 +165,11 @@ function getPaymentLinkApiBaseUrl(): string {
 
 function getPaymentLinkApiTimeoutMs(): number {
   // Keep timeout below WhatsApp Flow response window to avoid client-side timeout/blank screens.
-  const defaultTimeout = 8000;
-  const maxSafeTimeout = 9000;
-  const value = Number(process.env.PAYMENT_LINK_API_TIMEOUT_MS || defaultTimeout);
+  const defaultTimeout = 12000;
+  const maxSafeTimeout = 15000;
+  const value = Number(
+    process.env.PAYMENT_LINK_API_TIMEOUT_MS || defaultTimeout,
+  );
   if (!Number.isFinite(value) || value <= 0) {
     return defaultTimeout;
   }
@@ -655,7 +657,8 @@ export async function getGenerateLinkScreen(decryptedBody: {
 
         // Prefer internal webhook URL for payment success notifications.
         // Keep flow-provided successUrl as a fallback for backward compatibility.
-        const resolvedSuccessUrl = getPaymentLinkSuccessWebhookUrl() || successUrl;
+        const resolvedSuccessUrl =
+          getPaymentLinkSuccessWebhookUrl() || successUrl;
 
         const payload: PaymentLinkCreatePayload = {
           merchantId,
@@ -674,7 +677,9 @@ export async function getGenerateLinkScreen(decryptedBody: {
             flowToken: flow_token,
             whatsappNumber: user.whatsappNumber,
             ...(successUrl && { flowSuccessUrl: successUrl }),
-            ...(resolvedSuccessUrl && { webhookSuccessUrl: resolvedSuccessUrl }),
+            ...(resolvedSuccessUrl && {
+              webhookSuccessUrl: resolvedSuccessUrl,
+            }),
           },
         };
 
@@ -790,5 +795,3 @@ export async function getGenerateLinkScreen(decryptedBody: {
     "Unhandled endpoint request. Make sure you handle the request action & screen logged above.",
   );
 }
-
-
