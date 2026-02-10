@@ -165,7 +165,12 @@ export class ToronetService {
     address: string;
     fullName: string;
   }): Promise<void> {
-    const currencies: FiatVirtualWalletCurrency[] = ["NGN", "USD", "EUR", "GBP"];
+    const currencies: FiatVirtualWalletCurrency[] = [
+      "NGN",
+      "USD",
+      "EUR",
+      "GBP",
+    ];
 
     const results = await Promise.allSettled(
       currencies.map((currency) =>
@@ -180,8 +185,12 @@ export class ToronetService {
     const failed = results
       .map((result, index) => ({ result, currency: currencies[index] }))
       .filter(
-        (item): item is { result: PromiseRejectedResult; currency: FiatVirtualWalletCurrency } =>
-          item.result.status === "rejected",
+        (
+          item,
+        ): item is {
+          result: PromiseRejectedResult;
+          currency: FiatVirtualWalletCurrency;
+        } => item.result.status === "rejected",
       );
 
     if (failed.length > 0) {
@@ -1217,6 +1226,9 @@ export class ToronetService {
     user: Types.ObjectId; // Optional userId for recording transactions
   }) {
     if (from === to) throw new Error("You cannot convert to the same currency");
+    console.log("---- Conversion Start ----");
+    console.log("From:", from, "To:", to, "Amount:", amount);
+
     // Buy to TORO
     const buyBody = {
       op: "buytoro",
@@ -1226,6 +1238,8 @@ export class ToronetService {
         { name: "val", value: amount },
       ],
     };
+
+    console.log("Buy Body Params:", JSON.stringify(buyBody.params, null, 2));
 
     function getSellBody(amount: string, decryptedPassword: string) {
       return {
@@ -1248,6 +1262,11 @@ export class ToronetService {
         { name: "val", value: amount },
       ],
     };
+
+    console.log(
+      "Calc Buy Body Params:",
+      JSON.stringify(calBuyBody.params, null, 2),
+    );
 
     function getCalcSellBody(amount: string) {
       return {
@@ -1276,17 +1295,24 @@ export class ToronetService {
 
     const buyRespData = buyResp.data;
     const calcBuyData = calcBuyResp.data;
+
+    console.log("Calc Buy Response:", JSON.stringify(calcBuyData, null, 2));
+    console.log("Buy Response:", JSON.stringify(buyRespData, null, 2));
     if (!buyRespData.result) {
       throw new Error(buyRespData.error || `Error converting from ${from}`);
     }
 
     const toroReceivedAmount: string = calcBuyData.amount;
     const buyTxHash: string = buyRespData.transaction;
+
+    console.log("TORO Received Amount:", toroReceivedAmount);
+
     if (!toroReceivedAmount) {
       throw new Error(`Error calculating ${from} to TORO conversion`);
     }
 
     const sellBody = getSellBody(toroReceivedAmount, this.decrypt(password));
+    console.log("Sell Body Params:", JSON.stringify(sellBody.params, null, 2));
     const [calcSellResp, sellResp] = await Promise.all([
       axios({
         url: `${this.baseUrl}${toPath}`,
@@ -1297,6 +1323,11 @@ export class ToronetService {
     ]);
 
     const sellData = sellResp.data;
+    console.log(
+      "Calc Sell Response:",
+      JSON.stringify(calcSellResp.data, null, 2),
+    );
+    console.log("Sell Response:", JSON.stringify(sellData, null, 2));
     if (!sellData.result) {
       throw new Error(sellData.error || `Error converting to ${to}`);
     }
@@ -1345,6 +1376,9 @@ export class ToronetService {
   }) {
     if (from === to) throw new Error("You cannot convert to the same currency");
 
+    console.log("---- Simulation Start ----");
+    console.log("From:", from, "To:", to, "Amount:", amount);
+
     const calBuyBody = {
       op: "calculatebuyresult",
       params: [
@@ -1355,6 +1389,11 @@ export class ToronetService {
         { name: "val", value: amount },
       ],
     };
+
+    console.log(
+      "Calc Buy Body Params:",
+      JSON.stringify(calBuyBody.params, null, 2),
+    );
 
     const calSellBody = (toroAmount: string) => ({
       op: "calculatesellresult",
@@ -1376,12 +1415,14 @@ export class ToronetService {
       method: "GET",
     });
     const calcBuyData = calcBuyResp.data;
+    console.log("Calc Buy Response:", JSON.stringify(calcBuyData, null, 2));
     if (!calcBuyData.result) {
       throw new Error(
         calcBuyData.error || `Error calculating ${from} to TORO conversion`,
       );
     }
     const toroReceivedAmount: string = calcBuyData.amount;
+    console.log("TORO Received Amount:", toroReceivedAmount);
     if (!toroReceivedAmount) {
       throw new Error(`Error calculating ${from} to TORO conversion`);
     }
@@ -1392,6 +1433,7 @@ export class ToronetService {
       method: "GET",
     });
     const calcSellData = calcSellResp.data;
+    console.log("Calc Sell Response:", JSON.stringify(calcSellData, null, 2));
     if (!calcSellData.result) {
       throw new Error(
         calcSellData.error || `Error calculating TORO to ${to} conversion`,
@@ -1420,7 +1462,7 @@ export class ToronetService {
       data: { op: "getexchangerate", params: [] },
     });
     const data = resp.data;
-    console.log({ conversionData: data });
+    console.log("Exchange Rate Response:", JSON.stringify(data, null, 2));
 
     if (data.result) {
       const toroNairaRatio = parseFloat(data.exchangerate);
