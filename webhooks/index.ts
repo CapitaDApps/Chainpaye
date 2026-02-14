@@ -204,6 +204,33 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
             if (message.type == "interactive") {
               const interactive = message.interactive;
               const interactiveType = interactive.type;
+              if (interactiveType == "list_reply") {
+                await replyingMessage(message.id);
+                const selectedMenuId = interactive.list_reply?.id;
+                const phone = message.from.startsWith("+")
+                  ? message.from
+                  : `+${message.from}`;
+
+                const commandByMenuId: Record<string, string> = {
+                  other_menu_payment_link: "payment link",
+                  other_menu_transaction_history: "transaction history",
+                  other_menu_support: "support",
+                };
+
+                const selectedCommand = selectedMenuId
+                  ? commandByMenuId[selectedMenuId]
+                  : undefined;
+
+                if (selectedCommand) {
+                  await commandRouteHandler(phone, selectedCommand);
+                } else {
+                  await whatsappBusinessService.sendNormalMessage(
+                    "Invalid menu selection. Type menu to continue.",
+                    message.from,
+                  );
+                }
+              }
+
               if (interactiveType == "nfm_reply") {
                 const responseJson = JSON.parse(
                   interactive.nfm_reply.response_json,
