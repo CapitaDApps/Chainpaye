@@ -19,6 +19,17 @@ type ButtonPayloadType =
   | "Copy Account NO"
   | "Invoice a Client";
 
+type ListRow = {
+  id: string;
+  title: string;
+  description?: string;
+};
+
+type ListSection = {
+  title: string;
+  rows: ListRow[];
+};
+
 export class WhatsAppBusinessService {
   private GRAPH_API_TOKEN: string;
   private business_phone_number_id: string;
@@ -283,6 +294,36 @@ What can I do for you?
 
 🏦 Withdraw — Cash out to your bank.`,
       to,
+    );
+
+    await this.sendListMessage(
+      to,
+      "Other menu",
+      "Select an action to continue.",
+      // "Powered by Chainpaye",
+      "View Menu",
+      [
+        {
+          title: "Other menu",
+          rows: [
+            {
+              id: "other_menu_payment_link",
+              title: "Payment link",
+              description: "Create and share a payment link",
+            },
+            {
+              id: "other_menu_transaction_history",
+              title: "Transaction history",
+              description: "View your recent transactions",
+            },
+            {
+              id: "other_menu_support",
+              title: "Support",
+              description: "Contact Chainpaye support",
+            },
+          ],
+        },
+      ],
     );
   }
 
@@ -578,6 +619,56 @@ Our team is ready to assist you!`;
     await this.sendNormalMessage(message, to);
   }
 
+  private async sendListMessage(
+    to: string,
+    headerText: string,
+    bodyText: string,
+    // footerText: string,
+    buttonText: string,
+    sections: ListSection[],
+  ) {
+    const body = {
+      messaging_product: "whatsapp",
+      to,
+      recipient_type: "individual",
+      type: "interactive",
+      interactive: {
+        type: "list",
+        header: {
+          type: "text",
+          text: headerText,
+        },
+        body: {
+          text: bodyText,
+        },
+        // footer: {
+        //   text: footerText,
+        // },
+        action: {
+          button: buttonText,
+          sections,
+        },
+      },
+    };
+
+    try {
+      await axios({
+        method: "POST",
+        url: `https://graph.facebook.com/v24.0/${this.business_phone_number_id}/messages`,
+        headers: {
+          Authorization: `Bearer ${this.GRAPH_API_TOKEN}`,
+        },
+        data: body,
+      });
+    } catch (error) {
+      console.log(
+        "error sending list message",
+        (error as { response?: { data?: unknown } }).response?.data || error,
+      );
+      throw error;
+    }
+  }
+
   private async sendImageFlowById(
     to: string,
     flowId: string,
@@ -814,4 +905,3 @@ Our team is ready to assist you!`;
     }
   }
 }
-
