@@ -299,8 +299,8 @@ What can I do for you?
     await this.sendListMessage(
       to,
       "Other menu",
-      "Other menu:\nSelect an action to continue.",
-      "Powered by Chainpaye",
+      "Select an action to continue.",
+      // "Powered by Chainpaye",
       "View Menu",
       [
         {
@@ -623,7 +623,7 @@ Our team is ready to assist you!`;
     to: string,
     headerText: string,
     bodyText: string,
-    footerText: string,
+    // footerText: string,
     buttonText: string,
     sections: ListSection[],
   ) {
@@ -641,9 +641,9 @@ Our team is ready to assist you!`;
         body: {
           text: bodyText,
         },
-        footer: {
-          text: footerText,
-        },
+        // footer: {
+        //   text: footerText,
+        // },
         action: {
           button: buttonText,
           sections,
@@ -905,4 +905,3 @@ Our team is ready to assist you!`;
     }
   }
 }
-
