@@ -50,6 +50,7 @@ const DEFAULT_STAGING_ALLOWED_WHATSAPP_NUMBERS = [
   "+2347035428475",
   "+2347016505681",
   "+2349067490985",
+  "+2348135246063",
 ];
 
 function normalizePhoneNumber(value: string): string {
