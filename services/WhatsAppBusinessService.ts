@@ -282,17 +282,21 @@ No complex apps, just secure & fast payments right here! ✨`,
     // const topUpFlowId = "1513776869736922";
     // const topupScreenInitId = "TOPUP_WALLET";
     await this.sendNormalMessage(
-      `Hi, it’s Chainpaye 💳🏦! What’s good? 😊
+      `Hi! It’s Chainpaye 💳🏦
+Collect,Settle,Withdraw .
 
-What can I do for you?
+What are we doing today? 
+Reply with a Keyword:
 
-💰 Deposit — Top up instantly!
+💰 Deposit — Top up instantly via USD or NGN 🇳🇬
 
-💳 Offramp — Spend crypto anywhere.
- 
-🌍 Send — Pay friends in a flash using Whatsapp NO.
+💳 Offramp — Spend your crypto anywhere.
 
-🏦 Withdraw — Cash out to your bank.`,
+🌍 Send — Pay friends via WhatsApp No.
+
+🏦 Withdraw — Cash out to your bank.
+
+🔗 Payment Link — Collect USD, GBP, EUR, & NGN 💵💷💶🇳🇬`,
       to,
     );
 
