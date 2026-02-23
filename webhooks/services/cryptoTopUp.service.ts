@@ -338,14 +338,56 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
       }
 
       case "OFFRAMP_FIAT_REVIEW": {
-        // Just transitioning to the next review screen
-        // Echoing data back
-        return {
-          screen: "OFFRAMP_CRYPTO_REVIEW",
-          data: {
-            ...data,
-          },
-        };
+        // Calculate fees before showing crypto review screen
+        const { sell_amount, currency, network } = data;
+        
+        try {
+          // Get exchange rate
+          const ngnAmount = parseFloat(sell_amount);
+          const chainMapping: Record<string, { dexPay: string }> = {
+            sol: { dexPay: "solana" },
+            bsc: { dexPay: "bep20" },
+            base: { dexPay: "base" },
+            arbitrum: { dexPay: "arbitrum" },
+            bep20: { dexPay: "bep20" },
+          };
+          
+          const normalizedChain = chainMapping[network.toLowerCase()];
+          const dexPayChain = normalizedChain?.dexPay || "bep20";
+          
+          const rateData = await dexPayService.getCurrentRates(
+            currency,
+            dexPayChain,
+            ngnAmount,
+          );
+          
+          const nairaRate = rateData.rate;
+          
+          // Calculate fees using FinancialService
+          const financials = financialService.calculateTransactionFinancials(
+            ngnAmount,
+            nairaRate,
+          );
+          
+          return {
+            screen: "OFFRAMP_CRYPTO_REVIEW",
+            data: {
+              ...data,
+              // Add total fee in Naira
+              total_fee_ngn: financials.totalFees.toFixed(2),
+            },
+          };
+        } catch (error) {
+          logger.error("[OFFRAMP] Error calculating fees: " + (error as Error).message);
+          // Fallback to showing screen without fees
+          return {
+            screen: "OFFRAMP_CRYPTO_REVIEW",
+            data: {
+              ...data,
+              total_fee_ngn: "0.00",
+            },
+          };
+        }
       }
 
       // Fixed OFFRAMP_CRYPTO_REVIEW logic

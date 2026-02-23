@@ -247,6 +247,10 @@
           "type": "string",
           "__example__": "Kelechi"
         },
+        "total_fee_ngn": {
+          "type": "string",
+          "__example__": "1800.00"
+        },
         "error_message": {
           "type": "string",
           "__example__": "Invalid PIN"
@@ -269,7 +273,7 @@
           },
           {
             "type": "TextBody",
-            "text": "`'Fee: 1.00 '${data.currency}''`"
+            "text": "`'Total Fee: ₦'${data.total_fee_ngn}''`"
           },
           {
             "type": "TextBody",
