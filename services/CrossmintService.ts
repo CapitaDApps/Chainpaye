@@ -1323,6 +1323,7 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         console.log("\n========================================");
         console.log("🚀 CROSSMINT TRANSFER REQUEST");
         console.log("========================================");
+        console.log("📍 METHOD: POST");
         console.log("📍 ENDPOINT:", transferEndpoint);
         console.log("\n📋 HEADERS:");
         console.log(JSON.stringify({
@@ -1330,9 +1331,17 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
           "Content-Type": transferHeaders["Content-Type"],
           "Idempotency-Key": transferHeaders["Idempotency-Key"],
         }, null, 2));
-        console.log("\n📦 BODY:");
+        console.log("\n📦 REQUEST BODY:");
         console.log(JSON.stringify(transferPayload, null, 2));
+        console.log("\n🔧 Full cURL equivalent:");
+        console.log(`curl -X POST "${transferEndpoint}" \\`);
+        console.log(`  -H "X-API-KEY: ${this.apiKey.substring(0, 10)}..." \\`);
+        console.log(`  -H "Content-Type: application/json" \\`);
+        console.log(`  -H "Idempotency-Key: ${currentIdempotencyKey}" \\`);
+        console.log(`  -d '${JSON.stringify(transferPayload)}'`);
         console.log("========================================\n");
+
+        console.log("⏳ Sending request to Crossmint...\n");
 
         const response = await axios.post(
           transferEndpoint,
@@ -1343,6 +1352,11 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
             timeout: 30000, // 30 seconds
           },
         );
+
+        console.log("✅ CROSSMINT RESPONSE RECEIVED:");
+        console.log("Status:", response.status);
+        console.log("Data:", JSON.stringify(response.data, null, 2));
+        console.log("========================================\n");
 
         logger.info(
           `Transfer executed successfully on attempt ${attempt}: ${amount} ${token} from wallet ${wallet.address} to ${toAddress}`,
