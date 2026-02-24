@@ -382,7 +382,14 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           );
           
           // Convert total fees from NGN to USD using the current rate
-          const totalFeeUsd = financials.totalFees / nairaRate;
+          let totalFeeUsd = financials.totalFees / nairaRate;
+          
+          // Cap the fee at $5 maximum
+          const MAX_FEE_USD = 5.0;
+          if (totalFeeUsd > MAX_FEE_USD) {
+            logger.info(`[OFFRAMP] Fee capped: Original ${totalFeeUsd.toFixed(6)} USD -> Capped at ${MAX_FEE_USD} USD`);
+            totalFeeUsd = MAX_FEE_USD;
+          }
           
           // Format fee: remove trailing zeros but keep at least 2 decimals
           let formattedFee = totalFeeUsd.toFixed(6);
