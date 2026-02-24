@@ -549,6 +549,21 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           const crossmintChain = normalizedChain.crossmint;
 
           // ============================================================
+          // CONSOLE LOG: CHAIN MAPPING
+          // ============================================================
+          console.log("\n========================================");
+          console.log("🔗 CHAIN MAPPING");
+          console.log("========================================");
+          console.log(`📥 User selected network: ${network}`);
+          console.log(`📥 User selected currency: ${currency}`);
+          console.log(`\n🔄 Normalized values:`);
+          console.log(`   DexPay chain: ${dexPayChain}`);
+          console.log(`   Crossmint chain: ${crossmintChain}`);
+          console.log(`   Asset: ${normalizedAsset}`);
+          console.log(`\n🎯 Token identifier will be: ${crossmintChain}:${normalizedAsset.toLowerCase()}`);
+          console.log("========================================\n");
+
+          // ============================================================
           // STEP 3: LOG MAPPING
           // ============================================================
           logger.info(

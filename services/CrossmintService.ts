@@ -339,6 +339,25 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
           b.chain.toLowerCase() === chain.toLowerCase(),
       );
 
+      // ============================================================
+      // CONSOLE LOG: BALANCE VALIDATION
+      // ============================================================
+      console.log("\n========================================");
+      console.log("💰 BALANCE VALIDATION CHECK");
+      console.log("========================================");
+      console.log("🔍 Looking for:");
+      console.log(`   Asset: ${symbol.toLowerCase()}`);
+      console.log(`   Chain: ${chain.toLowerCase()}`);
+      console.log("\n📊 Available balances:");
+      balances.forEach((b, idx) => {
+        console.log(`   [${idx + 1}] ${b.asset} on ${b.chain}: ${b.amount}`);
+      });
+      console.log("\n✅ Match found:", !!tokenBalance);
+      if (tokenBalance) {
+        console.log(`   Balance: ${tokenBalance.amount} ${symbol}`);
+      }
+      console.log("========================================\n");
+
       if (!tokenBalance) {
         logger.warn(`Token balance not found for ${symbol} on ${chain}:`, {
           availableBalances: balances.map((b) => `${b.asset} on ${b.chain}`),
@@ -1291,16 +1310,35 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
           originalKey: idempotencyKey,
         });
 
+        const transferEndpoint = `${this.baseUrl}/wallets/${wallet.address}/tokens/${tokenIdentifier}/transfers`;
+        const transferHeaders = {
+          "X-API-KEY": this.apiKey,
+          "Content-Type": "application/json",
+          "Idempotency-Key": currentIdempotencyKey,
+        };
+
+        // ============================================================
+        // CONSOLE LOG: TRANSFER REQUEST DETAILS
+        // ============================================================
+        console.log("\n========================================");
+        console.log("🚀 CROSSMINT TRANSFER REQUEST");
+        console.log("========================================");
+        console.log("📍 ENDPOINT:", transferEndpoint);
+        console.log("\n📋 HEADERS:");
+        console.log(JSON.stringify({
+          "X-API-KEY": `${this.apiKey.substring(0, 10)}...`,
+          "Content-Type": transferHeaders["Content-Type"],
+          "Idempotency-Key": transferHeaders["Idempotency-Key"],
+        }, null, 2));
+        console.log("\n📦 BODY:");
+        console.log(JSON.stringify(transferPayload, null, 2));
+        console.log("========================================\n");
+
         const response = await axios.post(
-          `${this.baseUrl}/wallets/${wallet.address}/tokens/${tokenIdentifier}/transfers`,
+          transferEndpoint,
           transferPayload,
           {
-            headers: {
-              "X-API-KEY": this.apiKey,
-              "Content-Type": "application/json",
-              // Add idempotency header if supported by Crossmint
-              "Idempotency-Key": currentIdempotencyKey,
-            },
+            headers: transferHeaders,
             // Add timeout for better error handling
             timeout: 30000, // 30 seconds
           },
