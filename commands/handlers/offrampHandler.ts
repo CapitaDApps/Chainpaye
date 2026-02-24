@@ -211,6 +211,36 @@ async function displayUserWallets(
             "solana",
             ["usdc", "sol"],
           );
+        } else if (wallet.chainType === "evm") {
+          // For EVM wallets, fetch balances from each supported chain separately
+          const evmChains = ["bsc", "base", "arbitrum"];
+          const chainBalances: any[] = [];
+
+          for (const chain of evmChains) {
+            try {
+              const chainSpecificBalances =
+                await crossmintService.getBalancesByChain(
+                  userId,
+                  chain,
+                  ["usdc", "usdt"],
+                );
+
+              // Add chain info to each balance
+              chainSpecificBalances.forEach((balance) => {
+                chainBalances.push({
+                  ...balance,
+                  chain: chain.toUpperCase(), // Add chain identifier
+                });
+              });
+            } catch (chainError) {
+              console.error(
+                `Error getting ${chain} balances:`,
+                chainError,
+              );
+            }
+          }
+
+          balances = chainBalances;
         } else {
           balances = await crossmintService.getBalancesByChain(
             userId,
@@ -300,17 +330,41 @@ async function displayUserWallets(
       walletsMessage += `🔗 *${wallet.chainType.toUpperCase()}*\n`;
       walletsMessage += `Address: \`${wallet.address}\`\n`;
 
-      for (const balance of wallet.balances) {
-        const amount = parseFloat(balance.amount).toFixed(6);
-        const usdValue = balance.usdValue
-          ? ` (~$${balance.usdValue.toFixed(2)})`
-          : "";
-        const tokenName = (
-          balance.symbol ||
-          balance.token ||
-          "UNKNOWN"
-        ).toUpperCase();
-        walletsMessage += `• ${tokenName}: ${amount}${usdValue}\n`;
+      if (wallet.chainType === "evm") {
+        // Group balances by chain for EVM wallets
+        const balancesByChain = new Map<string, any[]>();
+
+        for (const balance of wallet.balances) {
+          const chain = balance.chain || "UNKNOWN";
+          if (!balancesByChain.has(chain)) {
+            balancesByChain.set(chain, []);
+          }
+          balancesByChain.get(chain)!.push(balance);
+        }
+
+        // Display balances grouped by chain
+        for (const [chain, chainBalances] of balancesByChain) {
+          for (const balance of chainBalances) {
+            const amount = parseFloat(balance.amount).toFixed(6);
+            const tokenName = (
+              balance.symbol ||
+              balance.token ||
+              "UNKNOWN"
+            ).toUpperCase();
+            walletsMessage += `• ${chain} ${tokenName}: ${amount}\n`;
+          }
+        }
+      } else {
+        // For non-EVM wallets (Solana), display normally
+        for (const balance of wallet.balances) {
+          const amount = parseFloat(balance.amount).toFixed(6);
+          const tokenName = (
+            balance.symbol ||
+            balance.token ||
+            "UNKNOWN"
+          ).toUpperCase();
+          walletsMessage += `• ${tokenName}: ${amount}\n`;
+        }
       }
       walletsMessage += "\n";
     }
