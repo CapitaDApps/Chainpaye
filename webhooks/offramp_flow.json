@@ -247,9 +247,9 @@
           "type": "string",
           "__example__": "Kelechi"
         },
-        "total_fee_ngn": {
+        "total_fee_usd": {
           "type": "string",
-          "__example__": "1800.00"
+          "__example__": "1.20"
         },
         "error_message": {
           "type": "string",
@@ -273,7 +273,7 @@
           },
           {
             "type": "TextBody",
-            "text": "`'Total Fee: ₦'${data.total_fee_ngn}''`"
+            "text": "`'Total Fee: '${data.total_fee_usd}' '${data.currency}''`"
           },
           {
             "type": "TextBody",

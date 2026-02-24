@@ -341,6 +341,18 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
         // Calculate fees before showing crypto review screen
         const { sell_amount, currency, network } = data;
         
+        // Validate required fields
+        if (!sell_amount || !currency || !network) {
+          logger.error("[OFFRAMP] Missing required fields for fee calculation");
+          return {
+            screen: "OFFRAMP_CRYPTO_REVIEW",
+            data: {
+              ...data,
+              total_fee_usd: "0.00",
+            },
+          };
+        }
+        
         try {
           // Get exchange rate
           const ngnAmount = parseFloat(sell_amount);
@@ -369,12 +381,29 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             nairaRate,
           );
           
+          // Convert total fees from NGN to USD using the current rate
+          const totalFeeUsd = financials.totalFees / nairaRate;
+          
+          // Format fee: remove trailing zeros but keep at least 2 decimals
+          let formattedFee = totalFeeUsd.toFixed(6);
+          // Remove trailing zeros after decimal point
+          formattedFee = formattedFee.replace(/\.?0+$/, '');
+          // Ensure at least 2 decimal places
+          if (!formattedFee.includes('.')) {
+            formattedFee += '.00';
+          } else {
+            const decimalPart = formattedFee.split('.')[1];
+            if (decimalPart && decimalPart.length === 1) {
+              formattedFee += '0';
+            }
+          }
+          
           return {
             screen: "OFFRAMP_CRYPTO_REVIEW",
             data: {
               ...data,
-              // Add total fee in Naira
-              total_fee_ngn: financials.totalFees.toFixed(2),
+              // Add total fee in USD with proper formatting
+              total_fee_usd: formattedFee,
             },
           };
         } catch (error) {
@@ -384,7 +413,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             screen: "OFFRAMP_CRYPTO_REVIEW",
             data: {
               ...data,
-              total_fee_ngn: "0.00",
+              total_fee_usd: "0.00",
             },
           };
         }
