@@ -496,11 +496,11 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             { dexPay: string; crossmint: string }
           > = {
             sol: { dexPay: "solana", crossmint: "solana" },
+            solana: { dexPay: "solana", crossmint: "solana" },
             bsc: { dexPay: "bep20", crossmint: "bsc" },
+            bep20: { dexPay: "bep20", crossmint: "bsc" },
             base: { dexPay: "base", crossmint: "base" },
             arbitrum: { dexPay: "arbitrum", crossmint: "arbitrum" },
-            // Aliases
-            bep20: { dexPay: "bep20", crossmint: "bsc" },
           };
 
           const normalizedChain = chainMapping[network.toLowerCase()];
@@ -509,7 +509,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
               screen: "OFFRAMP_CRYPTO_REVIEW",
               data: {
                 ...data,
-                error_message: `Unsupported network: ${network}. Supported: BSC, SOL, BASE, ARBITRUM`,
+                error_message: `Unsupported network: ${network}. Supported: BEP20, SOL, BASE, ARBITRUM`,
               },
             };
           }
@@ -517,20 +517,20 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           // Validate Asset + Chain Combinations
           const normalizedAsset = currency.toUpperCase(); // Ensure uppercase for comparison
           const chainKey = network.toLowerCase();
-          // Note: chainKey might be 'sol', 'bsc', 'base', 'arbitrum' or aliases
+          // Note: chainKey might be 'sol', 'solana', 'bsc', 'bep20', 'base', 'arbitrum'
 
           let isSupportedCombination = false;
 
           if (normalizedAsset === "USDC") {
             // USDC supported on all 4 chains
             if (
-              ["sol", "bsc", "base", "arbitrum", "bep20"].includes(chainKey)
+              ["sol", "solana", "bsc", "bep20", "base", "arbitrum"].includes(chainKey)
             ) {
               isSupportedCombination = true;
             }
           } else if (normalizedAsset === "USDT") {
-            // USDT only supported on BSC and SOL
-            if (["sol", "bsc", "bep20"].includes(chainKey)) {
+            // USDT supported on BEP20, SOL, and ARBITRUM
+            if (["sol", "solana", "bsc", "bep20", "arbitrum"].includes(chainKey)) {
               isSupportedCombination = true;
             }
           }
@@ -540,7 +540,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
               screen: "OFFRAMP_CRYPTO_REVIEW",
               data: {
                 ...data,
-                error_message: `${normalizedAsset} is not supported on ${network}. Supported: BSC (USDC/USDT), SOL (USDC/USDT), BASE (USDC), ARBITRUM (USDC)`,
+                error_message: `${normalizedAsset} is not supported on ${network}. Supported: BEP20 (USDC/USDT), SOL (USDC/USDT), BASE (USDC), ARBITRUM (USDC/USDT)`,
               },
             };
           }
