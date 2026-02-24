@@ -497,8 +497,8 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           > = {
             sol: { dexPay: "solana", crossmint: "solana" },
             solana: { dexPay: "solana", crossmint: "solana" },
-            bsc: { dexPay: "bep20", crossmint: "bep20" },
-            bep20: { dexPay: "bep20", crossmint: "bep20" },
+            bsc: { dexPay: "bep20", crossmint: "bsc" },
+            bep20: { dexPay: "bep20", crossmint: "bsc" },
             base: { dexPay: "base", crossmint: "base" },
             arbitrum: { dexPay: "arbitrum", crossmint: "arbitrum" },
           };
