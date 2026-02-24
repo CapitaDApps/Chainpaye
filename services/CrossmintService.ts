@@ -311,6 +311,10 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
       const userId = await this.extractUserIdFromWalletAddress(
         transferRequest.walletAddress,
       );
+      
+      // For balance validation, we need to get balances for the specific chain
+      // Don't use getChainType here because it converts "bsc" to "evm" which then maps to "base"
+      // Instead, get the wallet by the actual chain type for wallet lookup
       const chainType = this.getChainType(chain);
 
       // Verify wallet exists and belongs to user
@@ -332,11 +336,32 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
       }
 
       // Enhanced balance validation with detailed logging
-      const balances = await this.getWalletBalances(userId, chainType);
-      const tokenBalance = balances.find(
+      // For EVM chains, we need to get all EVM balances and filter by the specific chain
+      const balances = await this.getBalancesByChain(userId, chain);
+      
+      // Convert Crossmint balance format to our Balance format
+      const formattedBalances: Balance[] = balances.map((balance) => {
+        const asset = (balance.symbol || balance.token || "").toUpperCase();
+        let amount = parseFloat(balance.amount) || 0;
+        const decimals = balance.decimals ?? 6;
+        
+        // Handle raw amounts
+        const rawThreshold = Math.pow(10, decimals);
+        if (amount >= rawThreshold && decimals > 0) {
+          amount = amount / Math.pow(10, decimals);
+        }
+        
+        return {
+          asset,
+          chain, // Use the actual chain from token identifier
+          amount,
+          usdValue: balance.usdValue || 0,
+        };
+      });
+      
+      const tokenBalance = formattedBalances.find(
         (b) =>
-          b.asset.toLowerCase() === symbol.toLowerCase() &&
-          b.chain.toLowerCase() === chain.toLowerCase(),
+          b.asset.toLowerCase() === symbol.toLowerCase(),
       );
 
       // ============================================================
@@ -349,7 +374,7 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
       console.log(`   Asset: ${symbol.toLowerCase()}`);
       console.log(`   Chain: ${chain.toLowerCase()}`);
       console.log("\n📊 Available balances:");
-      balances.forEach((b, idx) => {
+      formattedBalances.forEach((b, idx) => {
         console.log(`   [${idx + 1}] ${b.asset} on ${b.chain}: ${b.amount}`);
       });
       console.log("\n✅ Match found:", !!tokenBalance);
@@ -360,7 +385,7 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
 
       if (!tokenBalance) {
         logger.warn(`Token balance not found for ${symbol} on ${chain}:`, {
-          availableBalances: balances.map((b) => `${b.asset} on ${b.chain}`),
+          availableBalances: formattedBalances.map((b) => `${b.asset} on ${b.chain}`),
           requestedToken: `${symbol} on ${chain}`,
         });
         return {
