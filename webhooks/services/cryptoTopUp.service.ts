@@ -338,14 +338,92 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
       }
 
       case "OFFRAMP_FIAT_REVIEW": {
-        // Just transitioning to the next review screen
-        // Echoing data back
-        return {
-          screen: "OFFRAMP_CRYPTO_REVIEW",
-          data: {
-            ...data,
-          },
-        };
+        // Calculate fees before showing crypto review screen
+        const { sell_amount, currency, network } = data;
+        
+        // Validate required fields
+        if (!sell_amount || !currency || !network) {
+          logger.error("[OFFRAMP] Missing required fields for fee calculation");
+          return {
+            screen: "OFFRAMP_CRYPTO_REVIEW",
+            data: {
+              ...data,
+              total_fee_usd: "0.00",
+            },
+          };
+        }
+        
+        try {
+          // Get exchange rate
+          const ngnAmount = parseFloat(sell_amount);
+          const chainMapping: Record<string, { dexPay: string }> = {
+            sol: { dexPay: "solana" },
+            bsc: { dexPay: "bep20" },
+            base: { dexPay: "base" },
+            arbitrum: { dexPay: "arbitrum" },
+            bep20: { dexPay: "bep20" },
+          };
+          
+          const normalizedChain = chainMapping[network.toLowerCase()];
+          const dexPayChain = normalizedChain?.dexPay || "bep20";
+          
+          const rateData = await dexPayService.getCurrentRates(
+            currency,
+            dexPayChain,
+            ngnAmount,
+          );
+          
+          const nairaRate = rateData.rate;
+          
+          // Calculate fees using FinancialService
+          const financials = financialService.calculateTransactionFinancials(
+            ngnAmount,
+            nairaRate,
+          );
+          
+          // Convert total fees from NGN to USD using the current rate
+          let totalFeeUsd = financials.totalFees / nairaRate;
+          
+          // Cap the fee at $5 maximum
+          const MAX_FEE_USD = 5.0;
+          if (totalFeeUsd > MAX_FEE_USD) {
+            logger.info(`[OFFRAMP] Fee capped: Original ${totalFeeUsd.toFixed(6)} USD -> Capped at ${MAX_FEE_USD} USD`);
+            totalFeeUsd = MAX_FEE_USD;
+          }
+          
+          // Format fee: remove trailing zeros but keep at least 2 decimals
+          let formattedFee = totalFeeUsd.toFixed(6);
+          // Remove trailing zeros after decimal point
+          formattedFee = formattedFee.replace(/\.?0+$/, '');
+          // Ensure at least 2 decimal places
+          if (!formattedFee.includes('.')) {
+            formattedFee += '.00';
+          } else {
+            const decimalPart = formattedFee.split('.')[1];
+            if (decimalPart && decimalPart.length === 1) {
+              formattedFee += '0';
+            }
+          }
+          
+          return {
+            screen: "OFFRAMP_CRYPTO_REVIEW",
+            data: {
+              ...data,
+              // Add total fee in USD with proper formatting
+              total_fee_usd: formattedFee,
+            },
+          };
+        } catch (error) {
+          logger.error("[OFFRAMP] Error calculating fees: " + (error as Error).message);
+          // Fallback to showing screen without fees
+          return {
+            screen: "OFFRAMP_CRYPTO_REVIEW",
+            data: {
+              ...data,
+              total_fee_usd: "0.00",
+            },
+          };
+        }
       }
 
       // Fixed OFFRAMP_CRYPTO_REVIEW logic
