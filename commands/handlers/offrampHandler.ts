@@ -224,21 +224,26 @@ async function displayUserWallets(
           (balance) => parseFloat(balance.amount) >= 0,
         );
 
-        if (validBalances.length > 0) {
-          walletsWithBalances.push({
-            ...wallet,
-            balances: validBalances,
-            balance: validBalances.reduce(
-              (sum, b) => sum + parseFloat(b.amount),
-              0,
-            ),
-          });
-        }
+        // Always add wallet to list, even if balance is 0
+        walletsWithBalances.push({
+          ...wallet,
+          balances: validBalances,
+          balance: validBalances.reduce(
+            (sum, b) => sum + parseFloat(b.amount),
+            0,
+          ),
+        });
       } catch (error) {
         console.error(
           `Error getting balances for ${wallet.chainType} wallet:`,
           error,
         );
+        // Add wallet even if balance fetch fails, with empty balance
+        walletsWithBalances.push({
+          ...wallet,
+          balances: [],
+          balance: 0,
+        });
       }
     }
 
