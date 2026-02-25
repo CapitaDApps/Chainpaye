@@ -345,7 +345,7 @@ async function displayUserWallets(
         // Display balances grouped by chain
         for (const [chain, chainBalances] of balancesByChain) {
           for (const balance of chainBalances) {
-            const amount = parseFloat(balance.amount).toFixed(6);
+            const amount = parseFloat(balance.amount).toFixed(2);
             const tokenName = (
               balance.symbol ||
               balance.token ||
@@ -357,7 +357,7 @@ async function displayUserWallets(
       } else {
         // For non-EVM wallets (Solana), display normally
         for (const balance of wallet.balances) {
-          const amount = parseFloat(balance.amount).toFixed(6);
+          const amount = parseFloat(balance.amount).toFixed(2);
           const tokenName = (
             balance.symbol ||
             balance.token ||
