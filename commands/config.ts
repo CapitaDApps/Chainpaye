@@ -138,6 +138,60 @@ const COMMANDS: Record<string, CommandConfig> = {
   },
 
   // ============================================================
+  // WALLET / CRYPTO WALLETS
+  // User wants to view their crypto wallet addresses and balances
+  // ============================================================
+  wallets: {
+    triggers: [
+      // Slash commands
+      "/wallet",
+      "/wallets",
+      "/addresses",
+      "/cryptowallet",
+
+      // Wallet queries
+      "wallet",
+      "wallets",
+      "my wallet",
+      "my wallets",
+      "show wallet",
+      "show wallets",
+      "view wallet",
+      "view wallets",
+      "wallet address",
+      "wallet addresses",
+      "my wallet address",
+      "my wallet addresses",
+
+      // Crypto wallet
+      "crypto wallet",
+      "crypto wallets",
+      "my crypto wallet",
+      "my crypto wallets",
+      "show crypto wallet",
+      "view crypto wallet",
+
+      // Deposit address
+      "deposit address",
+      "deposit addresses",
+      "my deposit address",
+      "where do i deposit",
+      "where can i deposit",
+      "how do i deposit crypto",
+
+      // Natural language
+      "show me my wallet",
+      "show me my wallets",
+      "what is my wallet address",
+      "what are my wallet addresses",
+      "where do i send crypto",
+      "where can i send crypto",
+    ],
+    description: "View your crypto wallet addresses and balances",
+    priority: 6,
+  },
+
+  // ============================================================
   // TRANSACTION HISTORY
   // User wants to view past transactions
   // ============================================================

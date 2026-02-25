@@ -151,29 +151,49 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
       const balances: Balance[] = crossmintBalances
         .map((balance) => {
           const asset = (balance.symbol || balance.token || "").toUpperCase();
-          // Crossmint API: 'amount' should be human-readable, 'rawAmount' is in smallest units
-          // However, in some cases the API may return raw amounts in 'amount' field
-          let amount = parseFloat(balance.amount) || 0;
-          const decimals = balance.decimals ?? 6;
-
-          // Log the raw API response for debugging
-          logger.debug(`[Balance Debug] Raw API response for ${asset}:`, {
-            amount: balance.amount,
-            rawAmount: balance.rawAmount,
-            decimals: balance.decimals,
-            parsedAmount: amount,
-          });
-
-          // Heuristic: If amount > 1 million and decimals > 0, it's likely raw
-          // For stablecoins (6 decimals), 1 million raw = 1 token
-          // For ETH-like (18 decimals), amounts are even larger
-          const rawThreshold = Math.pow(10, decimals);
-          if (amount >= rawThreshold && decimals > 0) {
-            logger.info(
-              `[Balance] Detected raw amount for ${asset}: ${amount}, converting with ${decimals} decimals`,
-            );
-            amount = amount / Math.pow(10, decimals);
+          
+          // Get decimals from API response
+          const apiDecimals = balance.decimals ?? 6;
+          
+          // Prefer rawAmount if available, otherwise use amount
+          let amount = 0;
+          if (balance.rawAmount) {
+            // rawAmount is always in the smallest unit, need to convert
+            const rawAmount = parseFloat(balance.rawAmount) || 0;
+            
+            // BSC USDT specifically uses 18 decimals for rawAmount (BSC standard)
+            // All other chains use their declared decimals
+            const isBscUsdt = chain.toLowerCase() === "bsc" && asset === "USDT";
+            const conversionDecimals = isBscUsdt ? 18 : apiDecimals;
+            amount = rawAmount / Math.pow(10, conversionDecimals);
+            
+            console.log(`\n[Balance Debug] ${asset} on ${chain}:`, {
+              rawAmount: balance.rawAmount,
+              apiDecimals: apiDecimals,
+              isBscUsdt: isBscUsdt,
+              conversionDecimals: conversionDecimals,
+              convertedAmount: amount,
+            });
+          } else {
+            // Fallback to amount field
+            amount = parseFloat(balance.amount) || 0;
+            
+            console.log(`\n[Balance Debug] ${asset} on ${chain}:`, {
+              amount: balance.amount,
+              apiDecimals: apiDecimals,
+              parsedAmount: amount,
+            });
+            
+            // Check if it's a raw amount that needs conversion
+            const rawThreshold = Math.pow(10, apiDecimals);
+            if (amount >= rawThreshold && apiDecimals > 0) {
+              console.log(`[Balance] Converting raw amount: ${amount} / 10^${apiDecimals}`);
+              amount = amount / Math.pow(10, apiDecimals);
+            }
           }
+          
+          console.log(`[Balance] Final amount for ${asset}: ${amount}`);
+          
           const usdValue = balance.usdValue || 0;
 
           // Validate balance data
@@ -298,6 +318,16 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         };
       }
 
+      console.log("\n========================================");
+      console.log("🔍 TRANSFER REQUEST PARSING");
+      console.log("========================================");
+      console.log(`📦 Token: ${transferRequest.token}`);
+      console.log(`   Chain: ${chain}`);
+      console.log(`   Symbol: ${symbol}`);
+      console.log(`📍 Wallet Address: ${transferRequest.walletAddress}`);
+      console.log(`💰 Amount: ${transferRequest.amount}`);
+      console.log("========================================\n");
+
       // Validate amount is positive
       const amount = parseFloat(transferRequest.amount);
       if (isNaN(amount) || amount <= 0) {
@@ -311,6 +341,10 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
       const userId = await this.extractUserIdFromWalletAddress(
         transferRequest.walletAddress,
       );
+      
+      // For balance validation, we need to get balances for the specific chain
+      // Don't use getChainType here because it converts "bsc" to "evm" which then maps to "base"
+      // Instead, get the wallet by the actual chain type for wallet lookup
       const chainType = this.getChainType(chain);
 
       // Verify wallet exists and belongs to user
@@ -332,16 +366,81 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
       }
 
       // Enhanced balance validation with detailed logging
-      const balances = await this.getWalletBalances(userId, chainType);
-      const tokenBalance = balances.find(
+      // For EVM chains, we need to get all EVM balances and filter by the specific chain
+      const balances = await this.getBalancesByChain(userId, chain);
+      
+      // Convert Crossmint balance format to our Balance format
+      const formattedBalances: Balance[] = balances.map((balance) => {
+        const asset = (balance.symbol || balance.token || "").toUpperCase();
+        
+        // Get decimals from API response
+        const apiDecimals = balance.decimals ?? 6;
+        
+        let amount = 0;
+        if (balance.rawAmount) {
+          // Use rawAmount for accurate conversion
+          const rawAmount = parseFloat(balance.rawAmount) || 0;
+          
+          // BSC USDT specifically uses 18 decimals
+          const isBscUsdt = chain.toLowerCase() === "bsc" && asset === "USDT";
+          const conversionDecimals = isBscUsdt ? 18 : apiDecimals;
+          amount = rawAmount / Math.pow(10, conversionDecimals);
+          
+          console.log(`\n[Transfer Balance] ${asset} on ${chain}:`, {
+            rawAmount: balance.rawAmount,
+            isBscUsdt: isBscUsdt,
+            conversionDecimals: conversionDecimals,
+            convertedAmount: amount,
+          });
+        } else {
+          // Fallback to amount field
+          amount = parseFloat(balance.amount) || 0;
+          const rawThreshold = Math.pow(10, apiDecimals);
+          if (amount >= rawThreshold && apiDecimals > 0) {
+            amount = amount / Math.pow(10, apiDecimals);
+          }
+          
+          console.log(`\n[Transfer Balance] ${asset} on ${chain}:`, {
+            amount: balance.amount,
+            convertedAmount: amount,
+          });
+        }
+        
+        return {
+          asset,
+          chain,
+          amount,
+          usdValue: balance.usdValue || 0,
+        };
+      });
+      
+      const tokenBalance = formattedBalances.find(
         (b) =>
-          b.asset.toLowerCase() === symbol.toLowerCase() &&
-          b.chain.toLowerCase() === chain.toLowerCase(),
+          b.asset.toLowerCase() === symbol.toLowerCase(),
       );
+
+      // ============================================================
+      // CONSOLE LOG: BALANCE VALIDATION
+      // ============================================================
+      console.log("\n========================================");
+      console.log("💰 BALANCE VALIDATION CHECK");
+      console.log("========================================");
+      console.log("🔍 Looking for:");
+      console.log(`   Asset: ${symbol.toLowerCase()}`);
+      console.log(`   Chain: ${chain.toLowerCase()}`);
+      console.log("\n📊 Available balances:");
+      formattedBalances.forEach((b, idx) => {
+        console.log(`   [${idx + 1}] ${b.asset} on ${b.chain}: ${b.amount}`);
+      });
+      console.log("\n✅ Match found:", !!tokenBalance);
+      if (tokenBalance) {
+        console.log(`   Balance: ${tokenBalance.amount} ${symbol}`);
+      }
+      console.log("========================================\n");
 
       if (!tokenBalance) {
         logger.warn(`Token balance not found for ${symbol} on ${chain}:`, {
-          availableBalances: balances.map((b) => `${b.asset} on ${b.chain}`),
+          availableBalances: formattedBalances.map((b) => `${b.asset} on ${b.chain}`),
           requestedToken: `${symbol} on ${chain}`,
         });
         return {
@@ -787,16 +886,33 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         prefixedTokens,
       );
 
-      // Map back to simple token names for the caller
+      // Map back to simple token names and fix BSC USDT decimals
       return balances.map((b) => {
         // b.token or b.symbol is likely "chain:token" like "base:usdc"
-        // We want to return just "usdc" to match what the caller expects
         const tokenVal = b.token || b.symbol || "";
         const simpleToken = tokenVal.includes(":")
           ? tokenVal.split(":")[1]
           : tokenVal;
+        
+        // Fix BSC USDT conversion
+        let amount = parseFloat(b.amount) || 0;
+        const asset = (simpleToken || "").toUpperCase();
+        const isBscUsdt = chain.toLowerCase() === "bsc" && asset === "USDT";
+        
+        if (b.rawAmount && isBscUsdt) {
+          // BSC USDT uses 18 decimals for rawAmount
+          const rawAmount = parseFloat(b.rawAmount) || 0;
+          amount = rawAmount / Math.pow(10, 18);
+          
+          console.log(`\n[getBalancesByChain] Fixed BSC USDT:`, {
+            rawAmount: b.rawAmount,
+            convertedAmount: amount,
+          });
+        }
+        
         return {
           ...b,
+          amount: amount.toString(),
           token: simpleToken || tokenVal,
           symbol: b.symbol || simpleToken || tokenVal,
         };
@@ -1087,6 +1203,7 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
   getSupportedAssets(chain: string): string[] {
     const supportedAssets: { [key: string]: string[] } = {
       bep20: ["usdc", "usdt"],
+      bsc: ["usdc", "usdt"], // BSC is the same as BEP20
       base: ["usdc"],
       arbitrum: ["usdc", "usdt"],
       solana: ["usdc", "usdt"],
@@ -1291,20 +1408,53 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
           originalKey: idempotencyKey,
         });
 
+        const transferEndpoint = `${this.baseUrl}/wallets/${wallet.address}/tokens/${tokenIdentifier}/transfers`;
+        const transferHeaders = {
+          "X-API-KEY": this.apiKey,
+          "Content-Type": "application/json",
+          "Idempotency-Key": currentIdempotencyKey,
+        };
+
+        // ============================================================
+        // CONSOLE LOG: TRANSFER REQUEST DETAILS
+        // ============================================================
+        console.log("\n========================================");
+        console.log("🚀 CROSSMINT TRANSFER REQUEST");
+        console.log("========================================");
+        console.log("📍 METHOD: POST");
+        console.log("📍 ENDPOINT:", transferEndpoint);
+        console.log("\n📋 HEADERS:");
+        console.log(JSON.stringify({
+          "X-API-KEY": `${this.apiKey.substring(0, 10)}...`,
+          "Content-Type": transferHeaders["Content-Type"],
+          "Idempotency-Key": transferHeaders["Idempotency-Key"],
+        }, null, 2));
+        console.log("\n📦 REQUEST BODY:");
+        console.log(JSON.stringify(transferPayload, null, 2));
+        console.log("\n🔧 Full cURL equivalent:");
+        console.log(`curl -X POST "${transferEndpoint}" \\`);
+        console.log(`  -H "X-API-KEY: ${this.apiKey.substring(0, 10)}..." \\`);
+        console.log(`  -H "Content-Type: application/json" \\`);
+        console.log(`  -H "Idempotency-Key: ${currentIdempotencyKey}" \\`);
+        console.log(`  -d '${JSON.stringify(transferPayload)}'`);
+        console.log("========================================\n");
+
+        console.log("⏳ Sending request to Crossmint...\n");
+
         const response = await axios.post(
-          `${this.baseUrl}/wallets/${wallet.address}/tokens/${tokenIdentifier}/transfers`,
+          transferEndpoint,
           transferPayload,
           {
-            headers: {
-              "X-API-KEY": this.apiKey,
-              "Content-Type": "application/json",
-              // Add idempotency header if supported by Crossmint
-              "Idempotency-Key": currentIdempotencyKey,
-            },
+            headers: transferHeaders,
             // Add timeout for better error handling
             timeout: 30000, // 30 seconds
           },
         );
+
+        console.log("✅ CROSSMINT RESPONSE RECEIVED:");
+        console.log("Status:", response.status);
+        console.log("Data:", JSON.stringify(response.data, null, 2));
+        console.log("========================================\n");
 
         logger.info(
           `Transfer executed successfully on attempt ${attempt}: ${amount} ${token} from wallet ${wallet.address} to ${toAddress}`,

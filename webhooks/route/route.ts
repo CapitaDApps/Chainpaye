@@ -14,6 +14,7 @@ import { topupFlow } from "../controllers/topUpFlow.controller";
 import { transferFlowController } from "../controllers/transferFlow.controller";
 import { userSetup } from "../controllers/userSetup.controller";
 import { withdrawalFlow } from "../controllers/withdrawalFlow.controller";
+import { verifyCrossmintWebhook } from "../middleware";
 
 const router: Router = express.Router();
 
@@ -29,11 +30,12 @@ router.post("/convert", conversionFlow);
 router.post("/offramp", cryptoTopupFlow);
 
 // Enhanced deposit notification webhooks with WorkflowController integration
-router.post("/deposit-notification", handleCrossmintDepositWebhook);
-router.post("/test-deposit-notification", testDepositNotification);
+// Protected with Crossmint signature verification
+router.post("/deposit-notification", verifyCrossmintWebhook, handleCrossmintDepositWebhook);
+router.post("/test-deposit-notification", testDepositNotification); // No verification for testing
 router.post("/payment-link/success", paymentLinkSuccessWebhook);
 
 // Legacy webhook endpoint (for backward compatibility)
-router.post("/deposit-webhook", handleCrossmintDepositWebhook);
+router.post("/deposit-webhook", verifyCrossmintWebhook, handleCrossmintDepositWebhook);
 
 export default router;

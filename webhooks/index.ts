@@ -98,36 +98,51 @@ app.get("/", userRateLimiter, (req, res) => {
 });
 
 async function readMessage(messageId: string) {
-  await axios({
-    method: "POST",
-    url: `https://graph.facebook.com/v24.0/${BUSINESS_PHONE_NUMBER_ID}/messages`,
-    headers: {
-      Authorization: `Bearer ${GRAPH_API_TOKEN}`,
-    },
-    data: {
-      messaging_product: "whatsapp",
-      status: "read",
-      message_id: messageId,
-    },
-  });
+  try {
+    await axios({
+      method: "POST",
+      url: `https://graph.facebook.com/v24.0/${BUSINESS_PHONE_NUMBER_ID}/messages`,
+      headers: {
+        Authorization: `Bearer ${GRAPH_API_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      data: {
+        messaging_product: "whatsapp",
+        status: "read",
+        message_id: messageId,
+      },
+    });
+  } catch (error: any) {
+    // Log but don't throw - marking as read is not critical
+    console.error(
+      `Failed to mark message ${messageId} as read:`,
+      error.response?.data || error.message,
+    );
+  }
 }
 
 async function replyingMessage(messageId: string) {
-  await axios({
-    method: "POST",
-    url: `https://graph.facebook.com/v24.0/${BUSINESS_PHONE_NUMBER_ID}/messages`,
-    headers: {
-      Authorization: `Bearer ${GRAPH_API_TOKEN}`,
-    },
-    data: {
-      messaging_product: "whatsapp",
-      status: "read",
-      message_id: messageId,
-      typing_indicator: {
-        type: "text",
+  try {
+    await axios({
+      method: "POST",
+      url: `https://graph.facebook.com/v24.0/${BUSINESS_PHONE_NUMBER_ID}/messages`,
+      headers: {
+        Authorization: `Bearer ${GRAPH_API_TOKEN}`,
+        "Content-Type": "application/json",
       },
-    },
-  });
+      data: {
+        messaging_product: "whatsapp",
+        status: "read",
+        message_id: messageId,
+      },
+    });
+  } catch (error: any) {
+    // Log but don't throw - marking as read is not critical
+    console.error(
+      `Failed to mark message ${messageId} as replying:`,
+      error.response?.data || error.message,
+    );
+  }
 }
 
 app.post("/webhook", verifyWebhookSignature, async (req, res) => {
