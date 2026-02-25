@@ -47,6 +47,116 @@ const FALLBACK_BANKS: Bank[] = [
   { id: "090267", title: "Kuda Bank" },
 ];
 
+/**
+ * Process DexPay quote and completion in background after transfer succeeds
+ * This allows us to return success screen immediately without waiting
+ */
+async function processOfframpInBackground(
+  userId: string,
+  phone: string,
+  ngnAmount: number,
+  normalizedAsset: string,
+  dexPayChain: string,
+  bank_code: string,
+  finalRecipientName: string,
+  account_number: string,
+  receivingAddress: string,
+  currency: string,
+  bank_name: string,
+  totalInUsd: number,
+  dexPayService: any,
+): Promise<void> {
+  try {
+    // Wait for crypto transaction to settle
+    logger.info("[OFFRAMP-BG] Waiting 20s for crypto settlement...");
+    console.log("\n⏳ [Background] Waiting 20 seconds for crypto transaction to settle...\n");
+    await new Promise((resolve) => setTimeout(resolve, 20000));
+
+    // Get quote from DexPay
+    console.log("\n========================================");
+    console.log("📊 [Background] GETTING DEXPAY QUOTE");
+    console.log("========================================");
+
+    const quoteRequest = {
+      fiatAmount: ngnAmount,
+      asset: normalizedAsset.toUpperCase(),
+      chain: dexPayService.mapChainForDexPay(dexPayChain),
+      type: "SELL" as const,
+      bankCode: bank_code,
+      accountName: finalRecipientName || "Beneficiary",
+      accountNumber: account_number,
+      receivingAddress: receivingAddress,
+    };
+
+    console.log("Quote Request:");
+    console.log(JSON.stringify(quoteRequest, null, 2));
+    console.log("========================================\n");
+
+    logger.info(
+      "[OFFRAMP-BG] Quote request: " + JSON.stringify(quoteRequest, null, 2),
+    );
+
+    const quote = await dexPayService.getQuote(quoteRequest);
+    logger.info(
+      "[OFFRAMP-BG] Quote received: " + JSON.stringify(quote, null, 2),
+    );
+
+    console.log("\n✅ [Background] Quote received:");
+    console.log(JSON.stringify(quote, null, 2));
+
+    // @ts-ignore - handling dynamic response structure
+    const quoteId = quote.id || (quote.data && quote.data.id);
+    console.log(`Quote ID: ${quoteId}\n`);
+
+    if (!quoteId) {
+      throw new Error("Invalid quote response: missing ID");
+    }
+
+    // Complete offramp
+    console.log("\n========================================");
+    console.log("💸 [Background] COMPLETING OFFRAMP");
+    console.log("========================================");
+    console.log(`Quote ID: ${quoteId}`);
+    console.log("========================================\n");
+
+    logger.info(`[OFFRAMP-BG] Completing offramp for quote ${quoteId}...`);
+
+    const offrampResult = await dexPayService.completeOfframp(quoteId);
+    logger.info(
+      "[OFFRAMP-BG] Offramp completed: " +
+        JSON.stringify(offrampResult, null, 2),
+    );
+
+    console.log("\n✅ [Background] OFFRAMP COMPLETED:");
+    console.log(JSON.stringify(offrampResult, null, 2));
+    console.log("========================================\n");
+
+    // Send success notification
+    await sendOfframpSuccessNotification(
+      phone,
+      ngnAmount,
+      totalInUsd,
+      currency || "UNKNOWN",
+      bank_name || "UNKNOWN",
+      finalRecipientName,
+      quoteId,
+    );
+
+    logger.info("[OFFRAMP-BG] Background processing completed successfully!");
+  } catch (error) {
+    logger.error(
+      "[OFFRAMP-BG] Background processing failed: " +
+        (error as Error).message,
+    );
+    console.log("\n❌ [Background] Processing failed:");
+    console.log((error as Error).message);
+    console.log("========================================\n");
+    
+    // TODO: Send notification to user about failure
+    // Could send a WhatsApp message or email notification
+  }
+}
+
 export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
   const { screen, data: rawData, action, flow_token } = decryptedBody;
   const data = rawData as OfframpData;
@@ -795,110 +905,36 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           }
 
           // ============================================================
-          // STEP 10: GET QUOTE FROM DEXPAY
-          // Now that funds are in our main wallet, we can get a quote
+          // TRANSFER SUCCESSFUL - RETURN SUCCESS SCREEN IMMEDIATELY
+          // Process DexPay quote and completion in background
           // ============================================================
+          logger.info("[OFFRAMP] Transfer successful! Returning success screen...");
+          
+          console.log("\n========================================");
+          console.log("✅ TRANSFER SUCCESSFUL");
+          console.log("🎉 RETURNING SUCCESS SCREEN IMMEDIATELY");
+          console.log("========================================\n");
 
-          // Wait for 10 seconds to allow crypto transaction to settle
-          logger.info("[OFFRAMP] Waiting 10s for crypto settlement...");
-          await new Promise((resolve) => setTimeout(resolve, 20000));
-
-          const quoteRequest = {
-            fiatAmount: ngnAmount,
-            asset: normalizedAsset.toUpperCase(),
-            chain: dexPayService.mapChainForDexPay(dexPayChain),
-            type: "SELL" as const,
-            bankCode: bank_code,
-            accountName: finalRecipientName || "Beneficiary",
-            accountNumber: account_number,
-            receivingAddress: receivingAddress,
-          };
-
-          logger.info(
-            "[OFFRAMP] Quote request: " + JSON.stringify(quoteRequest, null, 2),
-          );
-
-          let quote;
-          let quoteId: string;
-          try {
-            quote = await dexPayService.getQuote(quoteRequest);
-            logger.info(
-              "[OFFRAMP] Quote received: " + JSON.stringify(quote, null, 2),
-            );
-
-            // Extract ID safely handling potentially nested structure
-            // User JSON shows: { data: { id: "..." } }
-            // API type might imply: { id: "..." }
-            // We handle both
-            // @ts-ignore - handling dynamic response structure
-            quoteId = quote.id || (quote.data && quote.data.id);
-
-            if (!quoteId) {
-              throw new Error("Invalid quote response: missing ID");
-            }
-          } catch (quoteError) {
-            logger.error(
-              "[OFFRAMP] Failed to get quote: " + (quoteError as Error).message,
-            );
-            // TODO! Transfer was successful but quote failed - may need to handle refund
-            return {
-              screen: "OFFRAMP_CRYPTO_REVIEW",
-              data: {
-                ...data,
-                error_message:
-                  "Failed to create transaction quote. Your crypto has been transferred. Please contact support.",
-              },
-            };
-          }
-
-          // ============================================================
-          // STEP 11: COMPLETE OFFRAMP USING QUOTE ID
-          // This processes the fiat payment to user's bank account
-          // ============================================================
-          logger.info(`[OFFRAMP] Completing offramp for quote ${quoteId}...`);
-
-          let offrampResult;
-          try {
-            offrampResult = await dexPayService.completeOfframp(quoteId);
-            logger.info(
-              "[OFFRAMP] Offramp completed: " +
-                JSON.stringify(offrampResult, null, 2),
-            );
-          } catch (offrampError) {
-            logger.error(
-              "[OFFRAMP] Failed to complete offramp: " +
-                (offrampError as Error).message,
-            );
-            // TODO! Quote was created but when completion failed - may need manual intervention
-            return {
-              screen: "OFFRAMP_CRYPTO_REVIEW",
-              data: {
-                ...data,
-                error_message:
-                  "Failed to process bank transfer. Your transaction is pending. Please contact support.",
-              },
-            };
-          }
-
-          // ============================================================
-          // STEP 12: SEND SUCCESS NOTIFICATION (non-blocking)
-          // ============================================================
-          sendOfframpSuccessNotification(
+          // Process DexPay quote and completion in background (non-blocking)
+          processOfframpInBackground(
+            user.userId,
             phone,
             ngnAmount,
+            normalizedAsset,
+            dexPayChain,
+            bank_code,
+            finalRecipientName || "Beneficiary",
+            account_number,
+            receivingAddress,
+            currency || "USDT",
+            bank_name || "Bank",
             financials.totalInUsd,
-            currency || "UNKNOWN",
-            bank_name || "UNKNOWN",
-            finalRecipientName,
-            quoteId,
+            dexPayService,
           ).catch((err) =>
             logger.error(
-              "[OFFRAMP] Error sending success notification: " +
-                (err as Error).message,
+              "[OFFRAMP] Background processing error: " + (err as Error).message,
             ),
           );
-
-          logger.info("[OFFRAMP] Transaction completed successfully!");
 
           return {
             screen: "OFFRAMP_SUCCESS",
