@@ -886,16 +886,33 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         prefixedTokens,
       );
 
-      // Map back to simple token names for the caller
+      // Map back to simple token names and fix BSC USDT decimals
       return balances.map((b) => {
         // b.token or b.symbol is likely "chain:token" like "base:usdc"
-        // We want to return just "usdc" to match what the caller expects
         const tokenVal = b.token || b.symbol || "";
         const simpleToken = tokenVal.includes(":")
           ? tokenVal.split(":")[1]
           : tokenVal;
+        
+        // Fix BSC USDT conversion
+        let amount = parseFloat(b.amount) || 0;
+        const asset = (simpleToken || "").toUpperCase();
+        const isBscUsdt = chain.toLowerCase() === "bsc" && asset === "USDT";
+        
+        if (b.rawAmount && isBscUsdt) {
+          // BSC USDT uses 18 decimals for rawAmount
+          const rawAmount = parseFloat(b.rawAmount) || 0;
+          amount = rawAmount / Math.pow(10, 18);
+          
+          console.log(`\n[getBalancesByChain] Fixed BSC USDT:`, {
+            rawAmount: b.rawAmount,
+            convertedAmount: amount,
+          });
+        }
+        
         return {
           ...b,
+          amount: amount.toString(),
           token: simpleToken || tokenVal,
           symbol: b.symbol || simpleToken || tokenVal,
         };
