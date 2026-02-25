@@ -880,7 +880,7 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         prefixedTokens,
       );
 
-      // Map back to simple token names for the caller
+      // Map back to simple token names and convert amounts properly
       return balances.map((b) => {
         // b.token or b.symbol is likely "chain:token" like "base:usdc"
         // We want to return just "usdc" to match what the caller expects
@@ -888,8 +888,27 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         const simpleToken = tokenVal.includes(":")
           ? tokenVal.split(":")[1]
           : tokenVal;
+        
+        // Convert amount using rawAmount if available
+        let convertedAmount = b.amount;
+        if (b.rawAmount) {
+          const asset = (b.symbol || b.token || "").toUpperCase();
+          const rawAmount = parseFloat(b.rawAmount) || 0;
+          // Stablecoins on BSC use 18 decimals for rawAmount
+          const conversionDecimals = (asset.includes("USDT") || asset.includes("USDC")) ? 18 : (b.decimals ?? 6);
+          convertedAmount = (rawAmount / Math.pow(10, conversionDecimals)).toString();
+          
+          console.log(`[getBalancesByChain] Converting ${asset}:`, {
+            rawAmount: b.rawAmount,
+            originalAmount: b.amount,
+            conversionDecimals,
+            convertedAmount,
+          });
+        }
+        
         return {
           ...b,
+          amount: convertedAmount,
           token: simpleToken || tokenVal,
           symbol: b.symbol || simpleToken || tokenVal,
         };
