@@ -1141,6 +1141,7 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
   getSupportedAssets(chain: string): string[] {
     const supportedAssets: { [key: string]: string[] } = {
       bep20: ["usdc", "usdt"],
+      bsc: ["usdc", "usdt"], // BSC is the same as BEP20
       base: ["usdc"],
       arbitrum: ["usdc", "usdt"],
       solana: ["usdc", "usdt"],
