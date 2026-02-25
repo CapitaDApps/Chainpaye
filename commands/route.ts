@@ -30,32 +30,91 @@ async function handleWallets(phoneNumber: string): Promise<void> {
       return;
     }
 
-    // Get all user wallets
-    const wallets = await crossmintService.listWallets(user.userId);
+    // Get or create wallets for the user
+    let wallets = await crossmintService.listWallets(user.userId);
 
+    // If no wallets exist, create them
     if (!wallets || wallets.length === 0) {
-      await whatsappBusinessService.sendNormalMessage(
-        "📭 *No Wallets Found*\n\nYou don't have any crypto wallets yet.\n\nType *offramp* or *spend crypto* to create wallets automatically.",
-        phoneNumber,
-      );
-      return;
+      console.log(`Creating wallets for user ${user.userId}`);
+      
+      try {
+        const [evmWallet, solanaWallet] = await Promise.all([
+          crossmintService.getOrCreateWallet(user.userId, "evm"),
+          crossmintService.getOrCreateWallet(user.userId, "solana"),
+        ]);
+        
+        // Fetch the wallets again after creation
+        wallets = await crossmintService.listWallets(user.userId);
+      } catch (createError) {
+        console.error("Error creating wallets:", createError);
+        await whatsappBusinessService.sendNormalMessage(
+          "❌ *Error Creating Wallets*\n\nCouldn't create your wallets. Please try again later.",
+          phoneNumber,
+        );
+        return;
+      }
     }
+
+    console.log(`Found ${wallets.length} wallets for user ${user.userId}:`, 
+      wallets.map(w => `${w.chainType}: ${w.address}`));
 
     let message = "💼 *Your Crypto Wallets*\n\n";
 
-    for (const wallet of wallets) {
-      // Get balances for this wallet
-      let balances: any[] = [];
+    // Process EVM wallet first
+    const evmWallet = wallets.find(w => w.chainType === "evm");
+    if (evmWallet) {
+      message += `🔷 *EVM Wallet* (Multi-Chain)\n`;
+      message += `\`${evmWallet.address}\`\n\n`;
+      message += `*Supported Networks:* BSC, Base, Arbitrum\n\n`;
       
-      if (wallet.chainType === "solana") {
-        balances = await crossmintService.getBalancesByChain(
+      // Get balances for each EVM chain
+      const evmChains = ["bsc", "base", "arbitrum"];
+      let hasBalances = false;
+      
+      for (const chain of evmChains) {
+        try {
+          const chainBalances = await crossmintService.getBalancesByChain(
+            user.userId,
+            chain,
+            ["usdc", "usdt"],
+          );
+          
+          if (chainBalances.length > 0) {
+            const chainName = chain.toUpperCase();
+            message += `*${chainName} Balances:*\n`;
+            
+            for (const balance of chainBalances) {
+              const amount = parseFloat(balance.amount).toFixed(2);
+              const tokenName = (balance.symbol || balance.token || "UNKNOWN").toUpperCase();
+              message += `• ${tokenName}: ${amount}\n`;
+              hasBalances = true;
+            }
+            message += `\n`;
+          }
+        } catch (error) {
+          console.error(`Error fetching ${chain} balances:`, error);
+        }
+      }
+      
+      if (!hasBalances) {
+        message += `*Balance:* 0.00\n\n`;
+      }
+    }
+
+    // Process Solana wallet
+    const solanaWallet = wallets.find(w => w.chainType === "solana");
+    if (solanaWallet) {
+      message += `� *Solana Wallet*\n`;
+      message += `\`${solanaWallet.address}\`\n\n`;
+      
+      try {
+        const balances = await crossmintService.getBalancesByChain(
           user.userId,
           "solana",
           ["usdc", "usdt", "sol"],
         );
         
-        message += `🟣 *Solana Wallet*\n`;
-        message += `\`${wallet.address}\`\n\n`;
+        console.log(`Solana balances for ${user.userId}:`, balances);
         
         if (balances.length > 0) {
           message += `*Balances:*\n`;
@@ -68,44 +127,9 @@ async function handleWallets(phoneNumber: string): Promise<void> {
           message += `*Balance:* 0.00\n`;
         }
         message += `\n`;
-        
-      } else if (wallet.chainType === "evm") {
-        message += `🔷 *EVM Wallet* (Multi-Chain)\n`;
-        message += `\`${wallet.address}\`\n\n`;
-        message += `*Supported Networks:* BSC, Base, Arbitrum\n\n`;
-        
-        // Get balances for each EVM chain
-        const evmChains = ["bsc", "base", "arbitrum"];
-        let hasBalances = false;
-        
-        for (const chain of evmChains) {
-          try {
-            const chainBalances = await crossmintService.getBalancesByChain(
-              user.userId,
-              chain,
-              ["usdc", "usdt"],
-            );
-            
-            if (chainBalances.length > 0) {
-              const chainName = chain.toUpperCase();
-              message += `*${chainName} Balances:*\n`;
-              
-              for (const balance of chainBalances) {
-                const amount = parseFloat(balance.amount).toFixed(2);
-                const tokenName = (balance.symbol || balance.token || "UNKNOWN").toUpperCase();
-                message += `• ${tokenName}: ${amount}\n`;
-                hasBalances = true;
-              }
-              message += `\n`;
-            }
-          } catch (error) {
-            console.error(`Error fetching ${chain} balances:`, error);
-          }
-        }
-        
-        if (!hasBalances) {
-          message += `*Balance:* 0.00\n\n`;
-        }
+      } catch (error) {
+        console.error("Error fetching Solana balances:", error);
+        message += `*Balance:* 0.00\n\n`;
       }
     }
 
