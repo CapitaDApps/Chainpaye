@@ -520,7 +520,7 @@ What would you like to sell?`;
       cryptoTopUpFlowId,
       cryptoTopUpScreenId,
       {
-        body: `👆 Copy the address above.\n\n Please send ${token.toUpperCase()} on ${network.toUpperCase()} network \n\n⚠️ Warning: Sending on other networks will result in lost funds..
+        body: `Spend stablecoin like 💸
      `,
         cta: "Complete Off ramp",
       },
