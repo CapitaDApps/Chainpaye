@@ -1,5 +1,6 @@
 import { User } from "../models/User";
 import { whatsappBusinessService } from "../services";
+import { crossmintService } from "../services/CrossmintService";
 import { COMMANDS, TriggerPhrase } from "./config";
 import {
   handleAccountInfo,
@@ -12,6 +13,114 @@ import {
   handleTransfer,
   handleWithdrawal,
 } from "./handlers";
+
+/**
+ * Handle wallet command - show all crypto wallet addresses and balances
+ */
+async function handleWallets(phoneNumber: string): Promise<void> {
+  try {
+    const phone = phoneNumber.startsWith("+") ? phoneNumber : `+${phoneNumber}`;
+    const user = await User.findOne({ whatsappNumber: phone });
+
+    if (!user) {
+      await whatsappBusinessService.sendNormalMessage(
+        "❌ *Account Not Found*\n\nPlease create an account first.\n\nType *menu* to get started.",
+        phoneNumber,
+      );
+      return;
+    }
+
+    // Get all user wallets
+    const wallets = await crossmintService.listWallets(user.userId);
+
+    if (!wallets || wallets.length === 0) {
+      await whatsappBusinessService.sendNormalMessage(
+        "📭 *No Wallets Found*\n\nYou don't have any crypto wallets yet.\n\nType *offramp* or *spend crypto* to create wallets automatically.",
+        phoneNumber,
+      );
+      return;
+    }
+
+    let message = "💼 *Your Crypto Wallets*\n\n";
+
+    for (const wallet of wallets) {
+      // Get balances for this wallet
+      let balances: any[] = [];
+      
+      if (wallet.chainType === "solana") {
+        balances = await crossmintService.getBalancesByChain(
+          user.userId,
+          "solana",
+          ["usdc", "usdt", "sol"],
+        );
+        
+        message += `🟣 *Solana Wallet*\n`;
+        message += `\`${wallet.address}\`\n\n`;
+        
+        if (balances.length > 0) {
+          message += `*Balances:*\n`;
+          for (const balance of balances) {
+            const amount = parseFloat(balance.amount).toFixed(2);
+            const tokenName = (balance.symbol || balance.token || "UNKNOWN").toUpperCase();
+            message += `• ${tokenName}: ${amount}\n`;
+          }
+        } else {
+          message += `*Balance:* 0.00\n`;
+        }
+        message += `\n`;
+        
+      } else if (wallet.chainType === "evm") {
+        message += `🔷 *EVM Wallet* (Multi-Chain)\n`;
+        message += `\`${wallet.address}\`\n\n`;
+        message += `*Supported Networks:* BSC, Base, Arbitrum\n\n`;
+        
+        // Get balances for each EVM chain
+        const evmChains = ["bsc", "base", "arbitrum"];
+        let hasBalances = false;
+        
+        for (const chain of evmChains) {
+          try {
+            const chainBalances = await crossmintService.getBalancesByChain(
+              user.userId,
+              chain,
+              ["usdc", "usdt"],
+            );
+            
+            if (chainBalances.length > 0) {
+              const chainName = chain.toUpperCase();
+              message += `*${chainName} Balances:*\n`;
+              
+              for (const balance of chainBalances) {
+                const amount = parseFloat(balance.amount).toFixed(2);
+                const tokenName = (balance.symbol || balance.token || "UNKNOWN").toUpperCase();
+                message += `• ${tokenName}: ${amount}\n`;
+                hasBalances = true;
+              }
+              message += `\n`;
+            }
+          } catch (error) {
+            console.error(`Error fetching ${chain} balances:`, error);
+          }
+        }
+        
+        if (!hasBalances) {
+          message += `*Balance:* 0.00\n\n`;
+        }
+      }
+    }
+
+    message += `💡 *Tip:* Tap and hold the address to copy it.\n\n`;
+    message += `To deposit crypto, send USDC or USDT to the appropriate wallet address above.`;
+
+    await whatsappBusinessService.sendNormalMessage(message, phoneNumber);
+  } catch (error) {
+    console.error("Error in handleWallets:", error);
+    await whatsappBusinessService.sendNormalMessage(
+      "❌ *Error*\n\nCouldn't fetch your wallets. Please try again later.",
+      phoneNumber,
+    );
+  }
+}
 
 /**
  * Checks if a message is a crypto sell request (e.g., "usdc solana", "usdt on ethereum")
@@ -165,6 +274,10 @@ export async function commandRouteHandler(from: string, message: string) {
 
     case "myAccount":
       await handleAccountInfo(from);
+      break;
+
+    case "wallets":
+      await handleWallets(from);
       break;
 
     case "withdraw":
