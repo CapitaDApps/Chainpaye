@@ -138,16 +138,34 @@ async function handleWallets(phoneNumber: string): Promise<void> {
     // Send main message with balances
     await whatsappBusinessService.sendNormalMessage(message, phoneNumber);
     
-    // Send EVM wallet address in separate message
+    // Send EVM wallet messages
     if (evmWallet) {
-      const evmAddressMessage = `You can copy the address below to send crypto into your EVM wallet:\n\n${evmWallet.address}`;
-      await whatsappBusinessService.sendNormalMessage(evmAddressMessage, phoneNumber);
+      // Message 2: EVM instruction
+      await whatsappBusinessService.sendNormalMessage(
+        "You can copy the address below to send crypto into your EVM wallet:",
+        phoneNumber
+      );
+      
+      // Message 3: EVM address only
+      await whatsappBusinessService.sendNormalMessage(
+        evmWallet.address,
+        phoneNumber
+      );
     }
     
-    // Send Solana wallet address in separate message
+    // Send Solana wallet messages
     if (solanaWallet) {
-      const solanaAddressMessage = `You can copy the address below to send crypto into your Solana wallet:\n\n${solanaWallet.address}`;
-      await whatsappBusinessService.sendNormalMessage(solanaAddressMessage, phoneNumber);
+      // Message 4: Solana instruction
+      await whatsappBusinessService.sendNormalMessage(
+        "You can copy the address below to send crypto into your Solana wallet:",
+        phoneNumber
+      );
+      
+      // Message 5: Solana address only
+      await whatsappBusinessService.sendNormalMessage(
+        solanaWallet.address,
+        phoneNumber
+      );
     }
   } catch (error) {
     console.error("Error in handleWallets:", error);
