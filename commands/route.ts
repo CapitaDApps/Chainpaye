@@ -133,10 +133,22 @@ async function handleWallets(phoneNumber: string): Promise<void> {
       }
     }
 
-    message += `💡 *Tip:* Tap and hold the address to copy it.\n\n`;
-    message += `To deposit crypto, send USDC or USDT to the appropriate wallet address above.`;
+    message += `💡 *Tip:* Your wallet addresses will be sent in separate messages for easy copying.`;
 
+    // Send main message with balances
     await whatsappBusinessService.sendNormalMessage(message, phoneNumber);
+    
+    // Send EVM wallet address in separate message
+    if (evmWallet) {
+      const evmAddressMessage = `You can copy the address below to send crypto into your EVM wallet:\n\n${evmWallet.address}`;
+      await whatsappBusinessService.sendNormalMessage(evmAddressMessage, phoneNumber);
+    }
+    
+    // Send Solana wallet address in separate message
+    if (solanaWallet) {
+      const solanaAddressMessage = `You can copy the address below to send crypto into your Solana wallet:\n\n${solanaWallet.address}`;
+      await whatsappBusinessService.sendNormalMessage(solanaAddressMessage, phoneNumber);
+    }
   } catch (error) {
     console.error("Error in handleWallets:", error);
     await whatsappBusinessService.sendNormalMessage(
