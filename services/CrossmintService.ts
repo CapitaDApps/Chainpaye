@@ -159,16 +159,18 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
           let amount = 0;
           if (balance.rawAmount) {
             // rawAmount is always in the smallest unit, need to convert
-            // For BSC USDT, rawAmount has 18 decimals even though decimals field says 6
             const rawAmount = parseFloat(balance.rawAmount) || 0;
             
-            // Stablecoins should use 18 decimals for rawAmount conversion (BSC standard)
-            const conversionDecimals = (asset === "USDT" || asset === "USDC") ? 18 : apiDecimals;
+            // BSC USDT specifically uses 18 decimals for rawAmount (BSC standard)
+            // All other chains use their declared decimals
+            const isBscUsdt = chain.toLowerCase() === "bsc" && asset === "USDT";
+            const conversionDecimals = isBscUsdt ? 18 : apiDecimals;
             amount = rawAmount / Math.pow(10, conversionDecimals);
             
             console.log(`\n[Balance Debug] ${asset} on ${chain}:`, {
               rawAmount: balance.rawAmount,
               apiDecimals: apiDecimals,
+              isBscUsdt: isBscUsdt,
               conversionDecimals: conversionDecimals,
               convertedAmount: amount,
             });
@@ -378,11 +380,15 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         if (balance.rawAmount) {
           // Use rawAmount for accurate conversion
           const rawAmount = parseFloat(balance.rawAmount) || 0;
-          const conversionDecimals = (asset === "USDT" || asset === "USDC") ? 18 : apiDecimals;
+          
+          // BSC USDT specifically uses 18 decimals
+          const isBscUsdt = chain.toLowerCase() === "bsc" && asset === "USDT";
+          const conversionDecimals = isBscUsdt ? 18 : apiDecimals;
           amount = rawAmount / Math.pow(10, conversionDecimals);
           
-          console.log(`\n[Transfer Balance] ${asset}:`, {
+          console.log(`\n[Transfer Balance] ${asset} on ${chain}:`, {
             rawAmount: balance.rawAmount,
+            isBscUsdt: isBscUsdt,
             conversionDecimals: conversionDecimals,
             convertedAmount: amount,
           });
@@ -394,7 +400,7 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
             amount = amount / Math.pow(10, apiDecimals);
           }
           
-          console.log(`\n[Transfer Balance] ${asset}:`, {
+          console.log(`\n[Transfer Balance] ${asset} on ${chain}:`, {
             amount: balance.amount,
             convertedAmount: amount,
           });
@@ -880,7 +886,7 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         prefixedTokens,
       );
 
-      // Map back to simple token names and convert amounts properly
+      // Map back to simple token names for the caller
       return balances.map((b) => {
         // b.token or b.symbol is likely "chain:token" like "base:usdc"
         // We want to return just "usdc" to match what the caller expects
@@ -888,27 +894,8 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         const simpleToken = tokenVal.includes(":")
           ? tokenVal.split(":")[1]
           : tokenVal;
-        
-        // Convert amount using rawAmount if available
-        let convertedAmount = b.amount;
-        if (b.rawAmount) {
-          const asset = (b.symbol || b.token || "").toUpperCase();
-          const rawAmount = parseFloat(b.rawAmount) || 0;
-          // Stablecoins on BSC use 18 decimals for rawAmount
-          const conversionDecimals = (asset.includes("USDT") || asset.includes("USDC")) ? 18 : (b.decimals ?? 6);
-          convertedAmount = (rawAmount / Math.pow(10, conversionDecimals)).toString();
-          
-          console.log(`[getBalancesByChain] Converting ${asset}:`, {
-            rawAmount: b.rawAmount,
-            originalAmount: b.amount,
-            conversionDecimals,
-            convertedAmount,
-          });
-        }
-        
         return {
           ...b,
-          amount: convertedAmount,
           token: simpleToken || tokenVal,
           symbol: b.symbol || simpleToken || tokenVal,
         };
