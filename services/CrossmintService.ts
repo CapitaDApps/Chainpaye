@@ -154,26 +154,33 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
           // Crossmint API: 'amount' should be human-readable, 'rawAmount' is in smallest units
           // However, in some cases the API may return raw amounts in 'amount' field
           let amount = parseFloat(balance.amount) || 0;
-          const decimals = balance.decimals ?? 6;
+          
+          // Get decimals from API response
+          const apiDecimals = balance.decimals ?? 6;
+          
+          // Determine correct decimals for the asset
+          // Stablecoins (USDT/USDC) should always be 6 decimals
+          const correctDecimals = (asset === "USDT" || asset === "USDC") ? 6 : apiDecimals;
 
           // Log the raw API response for debugging
           logger.debug(`[Balance Debug] Raw API response for ${asset}:`, {
             amount: balance.amount,
             rawAmount: balance.rawAmount,
-            decimals: balance.decimals,
+            apiDecimals: apiDecimals,
+            correctDecimals: correctDecimals,
             parsedAmount: amount,
           });
 
-          // Heuristic: If amount > 1 million and decimals > 0, it's likely raw
-          // For stablecoins (6 decimals), 1 million raw = 1 token
-          // For ETH-like (18 decimals), amounts are even larger
-          const rawThreshold = Math.pow(10, decimals);
-          if (amount >= rawThreshold && decimals > 0) {
+          // Heuristic: If amount > threshold, it's likely raw and needs conversion
+          // Use API decimals for conversion (since that's how it was encoded)
+          const rawThreshold = Math.pow(10, apiDecimals);
+          if (amount >= rawThreshold && apiDecimals > 0) {
             logger.info(
-              `[Balance] Detected raw amount for ${asset}: ${amount}, converting with ${decimals} decimals`,
+              `[Balance] Detected raw amount for ${asset}: ${amount}, converting with ${apiDecimals} decimals`,
             );
-            amount = amount / Math.pow(10, decimals);
+            amount = amount / Math.pow(10, apiDecimals);
           }
+          
           const usdValue = balance.usdValue || 0;
 
           // Validate balance data
@@ -353,12 +360,14 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
       const formattedBalances: Balance[] = balances.map((balance) => {
         const asset = (balance.symbol || balance.token || "").toUpperCase();
         let amount = parseFloat(balance.amount) || 0;
-        const decimals = balance.decimals ?? 6;
         
-        // Handle raw amounts
-        const rawThreshold = Math.pow(10, decimals);
-        if (amount >= rawThreshold && decimals > 0) {
-          amount = amount / Math.pow(10, decimals);
+        // Get decimals from API response
+        const apiDecimals = balance.decimals ?? 6;
+        
+        // Handle raw amounts - use API decimals for conversion
+        const rawThreshold = Math.pow(10, apiDecimals);
+        if (amount >= rawThreshold && apiDecimals > 0) {
+          amount = amount / Math.pow(10, apiDecimals);
         }
         
         return {
