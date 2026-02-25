@@ -151,35 +151,46 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
       const balances: Balance[] = crossmintBalances
         .map((balance) => {
           const asset = (balance.symbol || balance.token || "").toUpperCase();
-          // Crossmint API: 'amount' should be human-readable, 'rawAmount' is in smallest units
-          // However, in some cases the API may return raw amounts in 'amount' field
-          let amount = parseFloat(balance.amount) || 0;
           
           // Get decimals from API response
           const apiDecimals = balance.decimals ?? 6;
           
-          // Determine correct decimals for the asset
-          // Stablecoins (USDT/USDC) should always be 6 decimals
-          const correctDecimals = (asset === "USDT" || asset === "USDC") ? 6 : apiDecimals;
-
-          // Log the raw API response for debugging
-          logger.debug(`[Balance Debug] Raw API response for ${asset}:`, {
-            amount: balance.amount,
-            rawAmount: balance.rawAmount,
-            apiDecimals: apiDecimals,
-            correctDecimals: correctDecimals,
-            parsedAmount: amount,
-          });
-
-          // Heuristic: If amount > threshold, it's likely raw and needs conversion
-          // Use API decimals for conversion (since that's how it was encoded)
-          const rawThreshold = Math.pow(10, apiDecimals);
-          if (amount >= rawThreshold && apiDecimals > 0) {
-            logger.info(
-              `[Balance] Detected raw amount for ${asset}: ${amount}, converting with ${apiDecimals} decimals`,
-            );
-            amount = amount / Math.pow(10, apiDecimals);
+          // Prefer rawAmount if available, otherwise use amount
+          let amount = 0;
+          if (balance.rawAmount) {
+            // rawAmount is always in the smallest unit, need to convert
+            // For BSC USDT, rawAmount has 18 decimals even though decimals field says 6
+            const rawAmount = parseFloat(balance.rawAmount) || 0;
+            
+            // Stablecoins should use 18 decimals for rawAmount conversion (BSC standard)
+            const conversionDecimals = (asset === "USDT" || asset === "USDC") ? 18 : apiDecimals;
+            amount = rawAmount / Math.pow(10, conversionDecimals);
+            
+            console.log(`\n[Balance Debug] ${asset} on ${chain}:`, {
+              rawAmount: balance.rawAmount,
+              apiDecimals: apiDecimals,
+              conversionDecimals: conversionDecimals,
+              convertedAmount: amount,
+            });
+          } else {
+            // Fallback to amount field
+            amount = parseFloat(balance.amount) || 0;
+            
+            console.log(`\n[Balance Debug] ${asset} on ${chain}:`, {
+              amount: balance.amount,
+              apiDecimals: apiDecimals,
+              parsedAmount: amount,
+            });
+            
+            // Check if it's a raw amount that needs conversion
+            const rawThreshold = Math.pow(10, apiDecimals);
+            if (amount >= rawThreshold && apiDecimals > 0) {
+              console.log(`[Balance] Converting raw amount: ${amount} / 10^${apiDecimals}`);
+              amount = amount / Math.pow(10, apiDecimals);
+            }
           }
+          
+          console.log(`[Balance] Final amount for ${asset}: ${amount}`);
           
           const usdValue = balance.usdValue || 0;
 
@@ -359,20 +370,39 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
       // Convert Crossmint balance format to our Balance format
       const formattedBalances: Balance[] = balances.map((balance) => {
         const asset = (balance.symbol || balance.token || "").toUpperCase();
-        let amount = parseFloat(balance.amount) || 0;
         
         // Get decimals from API response
         const apiDecimals = balance.decimals ?? 6;
         
-        // Handle raw amounts - use API decimals for conversion
-        const rawThreshold = Math.pow(10, apiDecimals);
-        if (amount >= rawThreshold && apiDecimals > 0) {
-          amount = amount / Math.pow(10, apiDecimals);
+        let amount = 0;
+        if (balance.rawAmount) {
+          // Use rawAmount for accurate conversion
+          const rawAmount = parseFloat(balance.rawAmount) || 0;
+          const conversionDecimals = (asset === "USDT" || asset === "USDC") ? 18 : apiDecimals;
+          amount = rawAmount / Math.pow(10, conversionDecimals);
+          
+          console.log(`\n[Transfer Balance] ${asset}:`, {
+            rawAmount: balance.rawAmount,
+            conversionDecimals: conversionDecimals,
+            convertedAmount: amount,
+          });
+        } else {
+          // Fallback to amount field
+          amount = parseFloat(balance.amount) || 0;
+          const rawThreshold = Math.pow(10, apiDecimals);
+          if (amount >= rawThreshold && apiDecimals > 0) {
+            amount = amount / Math.pow(10, apiDecimals);
+          }
+          
+          console.log(`\n[Transfer Balance] ${asset}:`, {
+            amount: balance.amount,
+            convertedAmount: amount,
+          });
         }
         
         return {
           asset,
-          chain, // Use the actual chain from token identifier
+          chain,
           amount,
           usdValue: balance.usdValue || 0,
         };
