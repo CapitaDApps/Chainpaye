@@ -298,6 +298,16 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         };
       }
 
+      console.log("\n========================================");
+      console.log("🔍 TRANSFER REQUEST PARSING");
+      console.log("========================================");
+      console.log(`📦 Token: ${transferRequest.token}`);
+      console.log(`   Chain: ${chain}`);
+      console.log(`   Symbol: ${symbol}`);
+      console.log(`📍 Wallet Address: ${transferRequest.walletAddress}`);
+      console.log(`💰 Amount: ${transferRequest.amount}`);
+      console.log("========================================\n");
+
       // Validate amount is positive
       const amount = parseFloat(transferRequest.amount);
       if (isNaN(amount) || amount <= 0) {
