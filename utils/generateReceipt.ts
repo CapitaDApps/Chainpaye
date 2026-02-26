@@ -305,21 +305,51 @@ function prepareTemplateData(data: ReceiptData): any {
 
 // 3. Core Function: Generate Receipt Image and return base64
 export async function generateReceipt(data: ReceiptData): Promise<string> {
-  const browser = await puppeteer.launch({
-    headless: true, // Use new headless mode
-    args: [
-      "--no-sandbox", // <--- REQUIRED for EC2 root user
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage", // Prevents memory crashes on low-RAM instances
-      "--disable-gpu",
-    ],
-    executablePath: "/usr/bin/chromium-browser", // Specify path to Chromium on your server
-  });
+  console.log(`[Receipt Generation] Starting Puppeteer...`);
+  let browser;
+  
+  // Try to find Chromium executable
+  const possiblePaths = [
+    "/usr/bin/chromium-browser",
+    "/usr/bin/chromium",
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    process.env.PUPPETEER_EXECUTABLE_PATH,
+  ].filter((path): path is string => Boolean(path));
+  
+  console.log(`[Receipt Generation] Possible Chromium paths:`, possiblePaths);
+  
+  try {
+    const launchOptions: any = {
+      headless: true,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+      ],
+    };
+    
+    // Only set executablePath if we have a valid path
+    if (possiblePaths.length > 0) {
+      launchOptions.executablePath = possiblePaths[0];
+    }
+    
+    browser = await puppeteer.launch(launchOptions);
+    console.log(`[Receipt Generation] Puppeteer launched successfully`);
+  } catch (launchError) {
+    console.error(`[Receipt Generation] Failed to launch Puppeteer:`, launchError);
+    console.error(`[Receipt Generation] Tried executable path: ${possiblePaths[0] || 'default'}`);
+    console.error(`[Receipt Generation] Tip: Install Chromium with: sudo apt-get install chromium-browser`);
+    throw launchError;
+  }
 
   try {
+    console.log(`[Receipt Generation] Creating new page...`);
     const page = await browser.newPage();
 
     // Read logo images and convert to base64
+    console.log(`[Receipt Generation] Reading logo files...`);
     const logoPath = path.join(__dirname, "../public/logo.jpg");
     const logoIconPath = path.join(__dirname, "../public/logo-icon.jpg");
 
@@ -332,8 +362,10 @@ export async function generateReceipt(data: ReceiptData): Promise<string> {
     const logoIconBase64 = `data:image/jpeg;base64,${logoIconBuffer.toString(
       "base64"
     )}`;
+    console.log(`[Receipt Generation] Logos loaded successfully`);
 
     // Read and compile template
+    console.log(`[Receipt Generation] Reading template...`);
     const templateHtml = await fs.readFile(
       path.join(__dirname, "../templates/transactionReceipts.hbs"),
       "utf-8"
@@ -341,6 +373,7 @@ export async function generateReceipt(data: ReceiptData): Promise<string> {
     const template = handlebars.compile(templateHtml);
 
     // Prepare data with necessary CSS classes and logo base64 strings
+    console.log(`[Receipt Generation] Preparing template data...`);
     const compiledData = prepareTemplateData(data);
     const html = template({
       ...compiledData,
@@ -354,9 +387,11 @@ export async function generateReceipt(data: ReceiptData): Promise<string> {
       .replace('src="/logo-icon.jpg"', `src="${logoIconBase64}"`);
 
     // Set content and wait for fonts to load for consistent rendering
+    console.log(`[Receipt Generation] Setting page content...`);
     await page.setContent(htmlWithImages, { waitUntil: "networkidle0" });
 
     // Important: Set viewport size to ensure the receipt renders fully within the view
+    console.log(`[Receipt Generation] Setting viewport...`);
     await page.setViewport({
       width: 600,
       height: 1000,
@@ -364,6 +399,7 @@ export async function generateReceipt(data: ReceiptData): Promise<string> {
     });
 
     // Select the receipt element itself to avoid taking a screenshot of the whole body background
+    console.log(`[Receipt Generation] Finding receipt container...`);
     const receiptElement = await page.$(".receipt-container");
 
     if (!receiptElement) {
@@ -371,17 +407,23 @@ export async function generateReceipt(data: ReceiptData): Promise<string> {
     }
 
     // Take screenshot of just the receipt element with transparent background and return as base64
+    console.log(`[Receipt Generation] Taking screenshot...`);
     const result = await receiptElement.screenshot({
       omitBackground: true, // ensures the jagged edge doesn't have white boxes behind it
       encoding: "base64",
     });
     await browser.close();
 
-    console.log(`Receipt generated successfully`);
+    console.log(`[Receipt Generation] Receipt generated successfully`);
     return `data:image/png;base64,${result}`;
   } catch (error) {
-    console.error("Error generating receipt:", error);
-    await browser.close();
+    console.error("[Receipt Generation] Error generating receipt:", error);
+    if (error instanceof Error) {
+      console.error("[Receipt Generation] Error stack:", error.stack);
+    }
+    if (browser) {
+      await browser.close();
+    }
     throw error;
   }
 }

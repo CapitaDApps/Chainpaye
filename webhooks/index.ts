@@ -114,10 +114,13 @@ async function readMessage(messageId: string) {
     });
   } catch (error: any) {
     // Log but don't throw - marking as read is not critical
-    console.error(
-      `Failed to mark message ${messageId} as read:`,
-      error.response?.data || error.message,
-    );
+    // Only log if it's not a 400 error (which is expected for invalid message IDs)
+    if (error.response?.status !== 400) {
+      console.error(
+        `Failed to mark message ${messageId} as read:`,
+        error.response?.data || error.message,
+      );
+    }
   }
 }
 
@@ -137,11 +140,14 @@ async function replyingMessage(messageId: string) {
       },
     });
   } catch (error: any) {
-    // Log but don't throw - marking as read is not critical
-    console.error(
-      `Failed to mark message ${messageId} as replying:`,
-      error.response?.data || error.message,
-    );
+    // Log but don't throw - marking as replying is not critical
+    // Only log if it's not a 400 error (which is expected for invalid message IDs)
+    if (error.response?.status !== 400) {
+      console.error(
+        `Failed to mark message ${messageId} as replying:`,
+        error.response?.data || error.message,
+      );
+    }
   }
 }
 

@@ -75,49 +75,75 @@ export class WhatsAppBusinessService {
   }
 
   async sendImageMessageById(phoneNumber: string, imageId: string) {
-    const data = {
-      messaging_product: "whatsapp",
-      recipient_type: "individual",
-      to: phoneNumber,
-      type: "image",
-      image: {
-        id: imageId,
-      },
-    };
-    const url = `https://graph.facebook.com/v24.0/${this.business_phone_number_id}/messages`;
-    await axios.post(url, data, {
-      headers: {
-        Authorization: `Bearer ${this.GRAPH_API_TOKEN}`,
-      },
-    });
+    try {
+      console.log(`[WhatsApp Send] Sending image message to ${phoneNumber}, media ID: ${imageId}`);
+      const data = {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: phoneNumber,
+        type: "image",
+        image: {
+          id: imageId,
+        },
+      };
+      const url = `https://graph.facebook.com/v24.0/${this.business_phone_number_id}/messages`;
+      const response = await axios.post(url, data, {
+        headers: {
+          Authorization: `Bearer ${this.GRAPH_API_TOKEN}`,
+        },
+      });
+      console.log(`[WhatsApp Send] Image message sent successfully, message ID: ${response.data.messages?.[0]?.id}`);
+    } catch (error) {
+      console.error(`[WhatsApp Send] Error sending image message:`, error);
+      if (axios.isAxiosError(error)) {
+        console.error(`[WhatsApp Send] Response status:`, error.response?.status);
+        console.error(`[WhatsApp Send] Response data:`, error.response?.data);
+      }
+      throw error;
+    }
   }
 
   async uploadImageToWhatapp(base64String: string): Promise<string> {
-    const cleanBase64 = base64String.replace(/^data:image\/\w+;base64,/, "");
+    try {
+      console.log(`[WhatsApp Upload] Starting image upload...`);
+      const cleanBase64 = base64String.replace(/^data:image\/\w+;base64,/, "");
+      console.log(`[WhatsApp Upload] Base64 cleaned, length: ${cleanBase64.length}`);
 
-    // 2. CONVERT TO BUFFER
-    const imageBuffer = Buffer.from(cleanBase64, "base64");
+      // 2. CONVERT TO BUFFER
+      const imageBuffer = Buffer.from(cleanBase64, "base64");
+      console.log(`[WhatsApp Upload] Buffer created, size: ${imageBuffer.length} bytes`);
 
-    // 3. CREATE BLOB FROM BUFFER
-    const blob = new Blob([imageBuffer], { type: "image/png" });
+      // 3. CREATE BLOB FROM BUFFER
+      const blob = new Blob([imageBuffer], { type: "image/png" });
+      console.log(`[WhatsApp Upload] Blob created, size: ${blob.size} bytes`);
 
-    // 4. PREPARE FORM DATA FOR UPLOAD
-    const form = new FormData();
-    form.append("file", blob, "receipt.png");
-    form.append("type", "image/png");
-    form.append("messaging_product", "whatsapp");
+      // 4. PREPARE FORM DATA FOR UPLOAD
+      const form = new FormData();
+      form.append("file", blob, "receipt.png");
+      form.append("type", "image/png");
+      form.append("messaging_product", "whatsapp");
 
-    const url = `https://graph.facebook.com/v24.0/${this.business_phone_number_id}/media`;
-    const resp = await axios({
-      method: "POST",
-      url,
-      headers: {
-        Authorization: `Bearer ${this.GRAPH_API_TOKEN}`,
-      },
-      data: form,
-    });
-    const data = resp.data;
-    return data.id;
+      const url = `https://graph.facebook.com/v24.0/${this.business_phone_number_id}/media`;
+      console.log(`[WhatsApp Upload] Uploading to WhatsApp API...`);
+      const resp = await axios({
+        method: "POST",
+        url,
+        headers: {
+          Authorization: `Bearer ${this.GRAPH_API_TOKEN}`,
+        },
+        data: form,
+      });
+      const data = resp.data;
+      console.log(`[WhatsApp Upload] Upload successful, media ID: ${data.id}`);
+      return data.id;
+    } catch (error) {
+      console.error(`[WhatsApp Upload] Error uploading image:`, error);
+      if (axios.isAxiosError(error)) {
+        console.error(`[WhatsApp Upload] Response status:`, error.response?.status);
+        console.error(`[WhatsApp Upload] Response data:`, error.response?.data);
+      }
+      throw error;
+    }
   }
 
   async sendTemplateIntroMessage(to: string) {
@@ -490,7 +516,7 @@ What would you like to sell?`;
     address: string,
   ) {
     // Message 1: Send the deposit address
-    await this.sendNormalMessage(address, to);
+    // await this.sendNormalMessage(address, to);
 
     // Fetch banks for the offramp flow
     let banks: { id: string; title: string }[] = [

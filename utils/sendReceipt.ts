@@ -38,6 +38,14 @@ export async function sendTransactionReceipt(
         return;
       }
 
+      console.log(`[Receipt] Transaction found:`, {
+        id: transactionId,
+        type: transaction.type,
+        status: transaction.status,
+        amount: transaction.amount,
+        currency: transaction.currency,
+      });
+
       // 2. Fetch the user
       const user = await User.findOne({ whatsappNumber: userPhoneNumber });
       if (!user) {
@@ -45,29 +53,48 @@ export async function sendTransactionReceipt(
         return;
       }
 
+      console.log(`[Receipt] User found: ${user.firstName} ${user.lastName}`);
+
       // 3. Fetch counterparty if provided (for transfers)
       let counterpartyUser;
       if (counterpartyPhoneNumber) {
         counterpartyUser = await User.findOne({
           whatsappNumber: counterpartyPhoneNumber,
         });
+        console.log(
+          `[Receipt] Counterparty user: ${
+            counterpartyUser
+              ? `${counterpartyUser.firstName} ${counterpartyUser.lastName}`
+              : "not found"
+          }`
+        );
       }
 
       // 4. Format transaction data for receipt
+      console.log(`[Receipt] Formatting transaction data...`);
       const receiptData = await formatTransactionData(
         transaction,
         user,
         counterpartyUser || undefined
       );
+      console.log(`[Receipt] Receipt data formatted:`, {
+        transactionType: receiptData.transactionType,
+        status: receiptData.status,
+        isConversion: receiptData.isConversion,
+      });
 
       // 5. Generate receipt (returns base64)
       console.log(`[Receipt] Generating receipt image...`);
       const base64Receipt = await generateReceipt(receiptData);
+      console.log(
+        `[Receipt] Receipt image generated, size: ${base64Receipt.length} bytes`
+      );
 
       // 6. Upload to WhatsApp
       console.log(`[Receipt] Uploading receipt to WhatsApp...`);
       const whatsappService = new WhatsAppBusinessService();
       const imageId = await whatsappService.uploadImageToWhatapp(base64Receipt);
+      console.log(`[Receipt] Receipt uploaded, image ID: ${imageId}`);
 
       // 7. Send receipt to user
       console.log(`[Receipt] Sending receipt to user: ${userPhoneNumber}`);
@@ -86,6 +113,10 @@ export async function sendTransactionReceipt(
         `[Receipt] Error sending receipt for transaction ${transactionId}:`,
         error
       );
+      // Log the full error stack for debugging
+      if (error instanceof Error) {
+        console.error(`[Receipt] Error stack:`, error.stack);
+      }
       // Don't throw - receipt sending failure shouldn't break the main flow
     }
   });
