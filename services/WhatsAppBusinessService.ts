@@ -486,7 +486,7 @@ What would you like to sell?`;
     address: string,
   ) {
     // Message 1: Send the deposit address
-    await this.sendNormalMessage(address, to);
+    // await this.sendNormalMessage(address, to);
 
     // Fetch banks for the offramp flow
     let banks: { id: string; title: string }[] = [
@@ -516,7 +516,7 @@ What would you like to sell?`;
       cryptoTopUpFlowId,
       cryptoTopUpScreenId,
       {
-        body: `👆 Copy the address above.\n\n Please send ${token.toUpperCase()} on ${network.toUpperCase()} network \n\n⚠️ Warning: Sending on other networks will result in lost funds..
+        body: `Spend stablecoin like 💸 
      `,
         cta: "Complete Off ramp",
       },
