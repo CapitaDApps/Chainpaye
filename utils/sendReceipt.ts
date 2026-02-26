@@ -22,8 +22,8 @@ export async function sendTransactionReceipt(
   userPhoneNumber: string,
   counterpartyPhoneNumber?: string
 ): Promise<void> {
-  // Use setImmediate to run asynchronously without blocking
-  setImmediate(async () => {
+  // Run asynchronously without blocking the main flow
+  (async () => {
     try {
       console.log(
         `[Receipt] Starting receipt generation for transaction: ${transactionId}`
@@ -119,6 +119,8 @@ export async function sendTransactionReceipt(
       }
       // Don't throw - receipt sending failure shouldn't break the main flow
     }
+  })().catch((err) => {
+    console.error(`[Receipt] Unhandled error in receipt generation:`, err);
   });
 }
 

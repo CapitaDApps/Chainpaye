@@ -6,16 +6,22 @@
 # 1. Check system setup
 bash scripts/check-receipt-setup.sh
 
-# 2. Test receipt generation
+# 2. Test receipt generation (creates test image)
 tsx utils/testReceiptGeneration.ts
 
-# 3. Watch receipt logs in real-time
+# 3. Find transactions without receipts (last 24 hours)
+tsx scripts/find-transactions-without-receipts.ts 24
+
+# 4. Send receipt for specific transaction
+tsx scripts/test-receipt-for-transaction.ts <transactionId> <phoneNumber>
+
+# 5. Watch receipt logs in real-time
 tail -f logs/combined.log | grep "\[Receipt"
 
-# 4. Check for receipt errors
+# 6. Check for receipt errors
 grep "\[Receipt" logs/error.log
 
-# 5. Find specific transaction logs
+# 7. Find specific transaction logs
 grep "transaction-id-here" logs/combined.log
 ```
 

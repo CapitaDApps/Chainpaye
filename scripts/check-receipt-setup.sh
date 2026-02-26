@@ -48,6 +48,11 @@ elif command -v chromium &> /dev/null; then
     print_status 0 "Chromium found at: $CHROMIUM_PATH"
     VERSION=$(chromium --version 2>/dev/null)
     echo "   Version: $VERSION"
+elif [ -f "/snap/bin/chromium" ]; then
+    CHROMIUM_PATH="/snap/bin/chromium"
+    print_status 0 "Chromium (Snap) found at: $CHROMIUM_PATH"
+    VERSION=$(/snap/bin/chromium --version 2>/dev/null)
+    echo "   Version: $VERSION"
 elif command -v google-chrome &> /dev/null; then
     CHROMIUM_PATH=$(which google-chrome)
     print_status 0 "Google Chrome found at: $CHROMIUM_PATH"
@@ -56,6 +61,7 @@ elif command -v google-chrome &> /dev/null; then
 else
     print_status 1 "Chromium not found"
     echo "   Install with: sudo apt-get install chromium-browser"
+    echo "   Or with Snap: sudo snap install chromium"
 fi
 
 echo ""

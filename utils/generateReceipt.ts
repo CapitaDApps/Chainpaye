@@ -308,15 +308,34 @@ export async function generateReceipt(data: ReceiptData): Promise<string> {
   console.log(`[Receipt Generation] Starting Puppeteer...`);
   let browser;
   
-  // Try to find Chromium executable
-  const possiblePaths = [
-    "/usr/bin/chromium-browser",
-    "/usr/bin/chromium",
-    "/usr/bin/google-chrome",
-    "/usr/bin/google-chrome-stable",
-    process.env.PUPPETEER_EXECUTABLE_PATH,
-  ].filter((path): path is string => Boolean(path));
+  // Register Handlebars helpers
+  handlebars.registerHelper('eq', function(a, b) {
+    return a === b;
+  });
   
+  // Detect platform
+  const isWindows = process.platform === 'win32';
+  
+  // Try to find Chromium executable based on platform
+  const possiblePaths = isWindows
+    ? [
+        process.env.PUPPETEER_EXECUTABLE_PATH,
+        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+        process.env.LOCALAPPDATA + '\\Google\\Chrome\\Application\\chrome.exe',
+        process.env.PROGRAMFILES + '\\Google\\Chrome\\Application\\chrome.exe',
+      ].filter((path): path is string => Boolean(path))
+    : [
+        process.env.PUPPETEER_EXECUTABLE_PATH,
+        "/snap/bin/chromium",
+        "/snap/chromium/current/usr/lib/chromium-browser/chrome",
+        "/usr/bin/chromium-browser",
+        "/usr/bin/chromium",
+        "/usr/bin/google-chrome",
+        "/usr/bin/google-chrome-stable",
+      ].filter((path): path is string => Boolean(path));
+  
+  console.log(`[Receipt Generation] Platform: ${process.platform}`);
   console.log(`[Receipt Generation] Possible Chromium paths:`, possiblePaths);
   
   try {
@@ -340,7 +359,14 @@ export async function generateReceipt(data: ReceiptData): Promise<string> {
   } catch (launchError) {
     console.error(`[Receipt Generation] Failed to launch Puppeteer:`, launchError);
     console.error(`[Receipt Generation] Tried executable path: ${possiblePaths[0] || 'default'}`);
-    console.error(`[Receipt Generation] Tip: Install Chromium with: sudo apt-get install chromium-browser`);
+    
+    if (isWindows) {
+      console.error(`[Receipt Generation] Tip: Install Google Chrome from: https://www.google.com/chrome/`);
+      console.error(`[Receipt Generation] Or set PUPPETEER_EXECUTABLE_PATH environment variable to your Chrome path`);
+    } else {
+      console.error(`[Receipt Generation] Tip: Install Chromium with: sudo apt-get install chromium-browser`);
+    }
+    
     throw launchError;
   }
 
@@ -412,6 +438,8 @@ export async function generateReceipt(data: ReceiptData): Promise<string> {
       omitBackground: true, // ensures the jagged edge doesn't have white boxes behind it
       encoding: "base64",
     });
+    
+    console.log(`[Receipt Generation] Closing browser...`);
     await browser.close();
 
     console.log(`[Receipt Generation] Receipt generated successfully`);
@@ -421,8 +449,14 @@ export async function generateReceipt(data: ReceiptData): Promise<string> {
     if (error instanceof Error) {
       console.error("[Receipt Generation] Error stack:", error.stack);
     }
-    if (browser) {
-      await browser.close();
+    // Ensure browser is closed even on error
+    try {
+      if (browser) {
+        await browser.close();
+        console.log(`[Receipt Generation] Browser closed after error`);
+      }
+    } catch (closeError) {
+      console.error("[Receipt Generation] Error closing browser:", closeError);
     }
     throw error;
   }

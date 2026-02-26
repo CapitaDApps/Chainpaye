@@ -38,9 +38,9 @@ async function testReceiptGeneration() {
     );
 
     // Optionally save to file for inspection
-    const fs = await import("fs-extra");
+    const fsExtra = await import("fs-extra");
     const cleanBase64 = base64Receipt.replace(/^data:image\/\w+;base64,/, "");
-    await fs.writeFile("test-receipt.png", cleanBase64, "base64");
+    await fsExtra.default.writeFile("test-receipt.png", Buffer.from(cleanBase64, 'base64'));
     console.log("\n📁 Receipt saved to: test-receipt.png");
 
     return true;

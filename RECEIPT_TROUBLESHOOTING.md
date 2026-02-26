@@ -286,7 +286,38 @@ This tests:
 - Image generation
 - File I/O
 
-### 2. Test Full Flow (Manual)
+### 2. Find Transactions Without Receipts
+
+```bash
+# Find transactions from last 24 hours without receipts
+tsx scripts/find-transactions-without-receipts.ts 24
+
+# Find transactions from last 7 days
+tsx scripts/find-transactions-without-receipts.ts 168
+```
+
+This will:
+- Connect to database
+- Find completed/failed transactions without `receiptImageId`
+- Display transaction details and user info
+- Provide command to send receipt for each transaction
+
+### 3. Send Receipt for Specific Transaction
+
+```bash
+tsx scripts/test-receipt-for-transaction.ts <transactionId> <phoneNumber>
+
+# Example:
+tsx scripts/test-receipt-for-transaction.ts 65f1234567890abcdef12345 +2348012345678
+```
+
+This will:
+- Verify transaction exists
+- Display transaction details
+- Send receipt to specified phone number
+- Wait for processing and show logs
+
+### 4. Test Full Flow (Manual)
 
 ```typescript
 import { sendTransactionReceipt } from "./utils/sendReceipt";
@@ -298,7 +329,7 @@ await sendTransactionReceipt(
 );
 ```
 
-### 3. Check Transaction Status
+### 5. Check Transaction Status
 
 ```bash
 # In MongoDB shell or using a script
