@@ -111,6 +111,10 @@ async function readMessage(messageId: string) {
         status: "read",
         message_id: messageId,
       },
+      validateStatus: function (status) {
+        // Don't throw for 400 errors - they're expected
+        return status < 500;
+      },
     });
   } catch (error: any) {
     // Log but don't throw - marking as read is not critical
@@ -121,6 +125,7 @@ async function readMessage(messageId: string) {
         error.response?.data || error.message,
       );
     }
+    // Silently ignore 400 errors as they're expected for certain message types
   }
 }
 
@@ -137,6 +142,10 @@ async function replyingMessage(messageId: string) {
         messaging_product: "whatsapp",
         status: "read",
         message_id: messageId,
+      },
+      validateStatus: function (status) {
+        // Don't throw for 400 errors - they're expected
+        return status < 500;
       },
     });
   } catch (error: any) {
