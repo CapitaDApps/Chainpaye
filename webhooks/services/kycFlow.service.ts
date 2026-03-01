@@ -4,6 +4,7 @@ import { ToronetService } from "../../services/ToronetService";
 import { UserService } from "../../services/UserService";
 import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService";
 import { formatDate } from "../utils/formatDate";
+import { handleKYCCompletion } from "../controllers/referral.controller";
 
 // ============================================================
 // KYC FLOW SERVICE
@@ -281,10 +282,19 @@ export const kycFlowScreen = async (decryptedBody: {
             dob,
           );
 
+          // Generate referral code for the user
+          try {
+            await handleKYCCompletion(user.userId);
+            console.log("DEBUG: Referral code generated for user:", user.userId);
+          } catch (referralError) {
+            console.error("DEBUG: Error generating referral code:", referralError);
+            // Don't fail the flow if referral code generation fails
+          }
+
           // Send WhatsApp message to user about successful verification
           try {
             await whatsappBusinessService.sendNormalMessage(
-              `🎉 *KYC Verification Successful!*\n\nCongratulations ${firstName}! Your identity has been verified.\n\nYou now have full access to all Chainpaye features including:\n✅ Bank withdrawals\n✅ Higher transaction limits\n✅ Full account access`,
+              `🎉 *KYC Verification Successful!*\n\nCongratulations ${firstName}! Your identity has been verified.\n\nYou now have full access to all Chainpaye features including:\n✅ Bank withdrawals\n✅ Higher transaction limits\n✅ Full account access\n✅ Referral rewards program\n\nType *referral* to get your referral code and start earning!`,
               phone,
             );
             console.log("DEBUG: KYC success WhatsApp message sent");

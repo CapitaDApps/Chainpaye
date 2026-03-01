@@ -698,6 +698,69 @@ const COMMANDS: Record<string, CommandConfig> = {
     description: "Complete KYC/BVN verification to unlock all features",
     priority: 5,
   },
+
+  // ============================================================
+  // REFERRAL SYSTEM
+  // View referral dashboard, earnings, and leaderboard
+  // ============================================================
+  referral: {
+    triggers: [
+      // Slash commands
+      "/referral",
+      "/referrals",
+      "/refer",
+      "/earnings",
+      "/dashboard",
+
+      // Referral terms
+      "referral",
+      "referrals",
+      "my referral",
+      "my referrals",
+      "referral code",
+      "my referral code",
+      "referral link",
+      "my referral link",
+      "refer",
+      "refer friend",
+      "refer a friend",
+
+      // Dashboard
+      "dashboard",
+      "referral dashboard",
+      "my dashboard",
+      "show dashboard",
+      "view dashboard",
+
+      // Earnings
+      "earnings",
+      "my earnings",
+      "referral earnings",
+      "how much have i earned",
+      "how much did i earn",
+      "check earnings",
+      "view earnings",
+      "show earnings",
+
+      // Leaderboard
+      "leaderboard",
+      "top earners",
+      "rankings",
+      "my rank",
+      "my ranking",
+
+      // Natural language
+      "how do i refer",
+      "how can i refer",
+      "invite friends",
+      "earn rewards",
+      "earn money",
+      "make money",
+      "passive income",
+    ],
+    description: "View your referral dashboard and earnings",
+    priority: 4,
+  },
 };
 
 export { COMMANDS };

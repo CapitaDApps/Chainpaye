@@ -13,6 +13,8 @@ import {
   handleTransfer,
   handleWithdrawal,
 } from "./handlers";
+import { handleStartCommand } from "./handlers/startCommandHandler";
+import { handleReferralCommand } from "./handlers/referralHandler";
 
 /**
  * Handle wallet command - show all crypto wallet addresses and balances
@@ -305,6 +307,13 @@ function findMatchingCommand(message: string): string | null {
 }
 
 export async function commandRouteHandler(from: string, message: string) {
+  // Check for "start [referral_code]" command first (highest priority)
+  const startMatch = message.trim().match(/^start\s+([A-Z0-9]+)$/i);
+  if (startMatch) {
+    await handleStartCommand(from, message);
+    return;
+  }
+
   if (isCryptoSellRequest(message)) {
     await handleOfframp(from, message);
     return;
@@ -394,6 +403,31 @@ export async function commandRouteHandler(from: string, message: string) {
 
     case "support":
       await handleSupport(from);
+      break;
+
+    case "referral":
+      // Show referral dashboard with earnings and referral link
+      try {
+        const phone = from.startsWith("+") ? from : `+${from}`;
+        const user = await User.findOne({ whatsappNumber: phone });
+
+        if (!user) {
+          await whatsappBusinessService.sendNormalMessage(
+            "❌ *Account Not Found*\n\nPlease create an account first.\n\nType *menu* to get started.",
+            from
+          );
+          return;
+        }
+
+        const dashboardMessage = await handleReferralCommand(user.userId);
+        await whatsappBusinessService.sendNormalMessage(dashboardMessage, from);
+      } catch (err) {
+        console.error("Error showing referral dashboard:", err);
+        await whatsappBusinessService.sendNormalMessage(
+          "❌ *Error*\n\nCouldn't load your referral dashboard. Please try again later.",
+          from
+        );
+      }
       break;
 
     default:

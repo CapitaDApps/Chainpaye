@@ -203,6 +203,24 @@ export class TransactionManager implements ITransactionManager {
         TransactionStatus.COMPLETED,
       );
 
+      // Process referral earnings (if applicable)
+      try {
+        const { handleOfframpTransaction } = await import("../../webhooks/controllers/referral.controller");
+        await handleOfframpTransaction({
+          id: transactionId,
+          userId: transaction.userId,
+          amount: transaction.amount,
+          feeAmount: transaction.fees || 0,
+          timestamp: transaction.completedAt,
+        });
+        this.log(`Referral earnings processed for transaction ${transactionId}`);
+      } catch (referralError) {
+        this.log(
+          `Warning: Failed to process referral earnings for transaction ${transactionId}: ${(referralError as Error).message}`,
+        );
+        // Don't fail the transaction if referral processing fails
+      }
+
       // Generate receipt
       const receipt = this.generateTransactionReceipt(transaction);
 

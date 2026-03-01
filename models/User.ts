@@ -23,6 +23,9 @@ export interface IUser extends Document {
   verificationCodeExpires?: Date;
   pin?: string;
   dob?: string;
+  referralCode?: string; // Unique referral code for this user
+  referredBy?: string; // User ID of the referrer
+  referredAt?: Date; // Timestamp when user was referred
   createdAt: Date;
   updatedAt: Date;
   comparePin(candidatePin: string): Promise<boolean>;
@@ -112,6 +115,21 @@ const UserSchema: Schema = new Schema(
     dob: {
       type: String,
     },
+    referralCode: {
+      type: String,
+      unique: true,
+      sparse: true, // Allows multiple null values, unique only when set
+      trim: true,
+      minlength: 6,
+      maxlength: 12,
+    },
+    referredBy: {
+      type: String,
+      trim: true,
+    },
+    referredAt: {
+      type: Date,
+    },
   },
   {
     timestamps: true, // Automatically add createdAt and updatedAt
@@ -123,6 +141,8 @@ const UserSchema: Schema = new Schema(
  */
 UserSchema.index({ whatsappNumber: 1 });
 UserSchema.index({ email: 1 });
+UserSchema.index({ referralCode: 1 });
+UserSchema.index({ referredBy: 1 });
 /**
  * Pre-save middleware to hash PIN
  */
