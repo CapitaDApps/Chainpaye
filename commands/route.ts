@@ -14,6 +14,7 @@ import {
   handleWithdrawal,
 } from "./handlers";
 import { handleStartCommand } from "./handlers/startCommandHandler";
+import { handleSignup } from "./handlers/signupHandler";
 import { handleReferralCommand } from "./handlers/referralHandler";
 
 /**
@@ -333,6 +334,11 @@ export async function commandRouteHandler(from: string, message: string) {
           (err as { response: any }).response?.data,
         );
       }
+      break;
+
+    case "signup":
+      // User wants to create an account
+      await handleSignup(from, message);
       break;
 
     case "myAccount":

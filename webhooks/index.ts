@@ -179,14 +179,14 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
               const startMatch = messageText.match(/^start\s+([A-Z0-9]+)$/i);
               
               if (startMatch) {
-                // Process the start command first
+                // Process the start command - this will send the welcome message
                 const phone = message.from.startsWith("+")
                   ? message.from
                   : `+${message.from}`;
                 await commandRouteHandler(phone, messageText);
                 
-                // Then send registration flow
-                whatsappBusinessService.sendIntroMessageByFlowId(message.from);
+                // Don't send registration flow immediately - let user read the welcome message
+                // The welcome message includes instructions to type "signup" to continue
                 return res.sendStatus(200);
               }
             }

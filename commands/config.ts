@@ -70,6 +70,46 @@ const COMMANDS: Record<string, CommandConfig> = {
   },
 
   // ============================================================
+  // SIGNUP / REGISTRATION
+  // User wants to create an account or complete registration
+  // ============================================================
+  signup: {
+    triggers: [
+      // Slash commands
+      "/signup",
+      "/register",
+      "/join",
+      "/create",
+
+      // Signup terms
+      "signup",
+      "sign up",
+      "sign-up",
+      "register",
+      "registration",
+      "create account",
+      "new account",
+      "join",
+      "get started",
+      "start account",
+
+      // Natural language
+      "i want to signup",
+      "i want to sign up",
+      "i want to register",
+      "i want to create an account",
+      "i want to join",
+      "how do i signup",
+      "how do i sign up",
+      "how do i register",
+      "create my account",
+      "make an account",
+    ],
+    description: "Create a new ChainPaye account",
+    priority: 8,
+  },
+
+  // ============================================================
   // ACCOUNT / BALANCE QUERIES
   // User wants to check their account info or balance
   // ============================================================

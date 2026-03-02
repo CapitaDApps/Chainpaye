@@ -73,6 +73,9 @@ export const userSetupScreen = async (decryptedBody: {
     const signupIntegrationService = new SignupIntegrationServiceImpl();
     const formData = await signupIntegrationService.prePopulateReferralField(phone);
     
+    console.log("DEBUG: INIT - Phone:", phone);
+    console.log("DEBUG: INIT - Form data:", JSON.stringify(formData, null, 2));
+    
     logger.info(`Signup INIT for ${phone}`, {
       detectedCountry,
       hasReferralCode: formData.isPrePopulated,
@@ -82,11 +85,15 @@ export const userSetupScreen = async (decryptedBody: {
     // If user has a referral code, get the referrer's name and show special screen
     if (formData.isPrePopulated && formData.referralCode) {
       try {
+        console.log("DEBUG: INIT - Has referral code, getting referrer info");
         const { ReferralCodeValidatorService } = await import('../../services/ReferralCodeValidatorService');
         const validator = new ReferralCodeValidatorService();
         const result = await validator.validateAndGetReferrer(formData.referralCode);
         
+        console.log("DEBUG: INIT - Validator result:", JSON.stringify(result, null, 2));
+        
         if (result.validation.isValid && result.referrer) {
+          console.log("DEBUG: INIT - Returning PERSONAL_INFO_WITH_REFERRAL screen");
           return {
             screen: "PERSONAL_INFO_WITH_REFERRAL",
             data: {
@@ -99,10 +106,12 @@ export const userSetupScreen = async (decryptedBody: {
         }
       } catch (error) {
         logger.error('Error getting referrer info for flow', { error, code: formData.referralCode });
+        console.error("DEBUG: INIT - Error getting referrer info:", error);
         // Fall through to normal screen if error
       }
     }
     
+    console.log("DEBUG: INIT - Returning normal PERSONAL_INFO screen");
     // Default screen without referral
     return {
       screen: "PERSONAL_INFO",
@@ -170,13 +179,18 @@ export const userSetupScreen = async (decryptedBody: {
 
           // Get referral code - either from form submission or from stored data
           let referralCode = data.referral_code?.trim() || "";
+          console.log("DEBUG: Referral code from form:", data.referral_code);
           
           // If no referral code in form, check if it was stored from INIT
           if (!referralCode) {
+            console.log("DEBUG: No referral code in form, checking Redis");
             const signupIntegrationService = new SignupIntegrationServiceImpl();
             const formData = await signupIntegrationService.prePopulateReferralField(phone);
             referralCode = formData.referralCode || "";
+            console.log("DEBUG: Referral code from Redis:", referralCode);
           }
+
+          console.log("DEBUG: Final referral code to pass to SECURITY_INFO:", referralCode);
 
           // Proceed to security setup (Skipping COUNTRY_SELECT)
           return {
@@ -317,8 +331,12 @@ export const userSetupScreen = async (decryptedBody: {
 
           // Process referral code if provided
           const referralCode = data.referral_code?.trim();
+          console.log("DEBUG: Referral code from data:", referralCode);
+          console.log("DEBUG: Full data object:", JSON.stringify(data, null, 2));
+          
           if (referralCode) {
             try {
+              console.log("DEBUG: Processing referral code:", referralCode, "for user:", userId);
               const signupIntegrationService = new SignupIntegrationServiceImpl();
               await signupIntegrationService.processReferralOnSignup(userId, referralCode);
               
@@ -326,14 +344,19 @@ export const userSetupScreen = async (decryptedBody: {
               await signupIntegrationService.cleanupTemporaryStorage(phone);
               
               logger.info(`Referral relationship created for user ${userId} with code ${referralCode}`);
+              console.log("DEBUG: Referral relationship created successfully");
             } catch (referralError: any) {
               // Log referral error but don't fail signup
               logger.error(`Failed to process referral code for user ${userId}:`, {
                 error: referralError.message,
-                code: referralCode
+                code: referralCode,
+                stack: referralError.stack
               });
+              console.error("DEBUG: Referral error:", referralError);
               // Continue with signup - referral is optional
             }
+          } else {
+            console.log("DEBUG: No referral code provided, skipping referral processing");
           }
 
           // Store account creation info in Redis for welcome message

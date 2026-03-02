@@ -134,11 +134,15 @@ export class ReferralService {
     }
 
     // Create the referral relationship
+    const createdAt = new Date();
+    const expiresAt = new Date(createdAt.getTime() + (30 * 24 * 60 * 60 * 1000)); // 30 days from creation
+    
     const relationship = new ReferralRelationship({
       referrerId: referrer.userId,
       referredUserId,
       referralCode,
-      createdAt: new Date(),
+      createdAt,
+      expiresAt,
     });
 
     await relationship.save();
@@ -147,7 +151,7 @@ export class ReferralService {
     const referredUser = await User.findOne({ userId: referredUserId });
     if (referredUser) {
       referredUser.referredBy = referrer.userId;
-      referredUser.referredAt = relationship.createdAt;
+      referredUser.referredAt = createdAt;
       await referredUser.save();
     }
 
