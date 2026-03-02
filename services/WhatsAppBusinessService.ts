@@ -281,8 +281,49 @@ No complex apps, just secure & fast payments right here! ✨`,
   async sendMenuMessageMyFlowId(to: string) {
     // const topUpFlowId = "1513776869736922";
     // const topupScreenInitId = "TOPUP_WALLET";
+    
+    // Get personalized greeting
+    const phone = to.startsWith("+") ? to : `+${to}`;
+    let greeting = "Hi";
+    
+    try {
+      const user = await userService.getUser(phone);
+      if (user) {
+        // Get appropriate name
+        let firstName = "";
+        if (user.isVerified && user.firstName) {
+          // User has done KYC, use firstName
+          firstName = user.firstName as string;
+        } else if (user.fullName) {
+          // Split fullName and use first part
+          firstName = user.fullName?.split(" ")[0] || "";
+        }
+        
+        // Get time-based greeting
+        const currentHour = new Date().getHours();
+        let timeGreeting = "";
+        if (currentHour < 12) {
+          timeGreeting = "Good morning";
+        } else if (currentHour <= 17) {
+          timeGreeting = "Good afternoon";
+        } else {
+          timeGreeting = "Good evening";
+        }
+        
+        // Combine greeting with name if available
+        if (firstName) {
+          greeting = `${timeGreeting} ${firstName}`;
+        } else {
+          greeting = timeGreeting;
+        }
+      }
+    } catch (error) {
+      // If user lookup fails, use default greeting
+      console.log("Error getting user for greeting:", error);
+    }
+    
     await this.sendNormalMessage(
-      `Hi, it’s Chainpaye 💳🏦! What’s good? 😊
+      `${greeting}, it’s Chainpaye 💳🏦!
 
 What can I do for you?
 
