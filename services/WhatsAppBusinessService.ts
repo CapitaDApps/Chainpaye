@@ -299,15 +299,45 @@ No complex apps, just secure & fast payments right here! ✨`,
           firstName = user.fullName?.split(" ")[0] || "";
         }
         
-        // Get time-based greeting
-        const currentHour = new Date().getHours();
+        // Get time-based greeting based on user's timezone
         let timeGreeting = "";
-        if (currentHour < 12) {
-          timeGreeting = "Good morning";
-        } else if (currentHour <= 17) {
-          timeGreeting = "Good afternoon";
-        } else {
-          timeGreeting = "Good evening";
+        try {
+          // Map country codes to timezones
+          const countryTimezones: { [key: string]: string } = {
+            'NG': 'Africa/Lagos',
+            'US': 'America/New_York',
+            'GB': 'Europe/London',
+            'CA': 'America/Toronto',
+            'GH': 'Africa/Accra',
+            'KE': 'Africa/Nairobi',
+            'ZA': 'Africa/Johannesburg'
+          };
+          
+          const timezone = countryTimezones[user.country] || 'UTC';
+          const userTime = new Date().toLocaleString('en-US', { 
+            timeZone: timezone,
+            hour12: false,
+            hour: 'numeric'
+          });
+          const currentHour = parseInt(userTime);
+          
+          if (currentHour < 12) {
+            timeGreeting = "Good morning";
+          } else if (currentHour <= 17) {
+            timeGreeting = "Good afternoon";
+          } else {
+            timeGreeting = "Good evening";
+          }
+        } catch (error) {
+          // Fallback to server time if timezone calculation fails
+          const currentHour = new Date().getHours();
+          if (currentHour < 12) {
+            timeGreeting = "Good morning";
+          } else if (currentHour <= 17) {
+            timeGreeting = "Good afternoon";
+          } else {
+            timeGreeting = "Good evening";
+          }
         }
         
         // Combine greeting with name if available
@@ -319,7 +349,7 @@ No complex apps, just secure & fast payments right here! ✨`,
       }
     } catch (error) {
       // If user lookup fails, use default greeting
-      console.log("Error getting user for, greeting:", error);
+      console.log("Error getting user for greeting:", error);
     }
     
     await this.sendNormalMessage(
@@ -894,7 +924,7 @@ Our team is ready to assist you!`;
       });
     } catch (error) {
       console.log(
-        "error sending flow with data.",
+        "error sending flow with data",
         (error as { response: any }).response.data,
       );
       throw error;
