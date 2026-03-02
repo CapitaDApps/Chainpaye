@@ -319,7 +319,7 @@ No complex apps, just secure & fast payments right here! ✨`,
       }
     } catch (error) {
       // If user lookup fails, use default greeting
-      console.log("Error getting user for greeting:", error);
+      console.log("Error getting user for, greeting:", error);
     }
     
     await this.sendNormalMessage(
