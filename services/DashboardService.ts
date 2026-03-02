@@ -30,12 +30,13 @@ export interface ReferralDashboard {
  * Service for generating referral dashboards
  */
 export class DashboardService {
-  private baseUrl: string;
+  private whatsappBusinessNumber: string;
   private cache: Map<string, { data: ReferralDashboard; timestamp: number }>;
   private cacheTTL: number = 30000; // 30 seconds
 
-  constructor(baseUrl: string = "https://chainpaye.com/referral") {
-    this.baseUrl = baseUrl;
+  constructor(whatsappBusinessNumber?: string) {
+    // Use provided number or fall back to environment variable
+    this.whatsappBusinessNumber = whatsappBusinessNumber || process.env.WHATSAPP_BUSINESS_NUMBER || "";
     this.cache = new Map();
   }
 
@@ -106,7 +107,7 @@ export class DashboardService {
     // Build dashboard
     const dashboard: ReferralDashboard = {
       referralCode: user.referralCode,
-      referralLink: `${this.baseUrl}/${user.referralCode}`,
+      referralLink: this.generateReferralLink(user.referralCode),
       totalReferred,
       currentBalance,
       totalEarned,
@@ -119,6 +120,28 @@ export class DashboardService {
     this.cache.set(userId, { data: dashboard, timestamp: Date.now() });
 
     return dashboard;
+  }
+
+  /**
+   * Generate WhatsApp deep link for referral
+   * 
+   * Creates a wa.me link that opens WhatsApp with pre-filled "start [code]" message
+   * 
+   * @param referralCode The user's referral code
+   * @returns WhatsApp deep link URL
+   */
+  private generateReferralLink(referralCode: string): string {
+    if (!this.whatsappBusinessNumber) {
+      // Fallback to web URL if WhatsApp number not configured
+      return `https://chainpaye.com/referral/${referralCode}`;
+    }
+    
+    // Remove + from phone number for wa.me format
+    const phoneNumber = this.whatsappBusinessNumber.replace(/^\+/, '');
+    
+    // Create WhatsApp deep link with pre-filled message
+    // URL encodes "start {referralCode}"
+    return `https://wa.me/${phoneNumber}?text=start%20${referralCode}`;
   }
 
   /**

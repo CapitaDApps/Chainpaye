@@ -40,7 +40,7 @@ describe("DashboardService Property-Based Tests", () => {
       return; // Skip if MongoDB not available
     }
     
-    dashboardService = new DashboardService();
+    dashboardService = new DashboardService("+1234567890"); // Test WhatsApp number
     
     // Clear all collections
     await User.deleteMany({});
