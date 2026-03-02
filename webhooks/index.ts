@@ -172,6 +172,25 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
 
           if (!isRegistered) {
             await replyingMessage(message.id);
+            
+            // Check if this is a "start [referral_code]" command
+            if (message.type === "text" && message.text.body) {
+              const messageText = message.text.body.trim();
+              const startMatch = messageText.match(/^start\s+([A-Z0-9]+)$/i);
+              
+              if (startMatch) {
+                // Process the start command first
+                const phone = message.from.startsWith("+")
+                  ? message.from
+                  : `+${message.from}`;
+                await commandRouteHandler(phone, messageText);
+                
+                // Then send registration flow
+                whatsappBusinessService.sendIntroMessageByFlowId(message.from);
+                return res.sendStatus(200);
+              }
+            }
+            
             // New user or incomplete profile - send registration flow
             whatsappBusinessService.sendIntroMessageByFlowId(message.from);
           } else {

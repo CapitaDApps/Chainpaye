@@ -79,13 +79,38 @@ export const userSetupScreen = async (decryptedBody: {
       referralCode: formData.referralCode
     });
     
+    // If user has a referral code, get the referrer's name and show special screen
+    if (formData.isPrePopulated && formData.referralCode) {
+      try {
+        const { ReferralCodeValidatorService } = await import('../../services/ReferralCodeValidatorService');
+        const validator = new ReferralCodeValidatorService();
+        const result = await validator.validateAndGetReferrer(formData.referralCode);
+        
+        if (result.validation.isValid && result.referrer) {
+          return {
+            screen: "PERSONAL_INFO_WITH_REFERRAL",
+            data: {
+              countries: countries,
+              default_country: detectedCountry || "NG",
+              referral_code: formData.referralCode,
+              referrer_name: result.referrer.name
+            },
+          };
+        }
+      } catch (error) {
+        logger.error('Error getting referrer info for flow', { error, code: formData.referralCode });
+        // Fall through to normal screen if error
+      }
+    }
+    
+    // Default screen without referral
     return {
       screen: "PERSONAL_INFO",
       data: {
         countries: countries,
         default_country: detectedCountry || "NG",
-        referral_code: formData.referralCode || "",
-        has_referral: formData.isPrePopulated
+        referral_code: "",
+        has_referral: false
       },
     };
   }
@@ -94,10 +119,11 @@ export const userSetupScreen = async (decryptedBody: {
     // Handle the request based on the current screen
     switch (screen) {
       // --------------------------------------------------------
-      // PERSONAL_INFO → COUNTRY_SELECT
-      // User submits name and DOB
+      // PERSONAL_INFO or PERSONAL_INFO_WITH_REFERRAL → SECURITY_INFO
+      // User submits name and country
       // --------------------------------------------------------
       case "PERSONAL_INFO":
+      case "PERSONAL_INFO_WITH_REFERRAL":
         console.log("DEBUG: Case PERSONAL_INFO");
         try {
           const fullName = data.full_name?.trim();
@@ -106,14 +132,34 @@ export const userSetupScreen = async (decryptedBody: {
 
           // Validate required fields
           if (!fullName || fullName.split(" ").length < 2) {
+            // Return to the same screen they came from
+            const returnScreen = screen === "PERSONAL_INFO_WITH_REFERRAL" ? "PERSONAL_INFO_WITH_REFERRAL" : "PERSONAL_INFO";
+            
+            // If returning to referral screen, need to get referrer name again
+            let returnData: any = {
+              countries: countries,
+              default_country: data.country || "NG",
+              error_message: "Please enter your full name (First and Last name)",
+            };
+            
+            if (returnScreen === "PERSONAL_INFO_WITH_REFERRAL" && data.referral_code) {
+              try {
+                const { ReferralCodeValidatorService } = await import('../../services/ReferralCodeValidatorService');
+                const validator = new ReferralCodeValidatorService();
+                const result = await validator.validateAndGetReferrer(data.referral_code);
+                
+                if (result.validation.isValid && result.referrer) {
+                  returnData.referral_code = data.referral_code;
+                  returnData.referrer_name = result.referrer.name;
+                }
+              } catch (error) {
+                logger.error('Error getting referrer info', { error });
+              }
+            }
+            
             return {
-              screen: "PERSONAL_INFO",
-              data: {
-                countries: countries,
-                default_country: data.country || "NG",
-                error_message:
-                  "Please enter your full name (First and Last name)",
-              },
+              screen: returnScreen,
+              data: returnData,
             };
           }
 
@@ -121,6 +167,16 @@ export const userSetupScreen = async (decryptedBody: {
           const nameParts = fullName.split(" ");
           const firstName = nameParts[0];
           const lastName = nameParts.slice(1).join(" ");
+
+          // Get referral code - either from form submission or from stored data
+          let referralCode = data.referral_code?.trim() || "";
+          
+          // If no referral code in form, check if it was stored from INIT
+          if (!referralCode) {
+            const signupIntegrationService = new SignupIntegrationServiceImpl();
+            const formData = await signupIntegrationService.prePopulateReferralField(phone);
+            referralCode = formData.referralCode || "";
+          }
 
           // Proceed to security setup (Skipping COUNTRY_SELECT)
           return {
@@ -131,6 +187,7 @@ export const userSetupScreen = async (decryptedBody: {
               last_name: lastName,
               // dob: dob, // Removed
               country: data.country || "NG",
+              referral_code: referralCode,
             },
           };
         } catch (error) {
