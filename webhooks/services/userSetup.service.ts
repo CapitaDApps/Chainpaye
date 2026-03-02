@@ -66,6 +66,8 @@ export const userSetupScreen = async (decryptedBody: {
 
   // Handle initial request when opening the flow
   if (action === "INIT") {
+    console.log("🚀 DEBUG: INIT ACTION CALLED - Flow opened!");
+    
     // Detect country from phone number
     const detectedCountry = getCountryCodeFromPhoneNumber(phone);
     
@@ -112,15 +114,25 @@ export const userSetupScreen = async (decryptedBody: {
     }
     
     console.log("DEBUG: INIT - Returning normal PERSONAL_INFO screen");
-    // Default screen without referral
+    // Default screen without referral - but check if we should pre-populate
+    const defaultData: any = {
+      countries: countries,
+      default_country: detectedCountry || "NG",
+      has_referral: false
+    };
+    
+    // If we have a referral code but couldn't show special screen, pre-populate the field
+    if (formData.referralCode) {
+      console.log("DEBUG: INIT - Pre-populating referral code in normal screen:", formData.referralCode);
+      defaultData.referral_code = formData.referralCode;
+      defaultData.has_referral = true;
+    } else {
+      defaultData.referral_code = "";
+    }
+    
     return {
       screen: "PERSONAL_INFO",
-      data: {
-        countries: countries,
-        default_country: detectedCountry || "NG",
-        referral_code: "",
-        has_referral: false
-      },
+      data: defaultData,
     };
   }
 
@@ -320,6 +332,7 @@ export const userSetupScreen = async (decryptedBody: {
             logger.info(`User created successfully: ${userId}`);
           } else {
             userId = existingUser.userId;
+            console.log("DEBUG: Using existing user ID:", userId);
           }
 
           // Update user with profile information
