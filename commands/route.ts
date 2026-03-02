@@ -14,7 +14,6 @@ import {
   handleWithdrawal,
 } from "./handlers";
 import { handleStartCommand } from "./handlers/startCommandHandler";
-import { handleSignup } from "./handlers/signupHandler";
 import { handleReferralCommand } from "./handlers/referralHandler";
 
 /**
@@ -311,6 +310,20 @@ export async function commandRouteHandler(from: string, message: string) {
   // Check for "start [referral_code]" command first (highest priority)
   const startMatch = message.trim().match(/^start\s+([A-Z0-9]+)$/i);
   if (startMatch) {
+    // Check if user is already registered
+    const phone = from.startsWith("+") ? from : `+${from}`;
+    const user = await User.findOne({ whatsappNumber: phone });
+    
+    if (user && (user.fullName || (user.firstName && user.lastName))) {
+      // User is already registered - don't process start command
+      await whatsappBusinessService.sendNormalMessage(
+        "You already have an account with ChainPaye! 🎉\n\nType *menu* to see available options or *referral* to view your referral dashboard.",
+        from
+      );
+      return;
+    }
+    
+    // User is not registered - process start command
     await handleStartCommand(from, message);
     return;
   }
@@ -334,11 +347,6 @@ export async function commandRouteHandler(from: string, message: string) {
           (err as { response: any }).response?.data,
         );
       }
-      break;
-
-    case "signup":
-      // User wants to create an account
-      await handleSignup(from, message);
       break;
 
     case "myAccount":
@@ -409,6 +417,21 @@ export async function commandRouteHandler(from: string, message: string) {
 
     case "support":
       await handleSupport(from);
+      break;
+
+    case "signup":
+      // Handle signup attempts from existing users
+      await whatsappBusinessService.sendNormalMessage(
+        "You already have an account with ChainPaye! 🎉\n\n" +
+        "Your account is ready to use. Here's what you can do:\n\n" +
+        "💰 *balance* - Check your wallet balance\n" +
+        "💸 *transfer* - Send money to friends\n" +
+        "🏦 *withdraw* - Transfer to your bank\n" +
+        "🔗 *referral* - Earn by referring friends\n" +
+        "📱 *menu* - See all options\n\n" +
+        "Need help? Type *support* to contact us.",
+        from
+      );
       break;
 
     case "referral":
