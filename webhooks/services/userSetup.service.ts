@@ -2,6 +2,8 @@ import { redisClient } from "../../services/redis";
 import { UserService } from "../../services/UserService";
 import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService";
 import { getCountryCodeFromPhoneNumber } from "../../utils/countryCodeMapping";
+import { SignupIntegrationServiceImpl } from "../../services/SignupIntegrationService";
+import { logger } from "../../utils/logger";
 
 // ============================================================
 // ACCOUNT SETUP FLOW SERVICE
@@ -66,11 +68,24 @@ export const userSetupScreen = async (decryptedBody: {
   if (action === "INIT") {
     // Detect country from phone number
     const detectedCountry = getCountryCodeFromPhoneNumber(phone);
+    
+    // Check for stored referral code from "start [code]" command
+    const signupIntegrationService = new SignupIntegrationServiceImpl();
+    const formData = await signupIntegrationService.prePopulateReferralField(phone);
+    
+    logger.info(`Signup INIT for ${phone}`, {
+      detectedCountry,
+      hasReferralCode: formData.isPrePopulated,
+      referralCode: formData.referralCode
+    });
+    
     return {
       screen: "PERSONAL_INFO",
       data: {
         countries: countries,
         default_country: detectedCountry || "NG",
+        referral_code: formData.referralCode || "",
+        has_referral: formData.isPrePopulated
       },
     };
   }
@@ -221,15 +236,19 @@ export const userSetupScreen = async (decryptedBody: {
           const existingUser = await userService.getUser(phone);
           console.log("DEBUG: Existing user found?", !!existingUser);
 
+          let userId: string;
           if (!existingUser) {
             // Create new user WITHOUT KYC verification
-            await userService.createUser({
+            const newUser = await userService.createUser({
               whatsappNumber: phone,
               pin: pin,
               fullName:
                 data.full_name || `${data.first_name} ${data.last_name}`,
             });
-            console.log("DEBUG: User created successfully");
+            userId = newUser.userId;
+            logger.info(`User created successfully: ${userId}`);
+          } else {
+            userId = existingUser.userId;
           }
 
           // Update user with profile information
@@ -238,6 +257,27 @@ export const userSetupScreen = async (decryptedBody: {
             dob: "", // No DOB collected at signup
           });
           console.log("DEBUG: User profile updated");
+
+          // Process referral code if provided
+          const referralCode = data.referral_code?.trim();
+          if (referralCode) {
+            try {
+              const signupIntegrationService = new SignupIntegrationServiceImpl();
+              await signupIntegrationService.processReferralOnSignup(userId, referralCode);
+              
+              // Clean up temporary Redis storage after successful relationship creation
+              await signupIntegrationService.cleanupTemporaryStorage(phone);
+              
+              logger.info(`Referral relationship created for user ${userId} with code ${referralCode}`);
+            } catch (referralError: any) {
+              // Log referral error but don't fail signup
+              logger.error(`Failed to process referral code for user ${userId}:`, {
+                error: referralError.message,
+                code: referralCode
+              });
+              // Continue with signup - referral is optional
+            }
+          }
 
           // Store account creation info in Redis for welcome message
           const userFullName =
@@ -264,6 +304,7 @@ export const userSetupScreen = async (decryptedBody: {
           };
         } catch (error) {
           console.error("Error in SECURITY_INFO screen:", error);
+          logger.error("Error in SECURITY_INFO screen:", error);
           return {
             screen: "SECURITY_INFO",
             data: {

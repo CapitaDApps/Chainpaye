@@ -31,17 +31,31 @@ This document specifies the requirements for a referral system integrated into a
 3. THE Referral_System SHALL create referral codes that are alphanumeric and between 6-12 characters in length
 4. WHEN a referral code is generated, THE Referral_System SHALL persist it to the user's record immediately
 
-### Requirement 2: User Registration with Referral Code
+### Requirement 2: Referral Code Capture and Validation
 
-**User Story:** As a new user, I want to enter a referral code during signup, so that I can be connected to the person who referred me.
+**User Story:** As a new user, I want to enter a referral code before signup, so that I can be connected to the person who referred me and see a personalized invitation.
 
 #### Acceptance Criteria
 
-1. WHEN a new user types "start [referral_code]", THE Referral_System SHALL validate the referral code exists
-2. WHEN a valid referral code is provided, THE Referral_System SHALL create an immutable referral relationship between the referrer and referred user
-3. WHEN an invalid referral code is provided, THE Referral_System SHALL reject the code and notify the user
-4. WHERE a user has already been referred, THE Referral_System SHALL prevent any modification to their referral relationship
-5. WHEN a user attempts to use their own referral code, THE Referral_System SHALL reject the self-referral
+1. WHEN a new user types "start [referral_code]", THE Referral_System SHALL validate that the referral code exists in the system
+2. WHEN a valid referral code is provided, THE Referral_System SHALL store the referral code in Redis with a 24-hour expiration linked to the user's phone number
+3. WHEN a valid referral code is provided, THE Referral_System SHALL retrieve the referrer's name and display a personalized message: "You have been invited to join ChainPaye by {referrer_name}"
+4. WHEN an invalid referral code is provided, THE Referral_System SHALL reject the code and notify the user with an appropriate error message
+5. AFTER displaying the invitation message, THE Referral_System SHALL proceed with the normal signup call-to-action flow
+
+### Requirement 2.1: Referral Code Integration in Signup Flow
+
+**User Story:** As a new user who entered a referral code, I want the code to be automatically filled during signup but still be editable, so that I have control over my referral connection.
+
+#### Acceptance Criteria
+
+1. WHEN a user begins the signup process, THE Referral_System SHALL check Redis for any stored referral code associated with the user's phone number
+2. IF a referral code exists in Redis, THE Referral_System SHALL pre-populate the referral code field in the signup form
+3. THE Referral_System SHALL make the referral code field optional and editable during signup
+4. WHEN the user completes signup with a referral code, THE Referral_System SHALL validate the code again before creating the relationship
+5. WHEN a valid referral code is confirmed during signup, THE Referral_System SHALL create an immutable referral relationship between the referrer and referred user
+6. WHERE a user has already been referred, THE Referral_System SHALL prevent any modification to their existing referral relationship
+7. WHEN a user attempts to use their own referral code, THE Referral_System SHALL reject the self-referral
 
 ### Requirement 3: Referral Earnings Calculation
 
@@ -117,6 +131,18 @@ This document specifies the requirements for a referral system integrated into a
 3. WHEN the elapsed time is less than or equal to 30 days, THE Referral_System SHALL process referral earnings
 4. WHEN the elapsed time exceeds 30 days, THE Referral_System SHALL skip referral earnings processing
 5. THE Referral_System SHALL preserve the referral relationship data indefinitely regardless of the 30-day period
+
+### Requirement 10: Temporary Referral Code Storage
+
+**User Story:** As a system administrator, I want referral codes to be temporarily stored when users enter them via the start command, so that they can be retrieved during the signup process.
+
+#### Acceptance Criteria
+
+1. WHEN a user types "start [referral_code]", THE Referral_System SHALL store the referral code in Redis using the user's phone number as the key
+2. THE Referral_System SHALL set a 24-hour expiration time for stored referral codes in Redis
+3. WHEN retrieving a referral code from Redis during signup, THE Referral_System SHALL handle cases where the code has expired gracefully
+4. WHEN a referral relationship is successfully created, THE Referral_System SHALL remove the temporary referral code from Redis
+5. THE Referral_System SHALL ensure Redis storage operations do not block the user experience
 
 ### Requirement 9: Data Integrity and Validation
 
