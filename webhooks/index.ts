@@ -179,14 +179,21 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
               const startMatch = messageText.match(/^start\s+([A-Z0-9]+)$/i);
               
               if (startMatch) {
-                // Process the start command - this will send the welcome message
+                // Process the start command first and wait for it to complete
                 const phone = message.from.startsWith("+")
                   ? message.from
                   : `+${message.from}`;
+                
+                console.log("DEBUG: Processing start command for new user:", phone);
                 await commandRouteHandler(phone, messageText);
                 
-                // Don't send registration flow immediately - let user read the welcome message
-                // The welcome message includes instructions to type "signup" to continue
+                console.log("DEBUG: Start command processed, waiting 1 second before sending flow");
+                // Wait a moment to ensure Redis storage completes
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                console.log("DEBUG: Sending registration flow");
+                // Then send registration flow
+                whatsappBusinessService.sendIntroMessageByFlowId(message.from);
                 return res.sendStatus(200);
               }
             }
