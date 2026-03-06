@@ -391,62 +391,77 @@ export async function getConversionFlowScreen(decryptedBody: {
         }
 
         try {
-          const result = await toronetService.convertToAndFro({
-            from: fromCurrency,
-            to: toCurrency,
-            amount: formatFixed2(amountToPayValue),
-            password: userToroWallet.password,
-            address: userToroWallet.publicKey,
-            user: user._id as Types.ObjectId,
-          });
+          // Return processing screen immediately, then handle conversion asynchronously
+          setImmediate(async () => {
+            try {
+              await ensureEurGbpWalletsForConversion({
+                address: userToroWallet.publicKey,
+                fullName: buildUserFullName(user),
+                currencies: [fromCurrency, toCurrency],
+              });
 
-          if (result.success) {
-            redisClient
-              .del(quoteId)
-              .catch((err) =>
-                console.log("Error deleting conversion quote cache", err),
-              );
+              const result = await toronetService.convertToAndFro({
+                from: fromCurrency,
+                to: toCurrency,
+                amount: formatFixed2(amountToPayValue),
+                password: userToroWallet.password,
+                address: userToroWallet.publicKey,
+                user: user._id as Types.ObjectId,
+              });
 
-            if (result.transaction) {
-              sendTransactionReceipt(
-                (result.transaction._id as Types.ObjectId).toString(),
+              if (result.success) {
+                redisClient
+                  .del(quoteId)
+                  .catch((err) =>
+                    console.log("Error deleting conversion quote cache", err),
+                  );
+
+                if (result.transaction) {
+                  sendTransactionReceipt(
+                    (result.transaction._id as Types.ObjectId).toString(),
+                    phone,
+                  ).catch((err) => console.log("Error sending receipt", err));
+                }
+
+                // Send success confirmation
+                await whatsappBusinessService.sendNormalMessage(
+                  `✅ Conversion completed successfully!\n\n💱 ${formatFixed2(amountToPayValue)} ${fromCurrency} → ${formatFixed2(amountToReceiveValue)} ${toCurrency}\n\nYour receipt will be sent shortly.`,
+                  phone,
+                );
+              }
+            } catch (error) {
+              redisClient
+                .del(quoteId)
+                .catch((err) =>
+                  console.log("Error deleting conversion quote cache", err),
+                );
+
+              const errorMessage =
+                error instanceof Error && error.message
+                  ? error.message
+                  : "Conversion failed. Please try again.";
+
+              console.log("Error during async conversion", error);
+
+              // Send error notification
+              await whatsappBusinessService.sendNormalMessage(
+                `❌ Conversion failed: ${errorMessage}\n\nPlease try again or contact support if the issue persists.`,
                 phone,
-              ).catch((err) => console.log("Error sending receipt", err));
+              );
             }
-          }
+          });
         } catch (error) {
-          redisClient
-            .del(quoteId)
-            .catch((err) =>
-              console.log("Error deleting conversion quote cache", err),
-            );
-
-          const errorMessage =
-            error instanceof Error && error.message
-              ? error.message
-              : "Conversion failed. Please try again.";
-
-          console.log("Error during conversion", error);
-
-          return {
-            screen: "PIN",
-            data: {
-              fromCurrency,
-              toCurrency,
-              amountToPay: formatFixed2(amountToPayValue),
-              amountToReceive: formatFixed2(amountToReceiveValue),
-              error_message: errorMessage,
-            },
-          };
+          console.log("Error setting up async conversion", error);
         }
-
-        sendConversionProcessingMessageOnce(phone, flow_token).catch((err) =>
-          console.log("Error sending conversion processing message", err),
-        );
 
         return {
           screen: "PROCESSING",
-          data: {},
+          data: {
+            fromCurrency,
+            toCurrency,
+            amountToPay: formatFixed2(amountToPayValue),
+            amountToReceive: formatFixed2(amountToReceiveValue),
+          },
         };
       }
 
