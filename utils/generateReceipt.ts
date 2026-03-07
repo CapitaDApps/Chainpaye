@@ -326,7 +326,7 @@ export async function generateReceipt(data: ReceiptData): Promise<string> {
     const logoBuffer = await fs.readFile(logoPath);
     const logoIconBuffer = await fs.readFile(logoIconPath);
 
-    const logoBase64 = `data:image/jpeg;base64,${logoBuffer.toString(
+    const logoBase64 = `data:image/png;base64,${logoBuffer.toString(
       "base64"
     )}`;
     const logoIconBase64 = `data:image/jpeg;base64,${logoIconBuffer.toString(
