@@ -589,7 +589,7 @@ What would you like to sell?`;
       {
         body: `Spend stablecoin like 💸 
      `,
-        cta: "Complete Off ramp",
+        cta: "Spend crypto",
       },
       {
         banks: banks,

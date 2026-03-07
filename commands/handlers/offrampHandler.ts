@@ -209,7 +209,7 @@ async function displayUserWallets(
           balances = await crossmintService.getBalancesByChain(
             userId,
             "solana",
-            ["usdc", "sol"],
+            ["usdc", "usdt"],
           );
         } else if (wallet.chainType === "evm") {
           // For EVM wallets, fetch balances from each supported chain separately
