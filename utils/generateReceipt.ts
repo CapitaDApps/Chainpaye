@@ -320,7 +320,7 @@ export async function generateReceipt(data: ReceiptData): Promise<string> {
     const page = await browser.newPage();
 
     // Read logo images and convert to base64
-    const logoPath = path.join(__dirname, "../public/logo.jpg");
+    const logoPath = path.join(__dirname, "../public/logo.png");
     const logoIconPath = path.join(__dirname, "../public/logo-icon.jpg");
 
     const logoBuffer = await fs.readFile(logoPath);
