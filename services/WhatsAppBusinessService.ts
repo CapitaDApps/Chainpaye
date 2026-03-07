@@ -359,7 +359,7 @@ What can I do for you?
 
 💰 Deposit — Top up instantly!
 
-💳 Offramp — Spend crypto anywhere.
+💳 Send crypto — Spend crypto anywhere.
  
 🌍 Send — Pay friends in a flash using Whatsapp NO.
 
@@ -402,7 +402,7 @@ What can I do for you?
     const topUpFlowId = WHATSAPP_CONFIG.FLOW_IDS.TOPUP;
     const topUpScreenInitId = "TOPUP_WALLET";
     await this.sendTextOnlyFlowById(to, topUpFlowId, topUpScreenInitId, {
-      header: "Top up Wallet",
+      header: "Fund your Wallet",
       body: "Top up your Chainpaye wallet in seconds and start sending or receiving money globally.",
       cta: "Start Top-up",
     });
@@ -473,15 +473,15 @@ What can I do for you?
       convertFlowScreen,
       {
         header: "Convert Fiat",
-        body: "Convert between NGN, USD, EUR, and GBP seamlessly.",
+        body: "Convert between NGN and USD seamlessly.",
         cta: "Start Conversion",
       },
       {
         currencies: [
           { id: "USD", title: "USD" },
           { id: "NGN", title: "NGN" },
-          { id: "EUR", title: "EUR" },
-          { id: "GBP", title: "GBP" },
+          // { id: "EUR", title: "EUR" },
+          // { id: "GBP", title: "GBP" },
         ],
       },
     );
@@ -510,8 +510,8 @@ What can I do for you?
         currencies: [
           { id: "NGN", title: "NGN" },
           { id: "USD", title: "USD" },
-          { id: "GBP", title: "GBP" },
-          { id: "EUR", title: "EUR" },
+          // { id: "GBP", title: "GBP" },
+          // { id: "EUR", title: "EUR" },
         ],
       },
     );
@@ -644,38 +644,45 @@ Account No: ${user.whatsappNumber.replace("+", "")}
 
 Available Balances:
 NGN: NGN ${ngnBalance.balance.toFixed(2)}
-USD: USD ${usdBalance.balance.toFixed(2)}
-EUR: EUR ${eurBalance.balance.toFixed(2)}
-GBP: GBP ${gbpBalance.balance.toFixed(2)}`;
+USD: USD ${usdBalance.balance.toFixed(2)}`;
+// let message = `Hello ${displayName},
+
+// Account No: ${user.whatsappNumber.replace("+", "")}
+
+// Available Balances:
+// NGN: NGN ${ngnBalance.balance.toFixed(2)}
+// USD: USD ${usdBalance.balance.toFixed(2)}
+// EUR: EUR ${eurBalance.balance.toFixed(2)}
+// GBP: GBP ${gbpBalance.balance.toFixed(2)}`;
 
     let accountnumber: string | null = null;
 
-    if (user.country === "NG") {
-      const [vw] = await Promise.all([
-        toronetService.getVirtualWalletByAddress(wallet.publicKey),
-        toronetService.updateVirtualWallet(wallet.publicKey),
-      ]);
+//     if (user.country === "NG") {
+//       const [vw] = await Promise.all([
+//         toronetService.getVirtualWalletByAddress(wallet.publicKey),
+//         toronetService.updateVirtualWallet(wallet.publicKey),
+//       ]);
 
-      if (vw.result) {
-        message += `\n\n
-*FUND YOUR ACCOUNT*
+//       if (vw.result) {
+//         message += `\n\n
+// *FUND YOUR ACCOUNT*
 
-To top up your NGN balance, transfer to:
+// To top up your NGN balance, transfer to:
 
-Bank: FCMB
-Account Name: ${vw.accountname}
-(NGN Deposits Only)
+// Bank: FCMB
+// Account Name: ${vw.accountname}
+// (NGN Deposits Only)
 
-Copy the account number below
-      `;
-        accountnumber = vw.accountnumber;
-      }
-    }
+// Copy the account number below
+//       `;
+//         accountnumber = vw.accountnumber;
+//       }
+//     }
 
     await this.sendNormalMessage(message, to);
-    if (accountnumber) {
-      await this.sendNormalMessage(accountnumber, to);
-    }
+    // if (accountnumber) {
+    //   await this.sendNormalMessage(accountnumber, to);
+    // }
   }
   async sendSupportMessage(to: string) {
     const message = `🆘 *Need Help?*

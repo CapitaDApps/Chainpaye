@@ -70,46 +70,6 @@ const COMMANDS: Record<string, CommandConfig> = {
   },
 
   // ============================================================
-  // SIGNUP / REGISTRATION
-  // User wants to create an account or complete registration
-  // ============================================================
-  signup: {
-    triggers: [
-      // Slash commands
-      "/signup",
-      "/register",
-      "/join",
-      "/create",
-
-      // Signup terms
-      "signup",
-      "sign up",
-      "sign-up",
-      "register",
-      "registration",
-      "create account",
-      "new account",
-      "join",
-      "get started",
-      "start account",
-
-      // Natural language
-      "i want to signup",
-      "i want to sign up",
-      "i want to register",
-      "i want to create an account",
-      "i want to join",
-      "how do i signup",
-      "how do i sign up",
-      "how do i register",
-      "create my account",
-      "make an account",
-    ],
-    description: "Create a new ChainPaye account",
-    priority: 8,
-  },
-
-  // ============================================================
   // ACCOUNT / BALANCE QUERIES
   // User wants to check their account info or balance
   // ============================================================
@@ -552,22 +512,24 @@ const COMMANDS: Record<string, CommandConfig> = {
   },
 
   // ============================================================
-  // OFFRAMP / CRYPTO TO FIAT
+  // SPEND CRYPTO / CRYPTO TO FIAT
   // Convert crypto to fiat currency
   // ============================================================
   offramp: {
     triggers: [
       // Slash commands
-      "/offramp",
+      "/spendcrypto",
+      "/spend",
       "/sellcrypto",
       "/cryptosell",
 
-      // Offramp terms
-      "off ramp",
-      "offramp",
-      "off-ramp",
-      "crypto offramp",
-      "crypto off ramp",
+      // Spend crypto terms
+      "spend crypto",
+      "spend my crypto",
+      "spend cryptocurrency",
+      "crypto spend",
+      "use crypto",
+      "use my crypto",
 
       // Sell crypto
       "sell crypto",
@@ -608,13 +570,15 @@ const COMMANDS: Record<string, CommandConfig> = {
       "sell crypto for cash",
       "i want to sell crypto",
       "i want to sell my crypto",
+      "i want to spend crypto",
+      "i want to spend my crypto",
       "convert my crypto",
       "turn crypto to cash",
       "change crypto to cash",
       "liquidate crypto",
     ],
     description:
-      "Offramp crypto to fiat and receive it in your chainpaye wallet",
+      "Spend your crypto and receive fiat in your chainpaye wallet",
     priority: 4,
   },
 
@@ -737,6 +701,26 @@ const COMMANDS: Record<string, CommandConfig> = {
     ],
     description: "Complete KYC/BVN verification to unlock all features",
     priority: 5,
+  },
+
+  // ============================================================
+  // SIGNUP (for existing users who try to signup again)
+  // ============================================================
+  signup: {
+    triggers: [
+      // Signup attempts
+      "signup",
+      "sign up",
+      "register",
+      "create account",
+      "new account",
+      "join",
+      "get started",
+      "start account",
+      "open account",
+    ],
+    description: "Handle signup attempts from existing users",
+    priority: 8,
   },
 
   // ============================================================
