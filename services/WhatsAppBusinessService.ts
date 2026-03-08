@@ -587,7 +587,7 @@ What would you like to sell?`;
       cryptoTopUpFlowId,
       cryptoTopUpScreenId,
       {
-        body: `Spend stablecoin like 💸 
+        body: `Complete the flow to \nSpend stablecoin like cash💸 
      `,
         cta: "Spend crypto",
       },

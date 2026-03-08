@@ -167,7 +167,8 @@ async function displayUserWallets(
         walletMessage += `\`${evmWallet.address}\`\n\n`;
         walletMessage += `🟣 *Solana Wallet* (for USDC on Solana)\n`;
         walletMessage += `\`${solanaWallet.address}\`\n\n`;
-        walletMessage += `💡 Deposit crypto to these addresses, then use the button below to sell and withdraw to your bank account.`;
+        walletMessage += `💡 Deposit crypto to these addresses, then use the button below to sell and withdraw to your bank account.\n`;
+        walletMessage += `Type wallet in the chat to copy your wallets for crypto deposit.`;
 
         await whatsappBusinessService.sendNormalMessage(
           walletMessage,

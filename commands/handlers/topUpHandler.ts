@@ -32,7 +32,7 @@ Bank: FCMB
 Account Name: ${vw.accountname}
 (NGN Deposits Only)
 
-Copy the account number below`;
+👇Copy the account number below👇`;
         accountnumber = vw.accountnumber;
               await whatsappBusinessService.sendNormalMessage(message, from);
 

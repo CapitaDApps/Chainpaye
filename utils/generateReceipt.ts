@@ -350,28 +350,36 @@ export async function generateReceipt(data: ReceiptData): Promise<string> {
 
     // Replace image src attributes with base64 data URIs
     const htmlWithImages = html
-      .replace('src="/logo.jpg"', `src="${logoBase64}"`)
-      .replace('src="/logo-icon.jpg"', `src="${logoIconBase64}"`);
+      .replace(/src="logo\.png"/g, `src="${logoBase64}"`)
+      .replace(/src="logo\.jpg"/g, `src="${logoBase64}"`)
+      .replace(/src="logo-icon\.jpg"/g, `src="${logoIconBase64}"`)
+      .replace(/url\('logo\.png'\)/g, `url('${logoBase64}')`);
 
     // Set content and wait for fonts to load for consistent rendering
-    await page.setContent(htmlWithImages, { waitUntil: "networkidle0" });
+    await page.setContent(htmlWithImages, { 
+      waitUntil: "domcontentloaded",
+      timeout: 15000 
+    });
+
+    // Wait a bit for rendering to complete
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Important: Set viewport size to ensure the receipt renders fully within the view
     await page.setViewport({
       width: 600,
-      height: 1000,
+      height: 1200, // Increased height to capture complete receipt
       deviceScaleFactor: 2,
     });
 
-    // Select the receipt element itself to avoid taking a screenshot of the whole body background
-    const receiptElement = await page.$(".receipt-container");
+    // Take screenshot of the entire screenshot-wrapper to capture complete receipt
+    const screenshotElement = await page.$(".screenshot-wrapper");
 
-    if (!receiptElement) {
-      throw new Error("Receipt container not found in template");
+    if (!screenshotElement) {
+      throw new Error("Screenshot wrapper not found in template");
     }
 
-    // Take screenshot of just the receipt element with transparent background and return as base64
-    const result = await receiptElement.screenshot({
+    // Take screenshot of the wrapper element to capture the complete receipt including success icon
+    const result = await screenshotElement.screenshot({
       omitBackground: true, // ensures the jagged edge doesn't have white boxes behind it
       encoding: "base64",
     });
