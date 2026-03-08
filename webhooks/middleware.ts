@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import rateLimit from "express-rate-limit";
-import crypto from "crypto";
+import { Webhook } from "svix";
 import { isRequestSignatureValid } from "./utils/validSignature";
 import { CustomReq } from "./types/request.type";
 
@@ -44,7 +44,7 @@ export function verifyWebhookSignature(
   }
 }
 
-// Crossmint webhook signature verification middleware
+// Crossmint webhook signature verification middleware using Svix
 export function verifyCrossmintWebhook(
   req: Request,
   res: Response,
@@ -58,33 +58,56 @@ export function verifyCrossmintWebhook(
       return next(); // Allow in development if not configured
     }
 
-    // Crossmint sends signature in X-Crossmint-Signature header
-    const signature = req.headers["x-crossmint-signature"] as string;
-    
-    if (!signature) {
-      console.error("Missing X-Crossmint-Signature header");
-      return res.status(403).json({ error: "Missing signature" });
+    // Get the Svix headers
+    const svixId = req.headers["svix-id"] as string;
+    const svixTimestamp = req.headers["svix-timestamp"] as string;
+    const svixSignature = req.headers["svix-signature"] as string;
+
+    // Check if all required Svix headers are present
+    if (!svixId || !svixTimestamp || !svixSignature) {
+      console.error("Missing required Svix headers");
+      return res.status(400).json({ 
+        error: "Missing required webhook headers" 
+      });
     }
 
     // Get raw body (should be available from body-parser with verify option)
-    const rawBody = (req as any).rawBody || JSON.stringify(req.body);
+    const rawBody = (req as CustomReq).rawBody;
     
-    // Compute expected signature
-    const expectedSignature = crypto
-      .createHmac("sha256", webhookSecret)
-      .update(rawBody)
-      .digest("hex");
-
-    // Compare signatures
-    if (signature === expectedSignature) {
-      console.log("Crossmint webhook signature verified successfully");
-      return next();
+    if (!rawBody) {
+      console.error("Missing raw body for webhook verification");
+      return res.status(400).json({ 
+        error: "Missing request body" 
+      });
     }
 
-    console.error("Invalid Crossmint webhook signature");
-    return res.status(403).json({ error: "Invalid signature" });
+    // Create Svix webhook instance
+    const wh = new Webhook(webhookSecret);
+
+    // Verify the webhook
+    try {
+      const payload = wh.verify(rawBody, {
+        "svix-id": svixId,
+        "svix-timestamp": svixTimestamp,
+        "svix-signature": svixSignature,
+      });
+
+      console.log("Crossmint webhook signature verified successfully");
+      
+      // Attach the verified payload to the request for use in the controller
+      (req as any).verifiedPayload = payload;
+      
+      return next();
+    } catch (verificationError) {
+      console.error("Svix webhook verification failed:", verificationError);
+      return res.status(400).json({ 
+        error: "Webhook verification failed" 
+      });
+    }
   } catch (error) {
-    console.error("Error verifying Crossmint webhook signature:", error);
-    return res.status(403).json({ error: "Signature verification failed" });
+    console.error("Error in Crossmint webhook verification middleware:", error);
+    return res.status(500).json({ 
+      error: "Internal server error during webhook verification" 
+    });
   }
 }
