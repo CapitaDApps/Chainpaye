@@ -66,6 +66,7 @@ Enter PIN to Confirm
 - **`Chainpaye/.env.example`**
   - Added: `OFFRAMP_FLAT_FEE_USD=0.75`
   - Added: `OFFRAMP_SPREAD_NGN=60`
+  - Added: `OFFRAMP_MIN_AMOUNT_NGN=5000`
 
 #### Service Files
 - **`Chainpaye/services/crypto-off-ramp/FinancialService.ts`**
@@ -96,12 +97,14 @@ Enter PIN to Confirm
   - Updated fee display message in `handleSpendCrypto()`
   - Updated transaction summary in `handleAccountConfirmation()`
   - Updated success message in `executeOfframpTransaction()`
+  - Added minimum amount validation in `handleAmountInput()`
   - All messages now show "$0.75 USD" instead of "1.5%"
   - All messages now show spread rate instead of original DexPay rate
+  - Minimum amount check reads from environment variable
 
 #### Flow Files
 - **`Chainpaye/webhooks/offramp_flow.json`**
-  - Updated helper text for amount input to show "$0.75 USD" fee
+  - Updated helper text for amount input to show "Min: ₦5,000 | Fee: $0.75 USD"
   - Updated OFFRAMP_FIAT_REVIEW screen to show:
     - "To Receive": Amount in NGN (what user will get in bank)
     - "Selling": Amount in USD excluding fees (calculated with spread rate)
@@ -116,6 +119,8 @@ Enter PIN to Confirm
   - Removed `total_fee_usd` field (replaced with `total_amount_usd`)
 
 - **`Chainpaye/webhooks/services/cryptoTopUp.service.ts`**
+  - Added minimum amount validation (reads from env)
+  - Returns error if amount is below minimum
   - Updated `OFFRAMP_FIAT_REVIEW` case to:
     - Apply spread to displayed rate (reads from env)
     - Calculate USD amount (excluding fees) using spread rate
@@ -182,17 +187,20 @@ Make sure to add these to your actual `.env` file:
 ```env
 OFFRAMP_FLAT_FEE_USD=0.75
 OFFRAMP_SPREAD_NGN=60
+OFFRAMP_MIN_AMOUNT_NGN=5000
 ```
 
-**Important:** Both values are now fully configurable via environment variables:
+**Important:** All values are now fully configurable via environment variables:
 - Change `OFFRAMP_FLAT_FEE_USD` to adjust the flat fee (e.g., 0.50, 1.00)
 - Change `OFFRAMP_SPREAD_NGN` to adjust the spread (e.g., 50, 70, 100)
+- Change `OFFRAMP_MIN_AMOUNT_NGN` to adjust minimum offramp amount (e.g., 3000, 10000)
 - No code changes needed - just update `.env` and restart the application
 
-**Example:** To change spread to 50 NGN and fee to $1.00:
+**Example:** To change spread to 50 NGN, fee to $1.00, and minimum to ₦10,000:
 ```env
 OFFRAMP_FLAT_FEE_USD=1.00
 OFFRAMP_SPREAD_NGN=50
+OFFRAMP_MIN_AMOUNT_NGN=10000
 ```
 
 ### 8. Backward Compatibility

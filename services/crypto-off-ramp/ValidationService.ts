@@ -30,6 +30,11 @@ export class ValidationService implements IValidationService {
   // Maximum transaction limits
   private static readonly MAX_TRANSACTION_USD = 50000;
   private static readonly MIN_TRANSACTION_USD = 1;
+  
+  // Minimum offramp amount in NGN (configurable via env)
+  private static getMinOfframpAmountNgn(): number {
+    return parseFloat(process.env.OFFRAMP_MIN_AMOUNT_NGN || "5000");
+  }
 
   /**
    * Validates asset-chain combination

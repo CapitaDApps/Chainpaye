@@ -65,10 +65,6 @@
                 "required": true,
                 "data-source": [
                   {
-                    "id": "TRC20",
-                    "title": "Tron (TRC20)"
-                  },
-                  {
                     "id": "BEP20",
                     "title": "BNB Smart Chain (BEP20)"
                   },
@@ -77,12 +73,12 @@
                     "title": "Solana (SOL)"
                   },
                   {
-                    "id": "ERC20",
-                    "title": "Ethereum (ERC20)"
-                  },
-                  {
                     "id": "BASE",
                     "title": "Base Network"
+                  },
+                  {
+                    "id": "ARBITRUM",
+                    "title": "Arbitrum"
                   }
                 ]
               },
@@ -107,7 +103,7 @@
                 "label": "Amount",
                 "required": true,
                 "input-type": "text",
-                "helper-text": "Enter amount in NGN (Fee: $0.75 USD)"
+                "helper-text": "Min: ₦5,000 | Fee: $0.75 USD"
               },
               {
                 "type": "Footer",
@@ -134,15 +130,15 @@
       "data": {
         "currency": {
           "type": "string",
-          "__example__": "USDT"
+          "__example__": "USDC"
         },
         "network": {
           "type": "string",
-          "__example__": "TRC20"
+          "__example__": "BASE"
         },
         "sell_amount": {
           "type": "string",
-          "__example__": "100"
+          "__example__": "5000"
         },
         "sell_amount_usd": {
           "type": "string",
@@ -239,11 +235,11 @@
       "data": {
         "currency": {
           "type": "string",
-          "__example__": "USDT"
+          "__example__": "USDC"
         },
         "network": {
           "type": "string",
-          "__example__": "TRC20"
+          "__example__": "BASE"
         },
         "sell_amount": {
           "type": "string",

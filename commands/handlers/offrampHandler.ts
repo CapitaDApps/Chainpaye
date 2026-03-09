@@ -693,6 +693,16 @@ export async function handleAmountInput(
 
     const ngnAmount = parseFloat(amountMatch[1]?.replace(/,/g, "") || "0");
 
+    // Check minimum offramp amount (configurable via env)
+    const minOfframpAmount = parseFloat(process.env.OFFRAMP_MIN_AMOUNT_NGN || "5000");
+    if (ngnAmount < minOfframpAmount) {
+      await whatsappBusinessService.sendNormalMessage(
+        `❌ *Amount Too Low*\n\nMinimum offramp amount is ₦${minOfframpAmount.toLocaleString()}.\n\nPlease enter a higher amount:`,
+        phoneNumber,
+      );
+      return true;
+    }
+
     // Validate amount using ValidationService
     const validation = validationService.validateTransactionLimits(
       ngnAmount,

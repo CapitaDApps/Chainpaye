@@ -285,6 +285,28 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           };
         }
 
+        // Validate minimum offramp amount (configurable via env)
+        const minOfframpAmount = parseFloat(process.env.OFFRAMP_MIN_AMOUNT_NGN || "5000");
+        const sellAmountNum = parseFloat(sell_amount);
+        if (sellAmountNum < minOfframpAmount) {
+          let banks = FALLBACK_BANKS;
+          try {
+            const dexPayBanks = await dexPayService.getBanks();
+            if (dexPayBanks && dexPayBanks.length > 0) {
+              banks = dexPayBanks.map((b) => ({ id: b.code, title: b.name }));
+            }
+          } catch {
+            // Use fallback
+          }
+          return {
+            screen: "OFFRAMP_DETAILS",
+            data: {
+              banks: banks,
+              error_message: `Minimum offramp amount is ₦${minOfframpAmount.toLocaleString()}. Please enter a higher amount.`,
+            },
+          };
+        }
+
         // Resolve bank name from bank code
         let bankName = "Bank";
         try {
@@ -476,7 +498,9 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
 
       case "OFFRAMP_FIAT_REVIEW": {
         // Calculate fees before showing crypto review screen
-        const { sell_amount, currency, network, sell_amount_usd, amount_to_receive } = data;
+        const { sell_amount, currency, network } = data;
+        const sell_amount_usd = data.sell_amount_usd as string | undefined;
+        const amount_to_receive = data.amount_to_receive as string | undefined;
         
         // Validate required fields
         if (!sell_amount || !currency || !network) {
@@ -495,7 +519,8 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
         try {
           // Calculate total amount (selling + fee)
           const sellAmountUsdNum = parseFloat(sell_amount_usd || "0");
-          const totalAmountUsdNum = sellAmountUsdNum + 0.75; // Add flat fee
+          const flatFeeUsd = parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75");
+          const totalAmountUsdNum = sellAmountUsdNum + flatFeeUsd; // Add flat fee from env
           
           // Format total amount
           let totalAmountUsd = totalAmountUsdNum.toFixed(6).replace(/\.?0+$/, ''); // Remove trailing zeros
@@ -510,7 +535,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             }
           }
           
-          logger.info(`[OFFRAMP] Total amount calculated: Selling ${sell_amount_usd} + Fee 0.75 = Total ${totalAmountUsd} USD`);
+          logger.info(`[OFFRAMP] Total amount calculated: Selling ${sell_amount_usd} + Fee ${flatFeeUsd} = Total ${totalAmountUsd} USD`);
           
           return {
             screen: "OFFRAMP_CRYPTO_REVIEW",
@@ -525,7 +550,8 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           logger.error("[OFFRAMP] Error calculating total amount: " + (error as Error).message);
           // Fallback to showing screen with calculated values
           const sellAmountUsdNum = parseFloat(sell_amount_usd || "0");
-          const totalAmountUsdNum = sellAmountUsdNum + 0.75;
+          const flatFeeUsd = parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75");
+          const totalAmountUsdNum = sellAmountUsdNum + flatFeeUsd;
           return {
             screen: "OFFRAMP_CRYPTO_REVIEW",
             data: {
