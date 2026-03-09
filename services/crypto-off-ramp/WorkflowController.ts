@@ -543,10 +543,14 @@ export class WorkflowController implements IWorkflowController {
         };
       }
 
-      // Calculate fees as per requirements 7.4 and 7.5
-      const chainpayeFee = amount * 0.015; // 1.5% of entered amount
-      const dexpayFeeUSD = 0.2; // $0.2 converted to NGN
-      const dexpayFee = dexpayFeeUSD * exchangeRate;
+      // Calculate fees as per updated requirements
+      const spreadNgn = parseFloat(process.env.OFFRAMP_SPREAD_NGN || "60");
+      const flatFeeUsd = parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75");
+      
+      const spreadRate = exchangeRate - spreadNgn; // Apply spread from env
+      const chainpayeFee = flatFeeUsd * spreadRate; // Flat fee in NGN
+      const dexpayFeeUSD = 0; // No separate DexPay fee
+      const dexpayFee = 0;
       const totalFees = chainpayeFee + dexpayFee;
       const totalAmount = amount + totalFees;
 
@@ -615,9 +619,13 @@ export class WorkflowController implements IWorkflowController {
         };
       }
 
-      // Convert total amount (including fees) to USD as per requirement 8.1
-      const totalAmountNGN = amount + totalFees;
-      const totalInUsd = totalAmountNGN / exchangeRate;
+      // Convert total amount to USD using spread rate as per updated requirements
+      const spreadNgn = parseFloat(process.env.OFFRAMP_SPREAD_NGN || "60");
+      const flatFeeUsd = parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75");
+      
+      const spreadRate = exchangeRate - spreadNgn; // Apply spread from env
+      const amountInUsd = amount / spreadRate;
+      const totalInUsd = amountInUsd + flatFeeUsd; // Add flat fee from env
 
       // Compare with wallet balance as per requirement 8.2
       if (walletBalance < totalInUsd) {

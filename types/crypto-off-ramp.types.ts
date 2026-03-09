@@ -90,8 +90,8 @@ export interface OffRampTransaction {
 
   // Financial Details
   exchangeRate: number;
-  chainpayeFee: number; // 1.5% of amount
-  dexpayFee: number; // $0.2 in NGN
+  chainpayeFee: number; // Flat $0.75 USD fee
+  dexpayFee: number; // $0 (spread covers this)
   totalFees: number;
   fiatAmount: number; // Amount in NGN
 

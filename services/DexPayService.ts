@@ -594,15 +594,23 @@ export class DexPayService implements IBankingManager, IDexPayService {
     totalFees: number;
     totalDeduction: number;
   } {
-    const feePercentage = parseFloat(
-      process.env.OFFRAMP_FEE_PERCENTAGE || "1.5",
-    );
-    const fixedFeeUsd = parseFloat(process.env.DEXPAY_FIXED_FEE_USD || "0.20");
+    const flatFeeUsd = parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75");
+    const spreadNgn = parseFloat(process.env.OFFRAMP_SPREAD_NGN || "60");
 
-    const platformFee = (ngnAmount * feePercentage) / 100;
-    const dexPayFee = fixedFeeUsd * cryptoRate; // Convert USD fee to NGN
+    // Apply spread to rate
+    const spreadRate = cryptoRate - spreadNgn;
+
+    // Platform fee is flat $0.75 converted to NGN using spread rate
+    const platformFee = flatFeeUsd * spreadRate;
+    
+    // No separate DexPay fee
+    const dexPayFee = 0;
+    
     const totalFees = platformFee + dexPayFee;
-    const totalDeduction = ngnAmount + totalFees;
+    
+    // Total deduction = amount converted at spread rate + flat fee
+    const amountInUsd = ngnAmount / spreadRate;
+    const totalDeduction = amountInUsd + flatFeeUsd;
 
     return {
       platformFee,

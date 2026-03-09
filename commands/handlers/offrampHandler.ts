@@ -650,9 +650,7 @@ export async function handleSpendCrypto(phoneNumber: string): Promise<boolean> {
     await whatsappBusinessService.sendNormalMessage(
       `💰 *Enter Amount*\n\nHow much NGN do you want to withdraw to your bank account?\n\n` +
         `Example: 50000\n\n` +
-        `⚠️ *Note:* Additional fees will apply:\n` +
-        `• Platform fee: 1.5%\n` +
-        `• DexPay fee: $0.20\n\n` +
+        `⚠️ *Note:* A flat fee of $0.75 USD will apply.\n\n` +
         `Type the amount in NGN:`,
       phoneNumber,
     );
@@ -1049,15 +1047,15 @@ export async function handleAccountConfirmation(
     }
 
     // Show transaction summary and ask for PIN
+    const spreadRate = financialService.getUserFacingRate(workflowState.stepData.exchangeRate);
+    
     const summaryMessage =
       `💱 *Transaction Summary*\n\n` +
       `💰 *Amount:* ₦${amount.toLocaleString()}\n` +
-      `📊 *Rate:* 1 ${selectedAsset.toUpperCase()} = ₦${exchangeRate.toLocaleString()}\n` +
+      `📊 *Rate:* 1 ${selectedAsset.toUpperCase()} = ₦${spreadRate.toFixed(2)}\n` +
       `🔸 *Crypto Required:* ${financialCalc.totalInUsd.toFixed(6)} ${selectedAsset.toUpperCase()}\n\n` +
-      `💸 *Fees:*\n` +
-      `• Platform Fee (1.5%): ₦${financialCalc.chainpayeFee.toLocaleString()}\n` +
-      `• DexPay Fee: ₦${financialCalc.dexpayFee.toLocaleString()}\n` +
-      `• Total Fees: ₦${financialCalc.totalFees.toLocaleString()}\n\n` +
+      `💸 *Fee:*\n` +
+      `• Platform Fee: $0.75 USD\n\n` +
       `🏦 *Destination:*\n` +
       `${workflowState.stepData.bankName}\n` +
       `${workflowState.stepData.accountName}\n` +
@@ -1286,17 +1284,17 @@ async function executeOfframpTransaction(
 
         if (completionResult.success) {
           // Send comprehensive success message with all details
+          const spreadRate = financialService.getUserFacingRate(workflowState.stepData.exchangeRate);
+          
           const successMessage =
             `🎉 *Transaction Successful!*\n\n` +
             `✅ Your off-ramp has been completed successfully!\n\n` +
             `💰 *Transaction Details:*\n` +
             `• Amount: ₦${workflowState.stepData.amount.toLocaleString()}\n` +
             `• Crypto Used: ${financialCalc.totalInUsd.toFixed(6)} ${workflowState.stepData.selectedAsset.toUpperCase()}\n` +
-            `• Exchange Rate: 1 ${workflowState.stepData.selectedAsset.toUpperCase()} = ₦${workflowState.stepData.exchangeRate.toLocaleString()}\n\n` +
-            `💸 *Fees Applied:*\n` +
-            `• Platform Fee: ₦${financialCalc.chainpayeFee.toLocaleString()}\n` +
-            `• Banking Fee: ₦${financialCalc.dexpayFee.toLocaleString()}\n` +
-            `• Total Fees: ₦${financialCalc.totalFees.toLocaleString()}\n\n` +
+            `• Exchange Rate: 1 ${workflowState.stepData.selectedAsset.toUpperCase()} = ₦${spreadRate.toFixed(2)}\n\n` +
+            `💸 *Fee Applied:*\n` +
+            `• Platform Fee: $0.75 USD\n\n` +
             `🏦 *Destination Account:*\n` +
             `• Bank: ${workflowState.stepData.bankName}\n` +
             `• Account Name: ${workflowState.stepData.accountName}\n` +

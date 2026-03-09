@@ -107,7 +107,7 @@
                 "label": "Amount",
                 "required": true,
                 "input-type": "text",
-                "helper-text": "Enter amount in NGN"
+                "helper-text": "Enter amount in NGN (Fee: $0.75 USD)"
               },
               {
                 "type": "Footer",
@@ -144,6 +144,14 @@
           "type": "string",
           "__example__": "100"
         },
+        "sell_amount_usd": {
+          "type": "string",
+          "__example__": "3.73"
+        },
+        "amount_to_receive": {
+          "type": "string",
+          "__example__": "5,000"
+        },
         "bank_name": {
           "type": "string",
           "__example__": "GTBank"
@@ -162,7 +170,11 @@
         },
         "rate": {
           "type": "string",
-          "__example__": "₦1,520"
+          "__example__": "₦1,460"
+        },
+        "fee_info": {
+          "type": "string",
+          "__example__": "Flat fee: $0.75 USD"
         }
       },
       "layout": {
@@ -186,7 +198,11 @@
           },
           {
             "type": "TextBody",
-            "text": "`'Selling: '${data.sell_amount}' NGN'`"
+            "text": "`'To Receive: ₦'${data.amount_to_receive}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Selling: '${data.sell_amount_usd}' '${data.currency}''`"
           },
           {
             "type": "TextBody",
@@ -194,7 +210,7 @@
           },
           {
             "type": "TextBody",
-            "text": "`'Rate: 1 '${data.currency}' = '${data.rate}''`"
+            "text": "`'Rate: 1 '${data.currency}' = '${data.rate}' (with spread)'`"
           },
           {
             "type": "Footer",
@@ -203,6 +219,8 @@
               "name": "data_exchange",
               "payload": {
                 "sell_amount": "${data.sell_amount}",
+                "sell_amount_usd": "${data.sell_amount_usd}",
+                "amount_to_receive": "${data.amount_to_receive}",
                 "currency": "${data.currency}",
                 "network": "${data.network}",
                 "bank_name": "${data.bank_name}",
@@ -229,7 +247,19 @@
         },
         "sell_amount": {
           "type": "string",
-          "__example__": "100"
+          "__example__": "5000"
+        },
+        "sell_amount_usd": {
+          "type": "string",
+          "__example__": "3.73"
+        },
+        "amount_to_receive": {
+          "type": "string",
+          "__example__": "5,000"
+        },
+        "total_amount_usd": {
+          "type": "string",
+          "__example__": "4.48"
         },
         "bank_name": {
           "type": "string",
@@ -247,10 +277,6 @@
           "type": "string",
           "__example__": "Kelechi"
         },
-        "total_fee_usd": {
-          "type": "string",
-          "__example__": "1.20"
-        },
         "error_message": {
           "type": "string",
           "__example__": "Invalid PIN"
@@ -265,15 +291,23 @@
           },
           {
             "type": "TextBody",
-            "text": "`'Selling: '${data.sell_amount}' NGN'`"
+            "text": "`'To Receive: ₦'${data.amount_to_receive}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Selling: '${data.sell_amount_usd}' '${data.currency}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Fee: $0.75 USD'`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Total: '${data.total_amount_usd}' '${data.currency}''`"
           },
           {
             "type": "TextBody",
             "text": "`'Network: '${data.network}''`"
-          },
-          {
-            "type": "TextBody",
-            "text": "`'Total Fee: '${data.total_fee_usd}' '${data.currency}''`"
           },
           {
             "type": "TextBody",
@@ -300,6 +334,9 @@
                   "payload": {
                     "pin": "${form.pin}",
                     "sell_amount": "${data.sell_amount}",
+                    "sell_amount_usd": "${data.sell_amount_usd}",
+                    "amount_to_receive": "${data.amount_to_receive}",
+                    "total_amount_usd": "${data.total_amount_usd}",
                     "currency": "${data.currency}",
                     "network": "${data.network}",
                     "bank_name": "${data.bank_name}",

@@ -406,6 +406,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
 
         const ngnAmount = parseFloat(sell_amount) || 1000;
         let rateDisplay = "Current market rate"; // Fallback
+        let sellAmountUsd = "0.00"; // Amount in USD (excluding fees)
 
         try {
           const rateData = await dexPayService.getCurrentRates(
@@ -414,13 +415,31 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             ngnAmount,
           );
           if (rateData && rateData.rate > 0) {
+            // Apply spread to the rate (user sees worse rate) - configurable via env
+            const spreadNgn = parseFloat(process.env.OFFRAMP_SPREAD_NGN || "60");
+            const spreadRate = rateData.rate - spreadNgn;
+            
+            // Calculate USD amount (excluding fees) using spread rate
+            const usdAmount = ngnAmount / spreadRate;
+            sellAmountUsd = usdAmount.toFixed(6).replace(/\.?0+$/, ''); // Remove trailing zeros
+            
+            // Ensure at least 2 decimal places
+            if (!sellAmountUsd.includes('.')) {
+              sellAmountUsd += '.00';
+            } else {
+              const decimalPart = sellAmountUsd.split('.')[1];
+              if (decimalPart && decimalPart.length === 1) {
+                sellAmountUsd += '0';
+              }
+            }
+            
             // Format rate with comma separators and Naira symbol
-            rateDisplay = `₦${rateData.rate.toLocaleString("en-NG", {
+            rateDisplay = `₦${spreadRate.toLocaleString("en-NG", {
               minimumFractionDigits: 0,
               maximumFractionDigits: 2,
             })}`;
             logger.info(
-              `Fetched rate for ${currency} on ${dexPayChain}: ${rateDisplay}`,
+              `Fetched rate for ${currency} on ${dexPayChain}: Original ${rateData.rate}, Spread rate shown: ${spreadRate}, USD amount: ${sellAmountUsd}`,
             );
           }
         } catch (error) {
@@ -431,25 +450,33 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           // TODO! Rate fetching failed - consider if we should block the flow or continue with fallback
         }
 
+        // Format amount to receive with comma separators
+        const amountToReceive = parseFloat(sell_amount).toLocaleString("en-NG", {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 2,
+        });
+
         return {
           screen: "OFFRAMP_FIAT_REVIEW",
           data: {
             currency,
             network,
-            sell_amount,
+            sell_amount, // Original NGN amount
+            sell_amount_usd: sellAmountUsd, // USD amount (excluding fees)
+            amount_to_receive: amountToReceive, // Formatted NGN amount
             bank_name: bankName,
             bank_code,
             account_number,
             recipient_name: recipientName,
             recipientName: recipientName, // Store for next step
-            rate: rateDisplay, // Dynamic rate from DexPay API
+            rate: rateDisplay, // Dynamic rate from DexPay API with spread
           },
         };
       }
 
       case "OFFRAMP_FIAT_REVIEW": {
         // Calculate fees before showing crypto review screen
-        const { sell_amount, currency, network } = data;
+        const { sell_amount, currency, network, sell_amount_usd, amount_to_receive } = data;
         
         // Validate required fields
         if (!sell_amount || !currency || !network) {
@@ -458,79 +485,54 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             screen: "OFFRAMP_CRYPTO_REVIEW",
             data: {
               ...data,
-              total_fee_usd: "0.00",
+              sell_amount_usd: sell_amount_usd || "0.00",
+              amount_to_receive: amount_to_receive || sell_amount,
+              total_amount_usd: "0.75",
             },
           };
         }
         
         try {
-          // Get exchange rate
-          const ngnAmount = parseFloat(sell_amount);
-          const chainMapping: Record<string, { dexPay: string }> = {
-            sol: { dexPay: "solana" },
-            bsc: { dexPay: "bep20" },
-            base: { dexPay: "base" },
-            arbitrum: { dexPay: "arbitrum" },
-            bep20: { dexPay: "bep20" },
-          };
+          // Calculate total amount (selling + fee)
+          const sellAmountUsdNum = parseFloat(sell_amount_usd || "0");
+          const totalAmountUsdNum = sellAmountUsdNum + 0.75; // Add flat fee
           
-          const normalizedChain = chainMapping[network.toLowerCase()];
-          const dexPayChain = normalizedChain?.dexPay || "bep20";
+          // Format total amount
+          let totalAmountUsd = totalAmountUsdNum.toFixed(6).replace(/\.?0+$/, ''); // Remove trailing zeros
           
-          const rateData = await dexPayService.getCurrentRates(
-            currency,
-            dexPayChain,
-            ngnAmount,
-          );
-          
-          const nairaRate = rateData.rate;
-          
-          // Calculate fees using FinancialService
-          const financials = financialService.calculateTransactionFinancials(
-            ngnAmount,
-            nairaRate,
-          );
-          
-          // Convert total fees from NGN to USD using the current rate
-          let totalFeeUsd = financials.totalFees / nairaRate;
-          
-          // Cap the fee at $5 maximum
-          const MAX_FEE_USD = 5.0;
-          if (totalFeeUsd > MAX_FEE_USD) {
-            logger.info(`[OFFRAMP] Fee capped: Original ${totalFeeUsd.toFixed(6)} USD -> Capped at ${MAX_FEE_USD} USD`);
-            totalFeeUsd = MAX_FEE_USD;
-          }
-          
-          // Format fee: remove trailing zeros but keep at least 2 decimals
-          let formattedFee = totalFeeUsd.toFixed(6);
-          // Remove trailing zeros after decimal point
-          formattedFee = formattedFee.replace(/\.?0+$/, '');
           // Ensure at least 2 decimal places
-          if (!formattedFee.includes('.')) {
-            formattedFee += '.00';
+          if (!totalAmountUsd.includes('.')) {
+            totalAmountUsd += '.00';
           } else {
-            const decimalPart = formattedFee.split('.')[1];
+            const decimalPart = totalAmountUsd.split('.')[1];
             if (decimalPart && decimalPart.length === 1) {
-              formattedFee += '0';
+              totalAmountUsd += '0';
             }
           }
           
+          logger.info(`[OFFRAMP] Total amount calculated: Selling ${sell_amount_usd} + Fee 0.75 = Total ${totalAmountUsd} USD`);
+          
           return {
             screen: "OFFRAMP_CRYPTO_REVIEW",
             data: {
               ...data,
-              // Add total fee in USD with proper formatting
-              total_fee_usd: formattedFee,
+              sell_amount_usd: sell_amount_usd || "0.00",
+              amount_to_receive: amount_to_receive || sell_amount,
+              total_amount_usd: totalAmountUsd,
             },
           };
         } catch (error) {
-          logger.error("[OFFRAMP] Error calculating fees: " + (error as Error).message);
-          // Fallback to showing screen without fees
+          logger.error("[OFFRAMP] Error calculating total amount: " + (error as Error).message);
+          // Fallback to showing screen with calculated values
+          const sellAmountUsdNum = parseFloat(sell_amount_usd || "0");
+          const totalAmountUsdNum = sellAmountUsdNum + 0.75;
           return {
             screen: "OFFRAMP_CRYPTO_REVIEW",
             data: {
               ...data,
-              total_fee_usd: "0.00",
+              sell_amount_usd: sell_amount_usd || "0.00",
+              amount_to_receive: amount_to_receive || sell_amount,
+              total_amount_usd: totalAmountUsdNum.toFixed(2),
             },
           };
         }
