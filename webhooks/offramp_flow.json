@@ -276,6 +276,10 @@
         "error_message": {
           "type": "string",
           "__example__": "Invalid PIN"
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
         }
       },
       "layout": {
@@ -284,6 +288,16 @@
           {
             "type": "TextHeading",
             "text": "Authorize"
+          },
+          {
+            "type": "If",
+            "condition": "${data.has_error}",
+            "then": [
+              {
+                "type": "TextCaption",
+                "text": "${data.error_message}"
+              }
+            ]
           },
           {
             "type": "TextBody",

@@ -17,6 +17,7 @@ import { userService, whatsappBusinessService } from "../../services";
 import { crossmintService } from "../../services/CrossmintService";
 import { dexPayService } from "../../services/DexPayService";
 import { redisClient } from "../../services/redis";
+import { logger } from "../../utils/logger";
 import { NormalizedNetworkType } from "../types";
 
 // Import new architecture services
@@ -1117,6 +1118,51 @@ export async function handlePinVerification(
 
     const pin = pinMatch[1]!;
 
+    // ============================================================
+    // IDEMPOTENCY CHECK - Prevent duplicate PIN submissions
+    // ============================================================
+    const transactionIdentifier = `${workflowState.userId}:${workflowState.stepData.amount}:${workflowState.stepData.bankCode}:${workflowState.stepData.accountNumber}:${workflowState.stepData.selectedAsset}:${workflowState.stepData.selectedChain}`;
+    const idempotencyKey = `offramp:pin:${Buffer.from(transactionIdentifier).toString('base64')}`;
+    
+    // Check if PIN was already submitted for this transaction
+    const existingPinSubmission = await redisClient.get(idempotencyKey);
+    
+    if (existingPinSubmission) {
+      const submissionData = JSON.parse(existingPinSubmission);
+      logger.warn(`[OFFRAMP] Duplicate PIN submission detected for workflow ${workflowId}`);
+      
+      if (submissionData.status === 'processing') {
+        await whatsappBusinessService.sendNormalMessage(
+          "⏳ *Transaction In Progress*\n\nYour transaction is already being processed. Please wait for completion.\n\nDo not submit your PIN again.",
+          phoneNumber,
+        );
+        return true;
+      }
+      
+      if (submissionData.status === 'completed') {
+        await whatsappBusinessService.sendNormalMessage(
+          "✅ *Transaction Already Completed*\n\nThis transaction was already processed successfully.\n\nType *offramp* to start a new transaction.",
+          phoneNumber,
+        );
+        return true;
+      }
+    }
+    
+    // Mark PIN as submitted (expires in 10 minutes)
+    await redisClient.set(
+      idempotencyKey,
+      JSON.stringify({
+        status: 'processing',
+        workflowId: workflowId,
+        userId: workflowState.userId,
+        submittedAt: new Date().toISOString(),
+      }),
+      'EX',
+      600 // 10 minutes
+    );
+    
+    logger.info(`[OFFRAMP] PIN submission marked as processing: ${idempotencyKey}`);
+
     // Verify PIN using AuthenticationService
     const pinValid = await authenticationService.validatePin(
       workflowState.userId,
@@ -1130,6 +1176,9 @@ export async function handlePinVerification(
     });
 
     if (!stepResult.success) {
+      // Clean up idempotency lock on PIN validation failure
+      await redisClient.del(idempotencyKey);
+      
       await whatsappBusinessService.sendNormalMessage(
         `❌ *${stepResult.error}*`,
         phoneNumber,
@@ -1138,7 +1187,7 @@ export async function handlePinVerification(
     }
 
     // Execute the off-ramp transaction
-    await executeOfframpTransaction(phoneNumber, workflowId);
+    await executeOfframpTransaction(phoneNumber, workflowId, idempotencyKey);
     return true;
   } catch (error) {
     console.error(`Error in handlePinVerification for ${phoneNumber}:`, error);
@@ -1157,6 +1206,7 @@ export async function handlePinVerification(
 async function executeOfframpTransaction(
   phoneNumber: string,
   workflowId: string,
+  idempotencyKey?: string,
 ): Promise<void> {
   try {
     await whatsappBusinessService.sendNormalMessage(
@@ -1293,6 +1343,22 @@ async function executeOfframpTransaction(
         );
 
         if (completionResult.success) {
+          // Update idempotency record to mark as completed
+          if (idempotencyKey) {
+            await redisClient.set(
+              idempotencyKey,
+              JSON.stringify({
+                status: 'completed',
+                workflowId: workflowId,
+                transactionId: result.transactionId,
+                completedAt: new Date().toISOString(),
+              }),
+              'EX',
+              300 // Keep for 5 minutes to prevent immediate duplicates
+            );
+            logger.info(`[OFFRAMP] Transaction marked as completed: ${idempotencyKey}`);
+          }
+          
           // Send comprehensive success message with all details
           const spreadRate = financialService.getUserFacingRate(workflowState.stepData.exchangeRate);
           
@@ -1340,12 +1406,22 @@ async function executeOfframpTransaction(
             }
           }
         } else {
+          // Clean up idempotency lock on completion failure
+          if (idempotencyKey) {
+            await redisClient.del(idempotencyKey);
+          }
+          
           await whatsappBusinessService.sendNormalMessage(
             `❌ *Transaction Completion Error*\n\n${completionResult.error}\n\nYour crypto transfer was successful, but there was an issue finalizing the transaction. Please contact support.\n\nReference: ${result.transactionId}`,
             phoneNumber,
           );
         }
       } else {
+        // Clean up idempotency lock on quote failure
+        if (idempotencyKey) {
+          await redisClient.del(idempotencyKey);
+        }
+        
         await whatsappBusinessService.sendNormalMessage(
           `❌ *Quote Creation Failed*\n\n${quoteStepResult.error}\n\nYour crypto transfer was successful, but we couldn't create the banking quote. Please contact support.\n\nReference: ${result.transactionId}`,
           phoneNumber,
@@ -1397,6 +1473,11 @@ async function executeOfframpTransaction(
         phoneNumber,
       );
 
+      // Clean up idempotency lock on transaction failure
+      if (idempotencyKey) {
+        await redisClient.del(idempotencyKey);
+      }
+
       // Clean up failed workflow session
       phoneToWorkflowMap.delete(phoneNumber);
       await redisClient.del(`offramp_workflow:${phoneNumber}`);
@@ -1435,6 +1516,11 @@ async function executeOfframpTransaction(
       "\n\nPlease contact support for assistance or try again later.";
 
     await whatsappBusinessService.sendNormalMessage(errorMessage, phoneNumber);
+
+    // Clean up idempotency lock on error
+    if (idempotencyKey) {
+      await redisClient.del(idempotencyKey);
+    }
 
     // Clean up failed workflow session
     phoneToWorkflowMap.delete(phoneNumber);

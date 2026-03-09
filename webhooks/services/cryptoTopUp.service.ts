@@ -65,6 +65,7 @@ async function processOfframpInBackground(
   bank_name: string,
   totalInUsd: number,
   dexPayService: any,
+  idempotencyKey?: string,
 ): Promise<void> {
   try {
     // Wait for crypto transaction to settle
@@ -131,6 +132,24 @@ async function processOfframpInBackground(
     console.log(JSON.stringify(offrampResult, null, 2));
     console.log("========================================\n");
 
+    // Update idempotency record to mark as completed
+    if (idempotencyKey) {
+      await redisClient.set(
+        idempotencyKey,
+        JSON.stringify({
+          status: 'completed',
+          userId: userId,
+          amount: totalInUsd,
+          asset: normalizedAsset,
+          quoteId: quoteId,
+          completedAt: new Date().toISOString(),
+        }),
+        'EX',
+        300 // Keep for 5 minutes to prevent immediate duplicates
+      );
+      logger.info(`[OFFRAMP-BG] Transaction marked as completed: ${idempotencyKey}`);
+    }
+
     // Send success notification
     await sendOfframpSuccessNotification(
       phone,
@@ -151,6 +170,21 @@ async function processOfframpInBackground(
     console.log("\n❌ [Background] Processing failed:");
     console.log((error as Error).message);
     console.log("========================================\n");
+    
+    // Mark transaction as failed in idempotency record
+    if (idempotencyKey) {
+      await redisClient.set(
+        idempotencyKey,
+        JSON.stringify({
+          status: 'failed',
+          userId: userId,
+          error: (error as Error).message,
+          failedAt: new Date().toISOString(),
+        }),
+        'EX',
+        300 // Keep for 5 minutes
+      );
+    }
     
     // TODO: Send notification to user about failure
     // Could send a WhatsApp message or email notification
@@ -287,7 +321,9 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
 
         // Validate minimum offramp amount (configurable via env)
         const minOfframpAmount = parseFloat(process.env.OFFRAMP_MIN_AMOUNT_NGN || "5000");
+        const maxOfframpAmount = parseFloat(process.env.OFFRAMP_MAX_AMOUNT_NGN || "10000000");
         const sellAmountNum = parseFloat(sell_amount);
+        
         if (sellAmountNum < minOfframpAmount) {
           let banks = FALLBACK_BANKS;
           try {
@@ -303,6 +339,25 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             data: {
               banks: banks,
               error_message: `Minimum offramp amount is ₦${minOfframpAmount.toLocaleString()}. Please enter a higher amount.`,
+            },
+          };
+        }
+        
+        if (sellAmountNum > maxOfframpAmount) {
+          let banks = FALLBACK_BANKS;
+          try {
+            const dexPayBanks = await dexPayService.getBanks();
+            if (dexPayBanks && dexPayBanks.length > 0) {
+              banks = dexPayBanks.map((b) => ({ id: b.code, title: b.name }));
+            }
+          } catch {
+            // Use fallback
+          }
+          return {
+            screen: "OFFRAMP_DETAILS",
+            data: {
+              banks: banks,
+              error_message: `Maximum offramp amount is ₦${maxOfframpAmount.toLocaleString()}. Please enter a lower amount.`,
             },
           };
         }
@@ -544,6 +599,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
               sell_amount_usd: sell_amount_usd || "0.00",
               amount_to_receive: amount_to_receive || sell_amount,
               total_amount_usd: totalAmountUsd,
+              has_error: false,
             },
           };
         } catch (error) {
@@ -559,6 +615,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
               sell_amount_usd: sell_amount_usd || "0.00",
               amount_to_receive: amount_to_receive || sell_amount,
               total_amount_usd: totalAmountUsdNum.toFixed(2),
+              has_error: false,
             },
           };
         }
@@ -594,6 +651,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             data: {
               ...data,
               error_message: "Missing required transaction details.",
+              has_error: true,
             },
           };
         }
@@ -608,6 +666,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             data: {
               ...data,
               error_message: "User not found.",
+              has_error: true,
             },
           };
         }
@@ -619,6 +678,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             data: {
               ...data,
               error_message: "Invalid PIN",
+              has_error: true,
             },
           };
         }
@@ -648,6 +708,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
               data: {
                 ...data,
                 error_message: `Unsupported network: ${network}. Supported: BEP20, SOL, BASE, ARBITRUM`,
+                has_error: true,
               },
             };
           }
@@ -679,6 +740,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
               data: {
                 ...data,
                 error_message: `${normalizedAsset} is not supported on ${network}. Supported: BEP20 (USDC/USDT), SOL (USDC/USDT), BASE (USDC), ARBITRUM (USDC/USDT)`,
+                has_error: true,
               },
             };
           }
@@ -735,6 +797,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
                   ...data,
                   error_message:
                     "Exchange rate unavailable. Please try again later.",
+                  has_error: true,
                 },
               };
             }
@@ -749,6 +812,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
                 ...data,
                 error_message:
                   "Could not fetch current exchange rate. Please try again.",
+                has_error: true,
               },
             };
           }
@@ -835,6 +899,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
               data: {
                 ...data,
                 error_message: `Insufficient balance. You need ${totalCryptoRequired.toFixed(4)} ${currency.toUpperCase()} but have ${currentBalance.toFixed(4)}. Please deposit ${shortfall.toFixed(4)} more.`,
+                has_error: true,
               },
             };
           }
@@ -869,6 +934,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
                   ...data,
                   error_message:
                     "Could not verify account details. Please try again.",
+                  has_error: true,
                 },
               };
             }
@@ -888,7 +954,69 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           );
 
           // ============================================================
-          // STEP 9: TRANSFER CRYPTO FROM USER WALLET TO MAIN WALLET
+          // STEP 9: IDEMPOTENCY CHECK - Prevent double-spending
+          // ============================================================
+          // Create a unique transaction identifier based on user, amount, and bank details
+          const transactionIdentifier = `${user.userId}:${ngnAmount}:${bank_code}:${account_number}:${normalizedAsset}:${crossmintChain}`;
+          const idempotencyKey = `offramp:transaction:${Buffer.from(transactionIdentifier).toString('base64')}`;
+          
+          // Check if this exact transaction is already in progress or completed
+          const existingTransaction = await redisClient.get(idempotencyKey);
+          
+          if (existingTransaction) {
+            const txData = JSON.parse(existingTransaction);
+            logger.warn(`[OFFRAMP] Duplicate transaction attempt detected for user ${user.userId}`);
+            
+            // If transaction is in progress, inform user
+            if (txData.status === 'processing') {
+              return {
+                screen: "OFFRAMP_CRYPTO_REVIEW",
+                data: {
+                  ...data,
+                  error_message: "Transaction already in progress. Please wait for completion.",
+                  has_error: true,
+                },
+              };
+            }
+            
+            // If transaction completed recently (within last 5 minutes), prevent duplicate
+            if (txData.status === 'completed') {
+              const completedAt = new Date(txData.completedAt);
+              const now = new Date();
+              const minutesSinceCompletion = (now.getTime() - completedAt.getTime()) / (1000 * 60);
+              
+              if (minutesSinceCompletion < 5) {
+                return {
+                  screen: "OFFRAMP_CRYPTO_REVIEW",
+                  data: {
+                    ...data,
+                    error_message: `Transaction already completed ${Math.floor(minutesSinceCompletion)} minute(s) ago. Reference: ${txData.transferHash?.slice(0, 8)}`,
+                    has_error: true,
+                  },
+                };
+              }
+            }
+          }
+          
+          // Mark transaction as processing (expires in 10 minutes)
+          await redisClient.set(
+            idempotencyKey,
+            JSON.stringify({
+              status: 'processing',
+              userId: user.userId,
+              amount: totalCryptoRequired,
+              asset: normalizedAsset,
+              chain: crossmintChain,
+              startedAt: new Date().toISOString(),
+            }),
+            'EX',
+            600 // 10 minutes expiry
+          );
+          
+          logger.info(`[OFFRAMP] Idempotency check passed. Transaction marked as processing: ${idempotencyKey}`);
+
+          // ============================================================
+          // STEP 10: TRANSFER CRYPTO FROM USER WALLET TO MAIN WALLET
           // This MUST happen before getting quote
           // ============================================================
           logger.info(
@@ -900,11 +1028,13 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           const wallet = wallets.find((w) => w.chainType === chainType);
 
           if (!wallet) {
+            // Clean up idempotency lock on error
+            await redisClient.del(idempotencyKey);
             throw new Error(`No wallet found for chain ${chainType}`);
           }
 
-          // Generate a unique idempotency key for this transfer
-          const transferIdempotencyKey = `offramp-transfer-${user.userId}-${Date.now()}`;
+          // Generate a unique idempotency key for this transfer (includes timestamp for uniqueness)
+          const transferIdempotencyKey = `offramp-transfer-${user.userId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
           const transferResult = await crossmintService.transferTokens({
             walletAddress: wallet.address,
@@ -923,14 +1053,36 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             logger.error(
               `[OFFRAMP] Transfer failed: ${transferResult.error || "Unknown error"}`,
             );
+            
+            // Clean up idempotency lock on transfer failure
+            await redisClient.del(idempotencyKey);
+            
             return {
               screen: "OFFRAMP_CRYPTO_REVIEW",
               data: {
                 ...data,
                 error_message: `Transfer failed: ${transferResult.error || "Please try again."}`,
+                has_error: true,
               },
             };
           }
+          
+          // Update idempotency record with transfer details
+          await redisClient.set(
+            idempotencyKey,
+            JSON.stringify({
+              status: 'transfer_completed',
+              userId: user.userId,
+              amount: totalCryptoRequired,
+              asset: normalizedAsset,
+              chain: crossmintChain,
+              startedAt: new Date().toISOString(),
+              transferId: transferResult.transactionId || transferIdempotencyKey,
+              transferCompletedAt: new Date().toISOString(),
+            }),
+            'EX',
+            600 // Keep for 10 minutes
+          );
 
           // ============================================================
           // TRANSFER SUCCESSFUL - RETURN SUCCESS SCREEN IMMEDIATELY
@@ -958,6 +1110,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             bank_name || "Bank",
             financials.totalInUsd,
             dexPayService,
+            idempotencyKey, // Pass idempotency key for completion tracking
           ).catch((err) =>
             logger.error(
               "[OFFRAMP] Background processing error: " + (err as Error).message,
@@ -1010,6 +1163,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             data: {
               ...data,
               error_message: errorMessage,
+              has_error: true,
             },
           };
         }

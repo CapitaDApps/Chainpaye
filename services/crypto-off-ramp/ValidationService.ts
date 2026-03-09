@@ -35,6 +35,25 @@ export class ValidationService implements IValidationService {
   private static getMinOfframpAmountNgn(): number {
     return parseFloat(process.env.OFFRAMP_MIN_AMOUNT_NGN || "5000");
   }
+  
+  // Maximum offramp amount in NGN (configurable via env)
+  private static getMaxOfframpAmountNgn(): number {
+    return parseFloat(process.env.OFFRAMP_MAX_AMOUNT_NGN || "10000000");
+  }
+  
+  /**
+   * Public method to get minimum offramp amount
+   */
+  getMinOfframpAmountNgn(): number {
+    return ValidationService.getMinOfframpAmountNgn();
+  }
+  
+  /**
+   * Public method to get maximum offramp amount
+   */
+  getMaxOfframpAmountNgn(): number {
+    return ValidationService.getMaxOfframpAmountNgn();
+  }
 
   /**
    * Validates asset-chain combination
