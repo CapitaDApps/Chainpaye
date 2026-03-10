@@ -206,11 +206,17 @@ export class TransactionManager implements ITransactionManager {
       // Process referral earnings (if applicable)
       try {
         const { handleOfframpTransaction } = await import("../../webhooks/controllers/referral.controller");
+        
+        // Calculate USD amount from fiatAmount (NGN) using exchange rate
+        // The transaction.amount is the crypto amount, transaction.fiatAmount is NGN
+        // We need to convert NGN to USD using the exchange rate
+        const sellAmountUsd = transaction.fiatAmount / transaction.exchangeRate;
+        
         await handleOfframpTransaction({
           id: transactionId,
           userId: transaction.userId,
           amount: transaction.amount,
-          feeAmount: transaction.fees || 0,
+          sellAmountUsd: sellAmountUsd,
           timestamp: transaction.completedAt,
         });
         this.log(`Referral earnings processed for transaction ${transactionId}`);

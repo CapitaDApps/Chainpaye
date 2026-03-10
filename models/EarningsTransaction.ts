@@ -52,7 +52,7 @@ const EarningsTransactionSchema: Schema = new Schema(
       type: Number,
       required: true,
       min: 0,
-      description: "Original transaction fee (1.5% of transaction amount)",
+      description: "Referral earnings amount (1% of offramp transaction volume in USD)",
     },
     transactionAmount: {
       type: Number,

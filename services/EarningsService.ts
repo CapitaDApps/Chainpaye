@@ -19,6 +19,7 @@ export interface OfframpTransaction {
   id: string;
   userId: string;
   amount: number;
+  sellAmountUsd: number; // USD value of crypto being sold (with spread)
   timestamp: Date;
 }
 
@@ -27,33 +28,22 @@ export interface OfframpTransaction {
  */
 export class EarningsService {
   private referralService: ReferralService;
+  private static readonly REFERRAL_PERCENTAGE = 0.01; // 1% of transaction volume
 
   constructor() {
     this.referralService = new ReferralService();
   }
 
   /**
-   * Calculate transaction fee (1.5% of amount)
+   * Calculate referrer earnings (1% of offramp volume)
    * 
-   * @param amount The transaction amount
-   * @returns number The calculated fee (amount * 0.015)
+   * @param sellAmountUsd The USD value of crypto being sold (with spread included)
+   * @returns number The earnings amount (1% of sellAmountUsd)
    * 
-   * Validates: Requirements 3.1
+   * Validates: Requirements 3.1, 3.2
    */
-  calculateFee(amount: number): number {
-    return amount * 0.015;
-  }
-
-  /**
-   * Calculate referrer earnings (25% of fee)
-   * 
-   * @param fee The transaction fee
-   * @returns number The referrer earnings (fee * 0.25)
-   * 
-   * Validates: Requirements 3.2
-   */
-  calculateReferrerEarnings(fee: number): number {
-    return fee * 0.25;
+  calculateReferrerEarnings(sellAmountUsd: number): number {
+    return sellAmountUsd * EarningsService.REFERRAL_PERCENTAGE;
   }
 
   /**
@@ -62,8 +52,8 @@ export class EarningsService {
    * This method:
    * 1. Checks if the user has a referral relationship
    * 2. Validates the relationship is within the 30-day earning period
-   * 3. Calculates the fee and referrer earnings
-   * 4. Credits points to the referrer atomically using MongoDB transactions
+   * 3. Calculates earnings (1% of offramp volume)
+   * 4. Credits earnings to the referrer atomically using MongoDB transactions
    * 5. Logs the earnings transaction for audit trail
    * 
    * @param transaction The offramp transaction to process
@@ -86,9 +76,8 @@ export class EarningsService {
       return;
     }
 
-    // Calculate fee and earnings
-    const fee = this.calculateFee(transaction.amount);
-    const earnings = this.calculateReferrerEarnings(fee);
+    // Calculate earnings (1% of offramp volume)
+    const earnings = this.calculateReferrerEarnings(transaction.sellAmountUsd);
 
     // Credit points atomically using MongoDB transactions
     const session = await mongoose.startSession();
@@ -120,7 +109,7 @@ export class EarningsService {
           referredUserId: transaction.userId,
           offrampTransactionId: transaction.id,
           amount: earnings,
-          feeAmount: fee,
+          feeAmount: earnings, // 1% of transaction volume
           transactionAmount: transaction.amount,
           timestamp: transaction.timestamp,
         });

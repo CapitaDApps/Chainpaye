@@ -11,7 +11,10 @@
     "test:coverage": "jest --coverage",
     "typecheck": "tsc --noEmit",
     "lint": "eslint --ext .ts",
-    "lint:fix": "eslint --ext .ts --fix"
+    "lint:fix": "eslint --ext .ts --fix",
+    "validate-referral": "tsx scripts/validate-referral-earnings.ts",
+    "validate-referral:live": "tsx scripts/validate-referral-earnings.ts --mode=live",
+    "validate-referral:compare": "tsx scripts/validate-referral-earnings.ts --mode=compare"
   },
   "keywords": [
     "whatsapp",

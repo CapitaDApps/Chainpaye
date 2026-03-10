@@ -50,12 +50,12 @@ Type *kyc* to start verification.
 
 💡 *How it works:*
 • Share your referral link with friends
-• Earn 25% of transaction fees from referrals
+• Earn 1% of offramp transaction volume from referrals
 • Earnings are credited for 30 days after signup
-• Minimum withdrawal: $100
+• Minimum withdrawal: $20
 
 To withdraw earnings, type: *withdraw [amount]*
-Example: withdraw 150
+Example: withdraw 50
     `.trim();
   } catch (error) {
     if (error instanceof Error) {

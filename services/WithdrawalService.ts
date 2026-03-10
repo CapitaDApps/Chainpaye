@@ -45,7 +45,7 @@ export class WithdrawalService {
    * Validate if a user can withdraw the specified amount
    * 
    * Checks:
-   * 1. User has at least $100 in their balance
+   * 1. User has at least $20 in their balance
    * 2. User has not made a withdrawal request in the past 7 days
    * 
    * @param userId The user ID requesting withdrawal
@@ -55,11 +55,11 @@ export class WithdrawalService {
    * Validates: Requirements 5.1, 5.2, 5.6
    */
   async canWithdraw(userId: string, amount: number): Promise<WithdrawalValidation> {
-    // Check minimum withdrawal amount ($100)
-    if (amount < 100) {
+    // Check minimum withdrawal amount ($20)
+    if (amount < 20) {
       return {
         canWithdraw: false,
-        reason: `Minimum withdrawal amount is $100. Requested amount: $${amount}`,
+        reason: `Minimum withdrawal amount is $20. Requested amount: $${amount}`,
       };
     }
 
