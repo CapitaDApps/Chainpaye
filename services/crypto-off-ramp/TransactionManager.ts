@@ -583,12 +583,15 @@ export class TransactionManager implements ITransactionManager {
     }
 
     try {
+      // Round down amount to 6 decimal places for offramp transfers
+      const roundedAmount = Math.floor(transaction.amount * 1000000) / 1000000;
+      
       // Create transfer request from transaction
       const transferRequest: TransferRequest = {
         walletAddress: transaction.sourceWalletAddress,
         token: `${transaction.chain}:${transaction.asset.toLowerCase()}`,
         recipient: this.getReceivingAddress(transaction.chain),
-        amount: transaction.amount.toString(),
+        amount: roundedAmount.toString(),
         idempotencyKey: this.generateIdempotencyKey(transaction.id),
       };
 
