@@ -32,7 +32,6 @@ export enum TransactionStatus {
   COMPLETED = "completed",
   FAILED = "failed",
   CANCELLED = "cancelled",
-  PENDING_MANUAL_REVIEW = "pending_manual_review",
 }
 
 export type SupportedAsset = "USDC" | "USDT";

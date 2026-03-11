@@ -448,12 +448,8 @@ export async function commandRouteHandler(from: string, message: string) {
           return;
         }
 
-        const dashboardMessage = await handleReferralCommand(user.userId, from);
-        
-        // Only send message if there's content (flow not sent)
-        if (dashboardMessage) {
-          await whatsappBusinessService.sendNormalMessage(dashboardMessage, from);
-        }
+        const dashboardMessage = await handleReferralCommand(user.userId);
+        await whatsappBusinessService.sendNormalMessage(dashboardMessage, from);
       } catch (err) {
         console.error("Error showing referral dashboard:", err);
         await whatsappBusinessService.sendNormalMessage(

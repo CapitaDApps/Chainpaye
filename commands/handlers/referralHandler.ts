@@ -9,19 +9,16 @@ import { DashboardService } from "../../services/DashboardService";
 import { WithdrawalService } from "../../services/WithdrawalService";
 import { PointsRepository } from "../../repositories/PointsRepository";
 import { User } from "../../models/User";
-import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService";
 
 /**
  * Handle "referral" command
  * 
- * Sends the interactive referral dashboard WhatsApp Flow.
- * Falls back to text message if flow is not configured.
+ * Displays user's referral dashboard with statistics.
  * 
  * @param userId The user ID executing the command
- * @param from The WhatsApp number to send the flow to
- * @returns Promise<string> Success message or error
+ * @returns Promise<string> Formatted dashboard message
  */
-export async function handleReferralCommand(userId: string, from: string): Promise<string> {
+export async function handleReferralCommand(userId: string): Promise<string> {
   try {
     // Check if user has a referral code (completed KYC)
     const user = await User.findOne({ userId });
@@ -36,23 +33,10 @@ Type *kyc* to start verification.
       `.trim();
     }
 
-    // Try to send the interactive flow
-    try {
-      const whatsappService = new WhatsAppBusinessService();
-      await whatsappService.sendReferralDashboardFlowById(from);
-      
-      // Return empty string since flow was sent successfully
-      return "";
-    } catch (flowError: any) {
-      // If flow is not configured, fall back to text message
-      if (flowError.message?.includes("not configured")) {
-        console.warn("Referral flow not configured, falling back to text message");
-        
-        // Fall back to text-based dashboard
-        const dashboardService = new DashboardService();
-        const dashboard = await dashboardService.getDashboard(userId);
+    const dashboardService = new DashboardService();
+    const dashboard = await dashboardService.getDashboard(userId);
 
-        return `
+    return `
 📊 *Your Referral Dashboard*
 
 🔗 *Referral Code:* ${dashboard.referralCode}
@@ -72,11 +56,7 @@ Type *kyc* to start verification.
 
 To withdraw earnings, type: *withdraw [amount]*
 Example: withdraw 50
-        `.trim();
-      }
-      
-      throw flowError;
-    }
+    `.trim();
   } catch (error) {
     if (error instanceof Error) {
       return `❌ ${error.message}`;

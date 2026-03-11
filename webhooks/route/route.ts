@@ -9,7 +9,6 @@ import { generateLinkFlow } from "../controllers/grl.controller";
 import { invoiceController } from "../controllers/invoice.controller";
 import { kycFlowController } from "../controllers/kyc.controller";
 import { paymentLinkSuccessWebhook } from "../controllers/paymentLinkWebhook.controller";
-import { referralFlow } from "../controllers/referralFlow.controller";
 import { setupPinFlow } from "../controllers/setupPinFlow.controller";
 import { topupFlow } from "../controllers/topUpFlow.controller";
 import { transferFlowController } from "../controllers/transferFlow.controller";
@@ -29,7 +28,6 @@ router.post("/withdrawal-flow", withdrawalFlow);
 router.post("/generate-link", generateLinkFlow);
 router.post("/convert", conversionFlow);
 router.post("/offramp", cryptoTopupFlow);
-router.post("/referral", referralFlow);
 
 // Enhanced deposit notification webhooks with WorkflowController integration
 // Protected with Crossmint signature verification

@@ -848,7 +848,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             balances = await crossmintService.getBalancesByChain(
               user.userId,
               crossmintChain,
-              ["usdc", "usdt"],
+              ["usdc", "sol"],
             );
           } else {
             balances = await crossmintService.getBalancesByChain(

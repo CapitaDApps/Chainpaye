@@ -69,36 +69,6 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
   }
 
   // ========================================
-  // Helper Methods
-  // ========================================
-
-  /**
-   * Round amount to 6 decimal places (standard for stablecoins and compatible with all chains)
-   * - Solana: 6 decimal places maximum
-   * - EVM chains: 18 decimal places maximum (6 is well within limit)
-   * - Stablecoins (USDC/USDT): Typically use 6 decimals
-   * 
-   * @param amount The amount to round
-   * @returns Rounded amount as string with up to 6 decimal places
-   */
-  private roundAmountForChain(amount: string): string {
-    const numAmount = parseFloat(amount);
-    
-    if (isNaN(numAmount)) {
-      return amount;
-    }
-    
-    // Use 6 decimal places for all chains (standard for stablecoins)
-    const decimalPlaces = 6;
-    
-    // Round to 6 decimal places using floor (always round down)
-    const rounded = Math.floor(numAmount * Math.pow(10, decimalPlaces)) / Math.pow(10, decimalPlaces);
-    
-    // Convert to string and remove trailing zeros
-    return rounded.toFixed(decimalPlaces).replace(/\.?0+$/, '');
-  }
-
-  // ========================================
   // Interface Implementation Methods (ICrossmintService & IWalletManager)
   // ========================================
 
@@ -1406,9 +1376,6 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
           specificTokenChain || this.getTokenChainIdentifier(chainType);
         const tokenIdentifier = `${tokenChain}:${token.toLowerCase()}`;
 
-        // Round amount to 6 decimal places (standard for all chains)
-        const roundedAmount = this.roundAmountForChain(amount);
-
         // Use different idempotency key for retries to avoid conflicts
         const currentIdempotencyKey =
           attempt === 1
@@ -1417,7 +1384,7 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
 
         // Enhanced request with idempotency support
         const transferPayload = {
-          amount: roundedAmount,
+          amount,
           recipient: toAddress,
           transactionType: "direct",
           // Add idempotency key to prevent duplicate transfers
@@ -1435,8 +1402,7 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
           userId,
           walletAddress: wallet.address,
           tokenIdentifier,
-          originalAmount: amount,
-          roundedAmount: roundedAmount,
+          amount,
           recipient: toAddress,
           idempotencyKey: currentIdempotencyKey,
           originalKey: idempotencyKey,
