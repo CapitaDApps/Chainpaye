@@ -161,6 +161,33 @@ async function processOfframpInBackground(
       quoteId,
     );
 
+    // Send offramp receipt
+    try {
+      const { sendOfframpReceiptAsync } = await import("../../utils/sendOfframpReceipt");
+      
+      // Calculate fees (flat fee from env)
+      const flatFeeUsd = parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75");
+      
+      sendOfframpReceiptAsync(phone, {
+        ngnAmount: ngnAmount,
+        cryptoSpentUsd: totalInUsd,
+        fees: flatFeeUsd,
+        bankName: bank_name || "Bank",
+        accountName: finalRecipientName,
+        accountNumber: account_number,
+        transactionDate: new Date(),
+        transactionReference: quoteId,
+        status: "Successful",
+      });
+      
+      logger.info(`[OFFRAMP-BG] Receipt generation initiated for ${phone}`);
+    } catch (receiptError) {
+      logger.error(
+        `[OFFRAMP-BG] Warning: Failed to send receipt: ${(receiptError as Error).message}`,
+      );
+      // Don't fail the transaction if receipt sending fails
+    }
+
     // Process referral earnings (if applicable)
     try {
       const { handleOfframpTransaction } = await import("../controllers/referral.controller");
