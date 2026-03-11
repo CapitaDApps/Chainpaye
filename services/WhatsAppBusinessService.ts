@@ -532,6 +532,25 @@ What can I do for you?
     });
   }
 
+  /**
+   * Send Referral Dashboard flow
+   * Shows referral stats and allows withdrawal management
+   */
+  async sendReferralDashboardFlowById(to: string) {
+    const referralFlowId = WHATSAPP_CONFIG.FLOW_IDS.REFERRAL;
+    
+    if (!referralFlowId) {
+      throw new Error("Referral flow ID not configured. Please upload the flow to WhatsApp Business Manager and add WHATSAPP_REFERRAL_FLOW_ID to .env");
+    }
+    
+    const referralScreenId = "REFERRAL_DASHBOARD";
+    await this.sendTextOnlyFlowById(to, referralFlowId, referralScreenId, {
+      header: "📊 Referral Dashboard",
+      body: "View your referral stats, share your code, and manage withdrawals.",
+      cta: "View Dashboard",
+    });
+  }
+
   async sendOfframpInstructions(to: string) {
     const message = `🪙 Sell Crypto for Fiat
 
