@@ -161,6 +161,35 @@ async function processOfframpInBackground(
       quoteId,
     );
 
+    // Process referral earnings (if applicable)
+    try {
+      const { handleOfframpTransaction } = await import("../controllers/referral.controller");
+      
+      // Calculate USD amount from NGN using the exchange rate
+      // We need to get the exchange rate that was used for this transaction
+      const rateData = await dexPayService.getCurrentRates(
+        normalizedAsset,
+        dexPayChain,
+        ngnAmount,
+      );
+      const exchangeRate = rateData.rate;
+      const sellAmountUsd = ngnAmount / exchangeRate;
+      
+      await handleOfframpTransaction({
+        id: quoteId,
+        userId: userId,
+        amount: totalInUsd,
+        sellAmountUsd: sellAmountUsd,
+        timestamp: new Date(),
+      });
+      logger.info(`[OFFRAMP-BG] Referral earnings processed for transaction ${quoteId}`);
+    } catch (referralError) {
+      logger.error(
+        `[OFFRAMP-BG] Warning: Failed to process referral earnings for transaction ${quoteId}: ${(referralError as Error).message}`,
+      );
+      // Don't fail the transaction if referral processing fails
+    }
+
     logger.info("[OFFRAMP-BG] Background processing completed successfully!");
   } catch (error) {
     logger.error(
