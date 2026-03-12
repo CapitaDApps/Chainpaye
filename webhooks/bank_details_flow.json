@@ -1,0 +1,145 @@
+{
+  "version": "7.2",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "BANK_DETAILS": ["PROCESSING"],
+    "PROCESSING": []
+  },
+  "screens": [
+    {
+      "id": "BANK_DETAILS",
+      "title": "Complete Transfer",
+      "data": {
+        "amount": {
+          "type": "string",
+          "__example__": "100.00"
+        },
+        "transactionId": {
+          "type": "string",
+          "__example__": "tx_123"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Complete Your Transfer"
+          },
+          {
+            "type": "TextCaption",
+            "text": "Transfer Amount"
+          },
+          {
+            "type": "TextHeading",
+            "text": "$${data.amount} USD"
+          },
+          {
+            "type": "TextBody",
+            "text": "───────────────────────"
+          },
+          {
+            "type": "TextHeading",
+            "text": "Bank Details"
+          },
+          {
+            "type": "TextCaption",
+            "text": "Bank Name"
+          },
+          {
+            "type": "TextBody",
+            "text": "Chase Bank"
+          },
+          {
+            "type": "TextCaption",
+            "text": "Account Name"
+          },
+          {
+            "type": "TextBody",
+            "text": "Connect Word Ink INC"
+          },
+          {
+            "type": "TextCaption",
+            "text": "Account Number"
+          },
+          {
+            "type": "TextBody",
+            "text": "839128227"
+          },
+          {
+            "type": "TextCaption",
+            "text": "Routing Number"
+          },
+          {
+            "type": "TextBody",
+            "text": "021000021"
+          },
+          {
+            "type": "TextCaption",
+            "text": "Bank Address"
+          },
+          {
+            "type": "TextBody",
+            "text": "Chase Bank, N.A., 270 Park Avenue, New York, NY 10017"
+          },
+          {
+            "type": "TextBody",
+            "text": "───────────────────────"
+          },
+          {
+            "type": "TextCaption",
+            "text": "Transaction ID"
+          },
+          {
+            "type": "TextHeading",
+            "text": "${data.transactionId}"
+          },
+          {
+            "type": "TextBody",
+            "text": "⚠️ Important: Use this Transaction ID as the payment description/memo when making your transfer."
+          },
+          {
+            "type": "Footer",
+            "label": "Complete Transfer",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "transactionId": "${data.transactionId}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "PROCESSING",
+      "title": "Processing",
+      "terminal": true,
+      "success": true,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Processing USD deposit ⏳"
+          },
+          {
+            "type": "TextBody",
+            "text": "Your USD deposit is being processed. You will receive a notification once successful ✅. Deposits typically process within 1-2 business days."
+          },
+          {
+            "type": "Footer",
+            "label": "Done",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {
+                "status": "usd_deposit_initiated"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

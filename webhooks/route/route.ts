@@ -1,5 +1,6 @@
 import express, { Router } from "express";
 import { conversionFlow } from "../controllers/conversion.controller";
+import { bankDetailsFlowController } from "../controllers/bankDetailsFlow.controller";
 import { cryptoTopupFlow } from "../controllers/cryptoTopUp.controller";
 import {
   handleCrossmintDepositWebhook,
@@ -12,6 +13,7 @@ import { paymentLinkSuccessWebhook } from "../controllers/paymentLinkWebhook.con
 import { setupPinFlow } from "../controllers/setupPinFlow.controller";
 import { topupFlow } from "../controllers/topUpFlow.controller";
 import { transferFlowController } from "../controllers/transferFlow.controller";
+import { usdDepositFlowController } from "../controllers/usdDepositFlow.controller";
 import { userSetup } from "../controllers/userSetup.controller";
 import { withdrawalFlow } from "../controllers/withdrawalFlow.controller";
 import { verifyCrossmintWebhook } from "../middleware";
@@ -28,6 +30,8 @@ router.post("/withdrawal-flow", withdrawalFlow);
 router.post("/generate-link", generateLinkFlow);
 router.post("/convert", conversionFlow);
 router.post("/offramp", cryptoTopupFlow);
+router.post("/usd-deposit", usdDepositFlowController);
+router.post("/bank-details", bankDetailsFlowController);
 
 // Enhanced deposit notification webhooks with WorkflowController integration
 // Protected with Crossmint signature verification

@@ -265,15 +265,10 @@ export class WhatsAppBusinessService {
 
     await this.sendImageFlowById(to, introFlowId, introInitScreedId, {
       link,
-      body: `Welcome to Chainpaye! 🚀
-
-We make managing money as easy as sending a text. Here's what you can do:
-
-💸 **Global Transfers**: Send & receive USD, EUR, and GBP instantly.
-🔗 **Get Paid Fast**: Create payment links in seconds.
-🔄 **Crypto to Cash**: Convert crypto to fiat in under 50 seconds.
-
-No complex apps, just secure & fast payments right here! ✨`,
+      body: `Welcome to Chainpaye! 🎉
+      - Send, Receive and Convert USD 🇺🇸 | GBP 🇬🇧 | EUR 🇪🇺 | NGN 🇳🇬.
+      - Spend stablecoins like cash, cutting out middle-men and Banks🏦.
+      - Generate payment links & collect USD 🇺🇸 | NGN 🇳🇬 seamlessly`,
       cta: "Sign Up",
     });
   }
@@ -530,6 +525,41 @@ What can I do for you?
       body: "Complete your BVN verification to unlock all Chainpaye features including bank withdrawals.",
       cta: "Start Verification",
     });
+  }
+
+  async sendUsdDepositFlowById(to: string) {
+    const usdDepositFlowId = WHATSAPP_CONFIG.FLOW_IDS.USD_DEPOSIT;
+    const usdDepositScreenId = "TOPUP_WALLET";
+    await this.sendTextOnlyFlowById(to, usdDepositFlowId, usdDepositScreenId, {
+      header: "USD Deposit",
+      body: "Deposit USD to your Chainpaye wallet using bank transfer.",
+      cta: "Start Deposit",
+    });
+  }
+
+  async sendBankDetailsFlowById(to: string, data: { amount: string; transactionId: string }) {
+    const bankDetailsFlowId = WHATSAPP_CONFIG.FLOW_IDS.BANK_DETAILS;
+    const bankDetailsScreenId = "BANK_DETAILS";
+    
+    // Store flow data in Redis for the second flow
+    await redisClient.set(
+      `BANK_DETAILS_FLOW_${to}`,
+      JSON.stringify(data),
+      "EX",
+      CONSTANTS.CACHE_24HRS,
+    );
+
+    await this.sendTextOnlyFlowWithDataById(
+      to,
+      bankDetailsFlowId,
+      bankDetailsScreenId,
+      {
+        header: "Complete Transfer",
+        body: "Confirm your USD transfer to complete the deposit process.",
+        cta: "Complete Transfer",
+      },
+      data,
+    );
   }
 
   async sendOfframpInstructions(to: string) {

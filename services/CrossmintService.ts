@@ -40,7 +40,7 @@ export interface CreateWalletRequest {
   type: "smart";
   config: {
     adminSigner: {
-      type: "api-key";
+      type: "external-wallet";
       address: string;
     };
   };
@@ -66,6 +66,35 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
 
   private get adminSignerAddress(): string {
     return process.env.CROSSMINT_ADMIN_SIGNER_ADDRESS || "";
+  }
+
+  private get adminSolanaAddress(): string {
+    return process.env.CROSSMINT_ADMIN_SOLANA_ADDRESS || "";
+  }
+
+  private get adminEvmAddress(): string {
+    return process.env.CROSSMINT_ADMIN_EVM_ADDRESS || "";
+  }
+
+  /**
+   * Get the appropriate admin address based on chain type
+   */
+  private getAdminAddressForChain(chainType: string): string {
+    const normalizedChainType = chainType.toLowerCase();
+    
+    // Solana chain
+    if (normalizedChainType === "solana") {
+      return this.adminSolanaAddress;
+    }
+    
+    // EVM-based chains
+    const evmChains = ["evm", "bsc", "base", "arbitrum", "apechain", "lisk"];
+    if (evmChains.includes(normalizedChainType)) {
+      return this.adminEvmAddress;
+    }
+    
+    // Fallback to legacy admin signer address for other chains
+    return this.adminSignerAddress;
   }
 
   // ========================================
@@ -811,17 +840,30 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
     chainType: string,
   ): Promise<CrossmintWallet> {
     try {
+      const adminAddress = this.getAdminAddressForChain(chainType);
+      
+      if (!adminAddress) {
+        throw new Error(
+          `No admin address configured for chain type: ${chainType}. ` +
+          `Please set CROSSMINT_ADMIN_SOLANA_ADDRESS for Solana or CROSSMINT_ADMIN_EVM_ADDRESS for EVM chains.`
+        );
+      }
+
       const requestBody: CreateWalletRequest = {
         chainType,
         type: "smart",
         config: {
           adminSigner: {
-            type: "api-key",
-            address: this.adminSignerAddress,
+            type: "external-wallet",
+            address: adminAddress,
           },
         },
         owner: `userId:${userId}`,
       };
+
+      logger.info(
+        `Creating ${chainType} wallet for user ${userId} with admin address: ${adminAddress}`
+      );
 
       const response = await axios.post(
         `${this.baseUrl}/wallets`,
@@ -1124,12 +1166,24 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
       const tokenChain = this.getTokenChainIdentifier(chainType);
       const tokenIdentifier = `${tokenChain}:${token.toLowerCase()}`;
 
+      // Get chain-specific admin address for signing
+      const adminAddress = this.getAdminAddressForChain(chainType);
+      
+      if (!adminAddress) {
+        throw new Error(
+          `No admin address configured for chain type: ${chainType}. ` +
+          `Please set CROSSMINT_ADMIN_SOLANA_ADDRESS for Solana or CROSSMINT_ADMIN_EVM_ADDRESS for EVM chains.`
+        );
+      }
+
       const response = await axios.post(
         `${this.baseUrl}/wallets/${wallet.address}/tokens/${tokenIdentifier}/transfers`,
         {
           amount,
           recipient: toAddress,
           executionRoute: "direct",
+          // Configure external wallet signer for transaction signing
+          signer: `external-wallet:${adminAddress}`,
         },
         {
           headers: {
@@ -1382,13 +1436,25 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
             ? idempotencyKey
             : this.generateRetryIdempotencyKey(idempotencyKey, attempt);
 
-        // Enhanced request with idempotency support
+        // Get chain-specific admin address for signing
+        const adminAddress = this.getAdminAddressForChain(chainType);
+        
+        if (!adminAddress) {
+          throw new Error(
+            `No admin address configured for chain type: ${chainType}. ` +
+            `Please set CROSSMINT_ADMIN_SOLANA_ADDRESS for Solana or CROSSMINT_ADMIN_EVM_ADDRESS for EVM chains.`
+          );
+        }
+
+        // Enhanced request with idempotency support and external wallet signer
         const transferPayload = {
           amount,
           recipient: toAddress,
           transactionType: "direct",
           // Add idempotency key to prevent duplicate transfers
           idempotencyKey: currentIdempotencyKey,
+          // Configure external wallet signer for transaction signing
+          signer: `external-wallet:${adminAddress}`,
           // Add metadata for off-ramp workflow tracking
           metadata: {
             userId,

@@ -9,6 +9,7 @@ export { handleTransfer } from "./transferHandler";
 export { handleWithdrawal } from "./withdrawalHandler";
 export { handleStartCommand } from "./startCommandHandler";
 export { handleReferralCommand, handleWithdrawCommand } from "./referralHandler";
+export { handleUsdDeposit } from "./usdDepositHandler";
 
 export {
   handleAccountConfirmation,

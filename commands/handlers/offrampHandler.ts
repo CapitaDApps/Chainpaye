@@ -168,7 +168,7 @@ async function displayUserWallets(
         walletMessage += `\`${evmWallet.address}\`\n\n`;
         walletMessage += `🟣 *Solana Wallet* (for USDC on Solana)\n`;
         walletMessage += `\`${solanaWallet.address}\`\n\n`;
-        walletMessage += `💡 Deposit crypto to these addresses, then use the button below to sell and withdraw to your bank account.\n`;
+        walletMessage += `� Deposit crypto to these addresses, then use the button below to sell and withdraw to your bank account.\n`;
         walletMessage += `Type wallet in the chat to copy your wallets for crypto deposit.`;
 
         await whatsappBusinessService.sendNormalMessage(
@@ -312,6 +312,24 @@ async function displayUserWallets(
         phoneNumber,
       );
 
+      // Send both EVM and Solana wallet addresses as separate messages (like in wallets command)
+      const evmWallet = wallets.find(w => w.chainType === "evm");
+      const solanaWallet = wallets.find(w => w.chainType === "solana");
+      
+      if (evmWallet) {
+        await whatsappBusinessService.sendNormalMessage(
+          evmWallet.address,
+          phoneNumber
+        );
+      }
+      
+      if (solanaWallet) {
+        await whatsappBusinessService.sendNormalMessage(
+          solanaWallet.address,
+          phoneNumber
+        );
+      }
+
       // Send the offramp flow
       const firstWallet = wallets[0];
       if (firstWallet) {
@@ -377,6 +395,24 @@ async function displayUserWallets(
       walletsMessage,
       phoneNumber,
     );
+
+    // Send both EVM and Solana wallet addresses as separate messages (like in wallets command)
+    const evmWallet = wallets.find(w => w.chainType === "evm");
+    const solanaWallet = wallets.find(w => w.chainType === "solana");
+    
+    if (evmWallet) {
+      await whatsappBusinessService.sendNormalMessage(
+        evmWallet.address,
+        phoneNumber
+      );
+    }
+    
+    if (solanaWallet) {
+      await whatsappBusinessService.sendNormalMessage(
+        solanaWallet.address,
+        phoneNumber
+      );
+    }
 
     // Also send the offramp flow so user can easily start offramping
     const primaryWallet = walletsWithBalances[0];

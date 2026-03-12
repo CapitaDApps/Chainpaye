@@ -404,6 +404,46 @@ const COMMANDS: Record<string, CommandConfig> = {
   },
 
   // ============================================================
+  // USD DEPOSIT
+  // Deposit USD via bank transfer
+  // ============================================================
+  usdDeposit: {
+    triggers: [
+      // Slash commands
+      "/usddeposit",
+      "/depositusd",
+
+      // USD deposit phrases
+      "deposit usd",
+      "usd deposit",
+      "deposit USD",
+      "USD deposit",
+      "deposit dollar",
+      "dollar deposit",
+      "deposit dollars",
+      "dollars deposit",
+
+      // Bank transfer USD
+      "bank transfer usd",
+      "usd bank transfer",
+      "wire transfer usd",
+      "usd wire transfer",
+
+      // Natural language
+      "i want to deposit usd",
+      "i want to deposit USD",
+      "i want to deposit dollars",
+      "deposit us dollars",
+      "add usd",
+      "add USD",
+      "fund with usd",
+      "fund with USD",
+    ],
+    description: "Deposit USD to your wallet via bank transfer",
+    priority: 7, // Higher priority than regular deposit
+  },
+
+  // ============================================================
   // PAYMENT LINKS
   // Create links to receive payments
   // ============================================================

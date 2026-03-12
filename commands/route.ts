@@ -12,6 +12,7 @@ import {
   handleTransactionHistory,
   handleTransfer,
   handleWithdrawal,
+  handleUsdDeposit,
 } from "./handlers";
 import { handleStartCommand } from "./handlers/startCommandHandler";
 import { handleReferralCommand } from "./handlers/referralHandler";
@@ -371,6 +372,10 @@ export async function commandRouteHandler(from: string, message: string) {
 
     case "deposit":
       await handleTopUp(from);
+      break;
+
+    case "usdDeposit":
+      await handleUsdDeposit(from);
       break;
 
     case "transfer":
