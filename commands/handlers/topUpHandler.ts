@@ -40,10 +40,10 @@ Account Name: ${vw.accountname}
 
       
       if (accountnumber) {
-        let message = `⚡ Confirm Deposit
-                        1. Transfer NGN 🇳🇬 to the account above.
-                        2. Tap "Deposit Completed" below.
-                        3. Enter the amount to confirm.`
+        let message = `⚡ Confirm Deposit 
+        1. Transfer NGN 🇳🇬 to the account above.
+        2. Tap "Deposit Completed" below.
+        3. Enter the amount to confirm.`
         await whatsappBusinessService.sendNormalMessage(accountnumber, from);
         await whatsappBusinessService.sendNormalMessage(message, from);
       }
