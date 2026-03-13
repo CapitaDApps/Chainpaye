@@ -384,7 +384,7 @@ What can I do for you?
           rows: [
           {
             id:"other_menu_ngn_deposit",
-            title:"deposit NGN",
+            title:"Deposit NGN",
             description:"Fund you NGN wallet"
           },
           {
@@ -394,13 +394,8 @@ What can I do for you?
           },
           {
             id:"other_menu_withdraw",
-            title:"Widthdraw To Bank",
-            description:"Widthdraw your funds to your bankk account"
-          },
-          {
-            id:"other_menu_transfer",
-            title:"Transfer",
-            description:"Transfer Money To Other Chainpaye Users"
+            title:"Withdraw To Bank",
+            description:"Withdraw your funds to your bankk account"
           },
           {
             id:"other_menu_spend_crypto",
@@ -409,13 +404,13 @@ What can I do for you?
           },
           {
             id:"other_menu_wallets",
-            title:"wallets",
-            description:"view list of wallets and balances"
+            title:"Wallets",
+            description:"View list of crypto wallets and balances"
           },
           {
-            id:"other_menu_referral",
-            title:"referral",
-            description:"view referral stats and details"
+            id:"other_menu_transfer",
+            title:"Transfer",
+            description:"Transfer Money To Other Chainpaye Users"
           },
           
             {
@@ -428,6 +423,13 @@ What can I do for you?
               title: "Transaction history",
               description: "View your recent transactions",
             },
+          {
+            id:"other_menu_referral",
+            title:"Referral",
+            description:"View referral stats and details"
+          },
+          
+          
             {
               id: "other_menu_support",
               title: "Support",
