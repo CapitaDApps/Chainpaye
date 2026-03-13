@@ -238,6 +238,13 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
                   : `+${message.from}`;
 
                 const commandByMenuId: Record<string, string> = {
+                  other_menu_ngn_deposit: "deposit ngn",
+                  other_menu_USD_deposit: "deposit usd",
+                  other_menu_spend_crypto: "spend crypto",
+                  other_menu_wallets: "wallets",
+                  other_menu_withdraw: "withdraw",
+                  other_menu_transfer: "transfer",
+                  other_menu_referral: "referral",
                   other_menu_payment_link: "payment link",
                   other_menu_transaction_history: "transaction history",
                   other_menu_support: "support",

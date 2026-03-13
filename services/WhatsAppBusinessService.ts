@@ -364,7 +364,8 @@ export class WhatsAppBusinessService {
 
     await this.sendListMessage(
       to,"",
-      `${greeting}, it’s Chainpaye 💳🏦!
+      `${greeting},\n 
+it’s Chainpaye 💳🏦!
 
 What can I do for you?
 
@@ -388,12 +389,22 @@ What can I do for you?
           },
           {
             id:"other_menu_USD_deposit",
-            title:"deposit USD",
+            title:"Deposit USD",
             description:"Fund you USD wallet"
           },
           {
+            id:"other_menu_withdraw",
+            title:"Widthdraw To Bank",
+            description:"Widthdraw your funds to your bankk account"
+          },
+          {
+            id:"other_menu_transfer",
+            title:"Transfer",
+            description:"Transfer Money To Other Chainpaye Users"
+          },
+          {
             id:"other_menu_spend_crypto",
-            title:"spend crypto",
+            title:"Spend Crypto",
             description:"Spend crypto like cash"
           },
           {
