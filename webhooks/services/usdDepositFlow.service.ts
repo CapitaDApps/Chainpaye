@@ -111,9 +111,7 @@ export const getUsdDepositScreen = async (decryptedBody: {
 
 *Amount to Transfer:* $${Number(data.amount).toFixed(2)} USD`;
 
-        const transactionIdMessage = `*Transaction ID:* ${result.transactionId}
-
-⚠️ *Important:* Make sure to copy the Transaction ID above and paste it in the description/memo field when making your transfer. This helps us process your funds faster!`;
+        const transactionIdMessage = `${result.transactionId}`;
 
         // Send messages asynchronously
         whatsappBusinessService

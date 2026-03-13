@@ -397,9 +397,9 @@ What can I do for you?
     const topUpFlowId = WHATSAPP_CONFIG.FLOW_IDS.TOPUP;
     const topUpScreenInitId = "TOPUP_WALLET";
     await this.sendTextOnlyFlowById(to, topUpFlowId, topUpScreenInitId, {
-      header: "Fund your Wallet",
-      body: "Top up your Chainpaye wallet in seconds and start sending or receiving money globally.",
-      cta: "Start Top-up",
+      header: "⚡ Confirm Deposit",
+      body: "1. Transfer NGN to the account above.\n2. Tap \"Deposit Completed\" below.\n3. Enter the amount to confirm.",
+      cta: "Complete Top-up",
     });
   }
 
@@ -555,7 +555,7 @@ What can I do for you?
       bankDetailsScreenId,
       {
         header: "Complete Transfer",
-        body: "Confirm your USD transfer to complete the deposit process.",
+        body: "👆copy and Include the above transaction ID above in your payment description/remark for faster processing.\nThen comeback and click complete transfer.",
         cta: "Complete Transfer",
       },
       data,
