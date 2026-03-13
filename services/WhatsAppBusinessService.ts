@@ -347,7 +347,23 @@ export class WhatsAppBusinessService {
       console.log("Error getting user for greeting:", error);
     }
     
-    await this.sendNormalMessage(
+//     await this.sendNormalMessage(
+//       `${greeting}, it’s Chainpaye 💳🏦!
+
+// What can I do for you?
+
+// 💰 Deposit — Top up instantly!
+
+// 💳 Send crypto — Spend crypto anywhere.
+ 
+// 🌍 Send — Pay friends in a flash using Whatsapp NO.
+
+// 🏦 Withdraw — Cash out to your bank.`,
+//       to,
+//     );
+
+    await this.sendListMessage(
+      to,"",
       `${greeting}, it’s Chainpaye 💳🏦!
 
 What can I do for you?
@@ -359,19 +375,38 @@ What can I do for you?
 🌍 Send — Pay friends in a flash using Whatsapp NO.
 
 🏦 Withdraw — Cash out to your bank.`,
-      to,
-    );
-
-    await this.sendListMessage(
-      to,
-      "Other menu",
-      "Select an action to continue.",
       // "Powered by Chainpaye",
       "View Menu",
       [
         {
           title: "Other menu",
           rows: [
+          {
+            id:"other_menu_ngn_deposit",
+            title:"deposit NGN",
+            description:"Fund you NGN wallet"
+          },
+          {
+            id:"other_menu_USD_deposit",
+            title:"deposit USD",
+            description:"Fund you USD wallet"
+          },
+          {
+            id:"other_menu_spend_crypto",
+            title:"spend crypto",
+            description:"Spend crypto like cash"
+          },
+          {
+            id:"other_menu_wallets",
+            title:"wallets",
+            description:"view list of wallets and balances"
+          },
+          {
+            id:"other_menu_referral",
+            title:"referral",
+            description:"view referral stats and details"
+          },
+          
             {
               id: "other_menu_payment_link",
               title: "Payment link",
@@ -387,6 +422,7 @@ What can I do for you?
               title: "Support",
               description: "Contact Chainpaye support",
             },
+            
           ],
         },
       ],
@@ -399,7 +435,7 @@ What can I do for you?
     await this.sendTextOnlyFlowById(to, topUpFlowId, topUpScreenInitId, {
       header: "⚡ Confirm Deposit",
       body: "1. Transfer NGN to the account above.\n2. Tap \"Deposit Completed\" below.\n3. Enter the amount to confirm.",
-      cta: "Complete Top-up",
+      cta: "Deposit Completed",
     });
   }
 
