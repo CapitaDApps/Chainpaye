@@ -40,8 +40,7 @@ export interface CreateWalletRequest {
   type: "smart";
   config: {
     adminSigner: {
-      type: "external-wallet";
-      address: string;
+      type: "api-key";
     };
   };
   owner: string;
@@ -840,29 +839,19 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
     chainType: string,
   ): Promise<CrossmintWallet> {
     try {
-      const adminAddress = this.getAdminAddressForChain(chainType);
-      
-      if (!adminAddress) {
-        throw new Error(
-          `No admin address configured for chain type: ${chainType}. ` +
-          `Please set CROSSMINT_ADMIN_SOLANA_ADDRESS for Solana or CROSSMINT_ADMIN_EVM_ADDRESS for EVM chains.`
-        );
-      }
-
       const requestBody: CreateWalletRequest = {
         chainType,
         type: "smart",
         config: {
           adminSigner: {
-            type: "external-wallet",
-            address: adminAddress,
+            type: "api-key",
           },
         },
         owner: `userId:${userId}`,
       };
 
       logger.info(
-        `Creating ${chainType} wallet for user ${userId} with admin address: ${adminAddress}`
+        `Creating ${chainType} wallet for user ${userId} with api-key signer`
       );
 
       const response = await axios.post(
@@ -1166,24 +1155,14 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
       const tokenChain = this.getTokenChainIdentifier(chainType);
       const tokenIdentifier = `${tokenChain}:${token.toLowerCase()}`;
 
-      // Get chain-specific admin address for signing
-      const adminAddress = this.getAdminAddressForChain(chainType);
-      
-      if (!adminAddress) {
-        throw new Error(
-          `No admin address configured for chain type: ${chainType}. ` +
-          `Please set CROSSMINT_ADMIN_SOLANA_ADDRESS for Solana or CROSSMINT_ADMIN_EVM_ADDRESS for EVM chains.`
-        );
-      }
-
       const response = await axios.post(
         `${this.baseUrl}/wallets/${wallet.address}/tokens/${tokenIdentifier}/transfers`,
         {
           amount,
           recipient: toAddress,
           executionRoute: "direct",
-          // Configure external wallet signer for transaction signing
-          signer: `external-wallet:${adminAddress}`,
+          // Use api-key signer for transaction signing
+          adminSigner: { type: "api-key" },
         },
         {
           headers: {
@@ -1522,10 +1501,51 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         console.log("Data:", JSON.stringify(response.data, null, 2));
         console.log("========================================\n");
 
+        // Check if transaction requires approval (external wallet signing)
+        if (response.data.status === "awaiting-approval") {
+          console.log("⚠️  TRANSACTION AWAITING APPROVAL");
+          console.log("The transaction was created but needs to be signed by the external wallet.");
+          console.log("Transaction ID:", response.data.id);
+          console.log("Approvals needed:", response.data.approvals?.pending?.length || 0);
+          console.log("========================================\n");
+
+          logger.warn(
+            `Transfer created but awaiting approval on attempt ${attempt}: ${amount} ${token} from wallet ${wallet.address} to ${toAddress}`,
+            {
+              transactionId: response.data.id,
+              status: response.data.status,
+              pendingApprovals: response.data.approvals?.pending?.length || 0,
+              idempotencyKey: currentIdempotencyKey,
+            },
+          );
+
+          // Return error indicating approval is needed
+          throw new Error(
+            `Transaction created but requires external wallet approval. Transaction ID: ${response.data.id}. ` +
+            `Please sign the transaction with your admin wallet to complete the transfer.`
+          );
+        }
+
+        // Check for other non-success statuses
+        if (response.data.status && response.data.status !== "completed" && response.data.status !== "confirmed") {
+          logger.warn(
+            `Transfer has unexpected status on attempt ${attempt}: ${response.data.status}`,
+            {
+              transactionId: response.data.id,
+              status: response.data.status,
+              idempotencyKey: currentIdempotencyKey,
+            },
+          );
+
+          // For now, we'll continue and let the background process handle status checking
+          // In the future, we might want to implement polling for status updates
+        }
+
         logger.info(
           `Transfer executed successfully on attempt ${attempt}: ${amount} ${token} from wallet ${wallet.address} to ${toAddress}`,
           {
             transactionId: response.data.id,
+            status: response.data.status,
             idempotencyKey: currentIdempotencyKey,
             responseStatus: response.status,
           },
