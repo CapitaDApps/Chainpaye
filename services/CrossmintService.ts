@@ -40,7 +40,8 @@ export interface CreateWalletRequest {
   type: "smart";
   config: {
     adminSigner: {
-      type: "api-key";
+      type: "external-wallet";
+      address: string;
     };
   };
   owner: string;
@@ -73,6 +74,14 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
 
   private get adminEvmAddress(): string {
     return process.env.CROSSMINT_ADMIN_EVM_ADDRESS || "";
+  }
+
+  private get adminEvmPrivateKey(): string {
+    return process.env.CROSSMINT_ADMIN_EVM_PRIVATE_KEY || "";
+  }
+
+  private get adminSolanaPrivateKey(): string {
+    return process.env.CROSSMINT_ADMIN_SOLANA_PRIVATE_KEY || "";
   }
 
   /**
@@ -839,19 +848,29 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
     chainType: string,
   ): Promise<CrossmintWallet> {
     try {
+      const adminAddress = this.getAdminAddressForChain(chainType);
+      
+      if (!adminAddress) {
+        throw new Error(
+          `No admin address configured for chain type: ${chainType}. ` +
+          `Please set CROSSMINT_ADMIN_SOLANA_ADDRESS for Solana or CROSSMINT_ADMIN_EVM_ADDRESS for EVM chains.`
+        );
+      }
+
       const requestBody: CreateWalletRequest = {
         chainType,
         type: "smart",
         config: {
           adminSigner: {
-            type: "api-key",
+            type: "external-wallet",
+            address: adminAddress,
           },
         },
         owner: `userId:${userId}`,
       };
 
       logger.info(
-        `Creating ${chainType} wallet for user ${userId} with api-key signer`
+        `Creating ${chainType} wallet for user ${userId} with admin address: ${adminAddress}`
       );
 
       const response = await axios.post(
@@ -1155,14 +1174,24 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
       const tokenChain = this.getTokenChainIdentifier(chainType);
       const tokenIdentifier = `${tokenChain}:${token.toLowerCase()}`;
 
+      // Get chain-specific admin address for signing
+      const adminAddress = this.getAdminAddressForChain(chainType);
+      
+      if (!adminAddress) {
+        throw new Error(
+          `No admin address configured for chain type: ${chainType}. ` +
+          `Please set CROSSMINT_ADMIN_SOLANA_ADDRESS for Solana or CROSSMINT_ADMIN_EVM_ADDRESS for EVM chains.`
+        );
+      }
+
       const response = await axios.post(
         `${this.baseUrl}/wallets/${wallet.address}/tokens/${tokenIdentifier}/transfers`,
         {
           amount,
           recipient: toAddress,
           executionRoute: "direct",
-          // Use api-key signer for transaction signing
-          adminSigner: { type: "api-key" },
+          // Configure external wallet signer for transaction signing
+          signer: `external-wallet:${adminAddress}`,
         },
         {
           headers: {
@@ -1503,14 +1532,14 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
 
         // Check if transaction requires approval (external wallet signing)
         if (response.data.status === "awaiting-approval") {
-          console.log("⚠️  TRANSACTION AWAITING APPROVAL");
+          console.log("⚠️  TRANSACTION AWAITING APPROVAL - ATTEMPTING AUTO-APPROVAL");
           console.log("The transaction was created but needs to be signed by the external wallet.");
           console.log("Transaction ID:", response.data.id);
           console.log("Approvals needed:", response.data.approvals?.pending?.length || 0);
           console.log("========================================\n");
 
-          logger.warn(
-            `Transfer created but awaiting approval on attempt ${attempt}: ${amount} ${token} from wallet ${wallet.address} to ${toAddress}`,
+          logger.info(
+            `Transfer created and awaiting approval on attempt ${attempt}: ${amount} ${token} from wallet ${wallet.address} to ${toAddress}`,
             {
               transactionId: response.data.id,
               status: response.data.status,
@@ -1519,11 +1548,54 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
             },
           );
 
-          // Return error indicating approval is needed
-          throw new Error(
-            `Transaction created but requires external wallet approval. Transaction ID: ${response.data.id}. ` +
-            `Please sign the transaction with your admin wallet to complete the transfer.`
-          );
+          // Attempt to auto-approve the transaction
+          try {
+            const approvalResult = await this.submitTransactionApproval(
+              wallet.address,
+              response.data.id,
+              response.data.approvals?.pending?.[0]?.message,
+              adminAddress
+            );
+            
+            console.log("✅ TRANSACTION AUTO-APPROVED SUCCESSFULLY");
+            console.log("Approval result:", JSON.stringify(approvalResult, null, 2));
+            console.log("========================================\n");
+            
+            logger.info(
+              `Transfer auto-approved successfully on attempt ${attempt}: ${amount} ${token}`,
+              {
+                transactionId: response.data.id,
+                approvalResult,
+                idempotencyKey: currentIdempotencyKey,
+              },
+            );
+            
+            // Return the original response with updated status
+            return {
+              ...response.data,
+              status: "approved",
+              approvalResult,
+            };
+          } catch (approvalError: any) {
+            console.log("❌ AUTO-APPROVAL FAILED");
+            console.log("Error:", approvalError.message);
+            console.log("========================================\n");
+            
+            logger.error(
+              `Failed to auto-approve transfer on attempt ${attempt}: ${approvalError.message}`,
+              {
+                transactionId: response.data.id,
+                error: approvalError.message,
+                idempotencyKey: currentIdempotencyKey,
+              },
+            );
+            
+            // Return error indicating approval failed
+            throw new Error(
+              `Transaction created but auto-approval failed: ${approvalError.message}. ` +
+              `Transaction ID: ${response.data.id}. Please check admin wallet configuration.`
+            );
+          }
         }
 
         // Check for other non-success statuses
@@ -1608,6 +1680,186 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
     throw new Error(
       `Failed to execute transfer after ${maxRetries} attempts: ${lastError.response?.data?.message || lastError.message}`,
     );
+  }
+
+  /**
+   * Submit transaction approval for external wallet signers
+   * Handles both EVM (using viem) and Solana (using @solana/web3.js + tweetnacl) chains
+   */
+  private async submitTransactionApproval(
+    walletAddress: string,
+    transactionId: string,
+    messageToSign: string,
+    signerAddress: string
+  ): Promise<any> {
+    try {
+      if (!messageToSign) {
+        throw new Error("No approval message found in transaction response");
+      }
+
+      // Determine if this is a Solana or EVM chain based on signer address format
+      const isSolanaChain = this.isSolanaAddress(signerAddress);
+      
+      logger.info(`Submitting transaction approval for ${isSolanaChain ? 'Solana' : 'EVM'} chain:`, {
+        walletAddress,
+        transactionId,
+        signerAddress,
+        messageLength: messageToSign.length,
+        chainType: isSolanaChain ? 'solana' : 'evm',
+      });
+
+      let signature: string;
+
+      if (isSolanaChain) {
+        // Handle Solana signing
+        signature = await this.signSolanaMessage(messageToSign, signerAddress);
+      } else {
+        // Handle EVM signing
+        signature = await this.signEvmMessage(messageToSign, signerAddress);
+      }
+
+      // Submit the approval
+      const approvalPayload = {
+        approvals: [
+          {
+            signer: `external-wallet:${signerAddress}`,
+            signature,
+          },
+        ],
+      };
+
+      const response = await axios.post(
+        `${this.baseUrl}/wallets/${walletAddress}/transactions/${transactionId}/approvals`,
+        approvalPayload,
+        {
+          headers: {
+            "X-API-KEY": this.apiKey,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      logger.info(`Transaction approval submitted successfully:`, {
+        transactionId,
+        approvalStatus: response.data.status,
+        chainType: isSolanaChain ? 'solana' : 'evm',
+      });
+
+      return response.data;
+    } catch (error: any) {
+      logger.error(`Error submitting transaction approval:`, {
+        walletAddress,
+        transactionId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Check if an address is a Solana address (base58 format, typically 32-44 characters)
+   */
+  private isSolanaAddress(address: string): boolean {
+    // Solana addresses are base58 encoded and typically 32-44 characters
+    // EVM addresses start with 0x and are 42 characters
+    return !address.startsWith('0x') && address.length >= 32 && address.length <= 44;
+  }
+
+  /**
+   * Sign message for EVM chains using viem
+   */
+  private async signEvmMessage(messageToSign: string, signerAddress: string): Promise<string> {
+    const privateKey = this.adminEvmPrivateKey;
+    
+    if (!privateKey) {
+      throw new Error(
+        `EVM private key not configured. Please set CROSSMINT_ADMIN_EVM_PRIVATE_KEY environment variable.`
+      );
+    }
+
+    try {
+      // Import viem for message signing
+      const { privateKeyToAccount } = await import('viem/accounts');
+      
+      // Create account from private key
+      const account = privateKeyToAccount(privateKey as `0x${string}`);
+      
+      // Verify the account address matches the signer address
+      if (account.address.toLowerCase() !== signerAddress.toLowerCase()) {
+        throw new Error(
+          `EVM private key address (${account.address}) does not match signer address (${signerAddress})`
+        );
+      }
+
+      // Sign the message (EVM messages are hex format)
+      const signature = await account.signMessage({
+        message: { raw: messageToSign as `0x${string}` },
+      });
+
+      logger.info(`EVM message signed successfully`, {
+        signerAddress,
+        messageLength: messageToSign.length,
+        signatureLength: signature.length,
+      });
+
+      return signature;
+    } catch (error: any) {
+      logger.error(`Error signing EVM message:`, {
+        signerAddress,
+        error: error.message,
+      });
+      throw new Error(`Failed to sign EVM message: ${error.message}`);
+    }
+  }
+
+  /**
+   * Sign message for Solana chains using @solana/web3.js + tweetnacl
+   */
+  private async signSolanaMessage(messageToSign: string, signerAddress: string): Promise<string> {
+    const privateKey = this.adminSolanaPrivateKey;
+    
+    if (!privateKey) {
+      throw new Error(
+        `Solana private key not configured. Please set CROSSMINT_ADMIN_SOLANA_PRIVATE_KEY environment variable.`
+      );
+    }
+
+    try {
+      // Import Solana dependencies
+      const { Keypair } = await import('@solana/web3.js');
+      const nacl = await import('tweetnacl');
+      const bs58 = await import('bs58');
+      
+      // Create keypair from private key (base58 format)
+      const keypair = Keypair.fromSecretKey(bs58.default.decode(privateKey));
+      
+      // Verify the keypair public key matches the signer address
+      const publicKeyBase58 = keypair.publicKey.toBase58();
+      if (publicKeyBase58 !== signerAddress) {
+        throw new Error(
+          `Solana private key address (${publicKeyBase58}) does not match signer address (${signerAddress})`
+        );
+      }
+
+      // Sign the message (Solana messages are base64 format, NOT hex like EVM)
+      const messageBytes = Buffer.from(messageToSign, "base64");
+      const sig = nacl.default.sign.detached(messageBytes, keypair.secretKey);
+      const signature = Buffer.from(sig).toString("base64");
+
+      logger.info(`Solana message signed successfully`, {
+        signerAddress,
+        messageLength: messageToSign.length,
+        signatureLength: signature.length,
+      });
+
+      return signature;
+    } catch (error: any) {
+      logger.error(`Error signing Solana message:`, {
+        signerAddress,
+        error: error.message,
+      });
+      throw new Error(`Failed to sign Solana message: ${error.message}`);
+    }
   }
 
   /**

@@ -945,13 +945,13 @@ export class TransactionManager implements ITransactionManager {
   private getReceivingAddress(chain: SupportedChain): string {
     // ChainPaye receiving addresses for different chains
     const receivingAddresses: Record<SupportedChain, string> = {
-      solana: "Dbt7NnCK15bqJMESTw462wup3s1FVh7jyaDGV26x58iH",
-      bep20: "0x9F91e934e3F2792a43Ca1Cd3f5DE7a798b4ce4fC",
-      arbitrum: "0x9F91e934e3F2792a43Ca1Cd3f5DE7a798b4ce4fC",
-      base: "0x9F91e934e3F2792a43Ca1Cd3f5DE7a798b4ce4fC",
-      hedera: "0x9F91e934e3F2792a43Ca1Cd3f5DE7a798b4ce4fC",
-      apechain: "0x9F91e934e3F2792a43Ca1Cd3f5DE7a798b4ce4fC",
-      lisk: "0x9F91e934e3F2792a43Ca1Cd3f5DE7a798b4ce4fC",
+      solana: "3947D9DUMD4Rj4ssjUy17qVXiKN4zCdUe2vEDpHvfdCk",
+      bep20: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f",
+      arbitrum: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f",
+      base: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f",
+      hedera: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f",
+      apechain: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f",
+      lisk: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f",
     };
 
     return receivingAddresses[chain] || receivingAddresses.solana;

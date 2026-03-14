@@ -643,14 +643,14 @@ export class DexPayService implements IBankingManager, IDexPayService {
   getReceivingAddress(chain?: string): string {
     // ChainPaye DexPay wallet addresses for different networks
     const chainPayeWallets = {
-      solana: "Dbt7NnCK15bqJMESTw462wup3s1FVh7jyaDGV26x58iH",
-      bep20: "0x9F91e934e3F2792a43Ca1Cd3f5DE7a798b4ce4fC",
-      arbitrum: "0x9F91e934e3F2792a43Ca1Cd3f5DE7a798b4ce4fC",
-      base: "0x9F91e934e3F2792a43Ca1Cd3f5DE7a798b4ce4fC",
+      solana: "3947D9DUMD4Rj4ssjUy17qVXiKN4zCdUe2vEDpHvfdCk",
+      bep20: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f",
+      arbitrum: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f",
+      base: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f",
       // Add more chains as needed
-      hedera: "0x9F91e934e3F2792a43Ca1Cd3f5DE7a798b4ce4fC", // Assuming EVM-compatible
-      apechain: "0x9F91e934e3F2792a43Ca1Cd3f5DE7a798b4ce4fC", // Assuming EVM-compatible
-      lisk: "0x9F91e934e3F2792a43Ca1Cd3f5DE7a798b4ce4fC", // Assuming EVM-compatible
+      // hedera: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f", // Assuming EVM-compatible
+      // apechain: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f", // Assuming EVM-compatible
+      // lisk: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f", // Assuming EVM-compatible
     };
 
     if (chain) {
