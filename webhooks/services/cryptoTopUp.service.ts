@@ -8,6 +8,8 @@ import { financialService } from "../../services/crypto-off-ramp/FinancialServic
 import { dexPayService } from "../../services/DexPayService";
 import { redisClient } from "../../services/redis";
 import { logger } from "../../utils/logger";
+import { Types } from "mongoose";
+import { TransactionStatus } from "../../models/Transaction";
 
 type Network = "bsc" | "sol" | "eth" | "poly" | "trx" | "base";
 
@@ -132,6 +134,31 @@ async function processOfframpInBackground(
     console.log(JSON.stringify(offrampResult, null, 2));
     console.log("========================================\n");
 
+    // Update transaction status to completed in database
+    try {
+      const { TransactionService } = await import("../../services/TransactionService");
+      
+      // Get transaction reference ID from Redis
+      const txnRefKey = `offramp-${userId}-*:txn_ref`;
+      const keys = await redisClient.keys(txnRefKey);
+      
+      if (keys.length > 0) {
+        // @ts-ignore - Redis get method returns string | null, but we handle null check below
+        const transactionRef = await redisClient.get(keys[0]);
+        if (transactionRef !== null) {
+          await TransactionService.updateOfframpStatus({
+            referenceId: transactionRef,
+            status: TransactionStatus.COMPLETED,
+            dexPayQuoteId: quoteId,
+          });
+          logger.info(`[OFFRAMP-BG] Transaction status updated to completed: ${transactionRef}`);
+        }
+      }
+    } catch (dbError) {
+      logger.error(`[OFFRAMP-BG] Failed to update transaction status: ${(dbError as Error).message}`);
+      // Don't fail the process if database update fails
+    }
+
     // Update idempotency record to mark as completed
     if (idempotencyKey) {
       await redisClient.set(
@@ -226,6 +253,30 @@ async function processOfframpInBackground(
     console.log("\n❌ [Background] Processing failed:");
     console.log((error as Error).message);
     console.log("========================================\n");
+    
+    // Mark transaction as failed in database
+    try {
+      const { TransactionService } = await import("../../services/TransactionService");
+      
+      // Get transaction reference ID from Redis
+      const txnRefKey = `offramp-${userId}-*:txn_ref`;
+      const keys = await redisClient.keys(txnRefKey);
+      
+      if (keys.length > 0) {
+        // @ts-ignore - Redis get method returns string | null, but we handle null check below
+        const transactionRef = await redisClient.get(keys[0]);
+        if (transactionRef !== null) {
+          await TransactionService.updateOfframpStatus({
+            referenceId: transactionRef,
+            status: TransactionStatus.FAILED,
+            failureReason: (error as Error).message,
+          });
+          logger.info(`[OFFRAMP-BG] Transaction status updated to failed: ${transactionRef}`);
+        }
+      }
+    } catch (dbError) {
+      logger.error(`[OFFRAMP-BG] Failed to update transaction status: ${(dbError as Error).message}`);
+    }
     
     // Mark transaction as failed in idempotency record
     if (idempotencyKey) {
@@ -1121,6 +1172,45 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
                 has_error: true,
               },
             };
+          }
+
+          // ============================================================
+          // RECORD OFFRAMP TRANSACTION IN DATABASE
+          // Status: PROCESSING (crypto transferred, waiting for DexPay)
+          // ============================================================
+          try {
+            const { TransactionService } = await import("../../services/TransactionService");
+            
+            const offrampTransaction = await TransactionService.recordOfframp({
+              refId: `OFFRAMP-${user.userId}-${Date.now()}`,
+              crossmintTxId: transferResult.transactionId || transferIdempotencyKey,
+              currency: normalizedAsset, // USDC or USDT
+              status: TransactionStatus.PROCESSING,
+              cryptoAmount: financials.totalInUsd - (parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75")), // USD amount (excluding fees)
+              ngnAmount: ngnAmount, // NGN amount to bank
+              fromUser: new Types.ObjectId(user.userId),
+              bankDetails: {
+                accountNumber: account_number,
+                accountName: finalRecipientName || "Beneficiary",
+                bankName: bank_name || "Bank",
+              },
+              exchangeRate: nairaRate,
+              fees: parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75"), // Flat fee in USD
+              chain: crossmintChain, // solana, bsc, base, etc.
+            });
+
+            logger.info(`[OFFRAMP] Transaction recorded in database: ${offrampTransaction.referenceId}`);
+            
+            // Store transaction reference ID for background processing
+            await redisClient.set(
+              `${idempotencyKey}:txn_ref`,
+              offrampTransaction.referenceId,
+              'EX',
+              600 // Keep for 10 minutes
+            );
+          } catch (dbError) {
+            logger.error(`[OFFRAMP] Failed to record transaction in database: ${(dbError as Error).message}`);
+            // Don't fail the offramp process if database recording fails
           }
           
           // Update idempotency record with transfer details

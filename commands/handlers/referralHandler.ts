@@ -42,21 +42,19 @@ Type *kyc* to start verification.
 🔗 *Referral Code:* ${dashboard.referralCode}
 🔗 *Referral Link:* ${dashboard.referralLink}
 
-👥 *Total Referred:* ${dashboard.totalReferred} users
+👥 *Total Users Referred:* ${dashboard.totalReferred} users
 💰 *Current Balance:* $${dashboard.currentBalance.toFixed(2)}
 📈 *Total Earned:* $${dashboard.totalEarned.toFixed(2)}
 💵 *Total Volume:* $${dashboard.totalVolume.toFixed(2)}
-💸 *Total Fees Generated:* $${dashboard.totalFees.toFixed(2)}
 
 💡 *How it works:*
 • Share your referral link with friends
 • Earn 1% of offramp transaction volume from referrals
-• Earnings are credited for 30 days after signup
+• Earnings are credited for 30 days after referred user signup
 • Minimum withdrawal: $20
 
-To withdraw earnings, type: *withdraw [amount]*
-Example: withdraw 50
-    `.trim();
+To withdraw earnings, type: *withdraw earnings*
+     `.trim();
   } catch (error) {
     if (error instanceof Error) {
       return `❌ ${error.message}`;

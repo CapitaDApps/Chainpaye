@@ -56,6 +56,15 @@ class RedisClient implements RedisStorageService {
     }
   }
 
+  async keys(pattern: string): Promise<string[]> {
+    try {
+      this.ensureConnection();
+      return await this.client.keys(pattern);
+    } catch (error) {
+      throw new RedisOperationError(`Failed to get keys with pattern ${pattern}: ${error}`, "keys");
+    }
+  }
+
   async getOrSetCache<T>(
     key: string,
     func: () => Promise<T>,

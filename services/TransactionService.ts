@@ -328,4 +328,155 @@ export class TransactionService {
 
     return transaction;
   }
+
+  static async recordOfframp({
+    refId,
+    crossmintTxId,
+    currency,
+    status,
+    cryptoAmount,
+    ngnAmount,
+    fromUser,
+    bankDetails,
+    exchangeRate,
+    fees,
+    chain,
+    dexPayQuoteId,
+    failureReason,
+  }: {
+    refId: string;
+    crossmintTxId: string;
+    currency: string; // USDC, USDT
+    status: TransactionStatus;
+    cryptoAmount: number; // USD amount of crypto
+    ngnAmount: number; // NGN amount to bank
+    fromUser: Types.ObjectId;
+    bankDetails: BankDetails;
+    exchangeRate: number; // NGN per USD
+    fees: number; // USD fees
+    chain: string; // solana, bsc, base, etc.
+    dexPayQuoteId?: string;
+    failureReason?: string;
+  }) {
+    const transaction = await Transaction.create({
+      referenceId: refId,
+      toronetTransactionId: crossmintTxId,
+      type: TransactionType.OFF_RAMP,
+      currency: `${currency.toUpperCase()}${chain.toUpperCase()}`, // e.g., USDCBASE, USDTBSC
+      status,
+      amount: ngnAmount, // NGN amount (what user receives)
+      totalAmount: cryptoAmount + fees, // Total crypto spent (including fees)
+      fromUser,
+      bankDetails,
+      exchangeRate,
+      fees,
+      entryType: "DEBIT", // Crypto is debited from user
+      description: `Offramp ${cryptoAmount} ${currency.toUpperCase()} to ${bankDetails.bankName}`,
+      ...(dexPayQuoteId && { 
+        // Store DexPay quote ID in description for now, can be moved to separate field later
+        description: `Offramp ${cryptoAmount} ${currency.toUpperCase()} to ${bankDetails.bankName} (DexPay: ${dexPayQuoteId})`
+      }),
+      ...(failureReason && { failureReason }),
+    });
+
+    return transaction;
+  }
+
+  static async updateOfframpStatus({
+    referenceId,
+    status,
+    dexPayQuoteId,
+    failureReason,
+  }: {
+    referenceId: string;
+    status: TransactionStatus;
+    dexPayQuoteId?: string;
+    failureReason?: string;
+  }) {
+    const updateData: any = {
+      status,
+      ...(status === TransactionStatus.COMPLETED && { completedAt: new Date() }),
+      ...(failureReason && { failureReason }),
+    };
+
+    // Update description to include DexPay quote ID if provided
+    if (dexPayQuoteId) {
+      const transaction = await Transaction.findOne({ referenceId });
+      if (transaction && transaction.description) {
+        updateData.description = transaction.description.includes('(DexPay:') 
+          ? transaction.description 
+          : `${transaction.description} (DexPay: ${dexPayQuoteId})`;
+      }
+    }
+
+    const transaction = await Transaction.findOneAndUpdate(
+      { referenceId },
+      updateData,
+      { new: true }
+    );
+
+    return transaction;
+  }
+
+  static async getTransactionHistory({
+    userId,
+    page = 1,
+    limit = 20,
+    status,
+    type,
+  }: {
+    userId?: Types.ObjectId;
+    page?: number;
+    limit?: number;
+    status?: TransactionStatus;
+    type?: TransactionType;
+  }) {
+    const query: any = {};
+    
+    if (userId) {
+      query.fromUser = userId;
+    }
+    
+    if (status) {
+      query.status = status;
+    }
+    
+    if (type) {
+      query.type = type;
+    }
+
+    const skip = (page - 1) * limit;
+    
+    const [transactions, total] = await Promise.all([
+      Transaction.find(query)
+        .populate('fromUser', 'firstName lastName phone')
+        .populate('toUser', 'firstName lastName phone')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Transaction.countDocuments(query)
+    ]);
+
+    return {
+      transactions,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+        hasNext: page < Math.ceil(total / limit),
+        hasPrev: page > 1,
+      }
+    };
+  }
+
+  static async getTransactionByReference(referenceId: string) {
+    const transaction = await Transaction.findOne({ referenceId })
+      .populate('fromUser', 'firstName lastName phone')
+      .populate('toUser', 'firstName lastName phone')
+      .lean();
+
+    return transaction;
+  }
 }

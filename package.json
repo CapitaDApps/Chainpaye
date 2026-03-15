@@ -16,7 +16,8 @@
     "validate-referral:live": "tsx scripts/validate-referral-earnings.ts --mode=live",
     "validate-referral:compare": "tsx scripts/validate-referral-earnings.ts --mode=compare",
     "test:offramp-receipt": "tsx utils/testGenerateSingleReceipt.ts",
-    "test:crossmint-signing": "tsx scripts/test-crossmint-signing.ts"
+    "test:crossmint-signing": "tsx scripts/test-crossmint-signing.ts",
+    "test:offramp-transactions": "tsx scripts/test-offramp-transaction-recording.ts"
   },
   "keywords": [
     "whatsapp",

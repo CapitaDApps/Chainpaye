@@ -328,3 +328,7 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
 
 // Apply rate limiting to flow routes (user-facing endpoints)
 app.use("/flow", userRateLimiter, flowRouter);
+
+// Transaction API routes
+import transactionRoutes from "../routes/transactionRoutes";
+app.use("/api/transactions", transactionRoutes);
