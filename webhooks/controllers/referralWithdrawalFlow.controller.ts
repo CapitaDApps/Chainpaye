@@ -1,8 +1,9 @@
 /**
  * Referral Withdrawal Flow Controller
  *
- * Handles WhatsApp flow submissions for referral earnings withdrawals.
- * Processes withdrawal requests and sends confirmation messages.
+ * Handles WhatsApp encrypted flow submissions for referral earnings withdrawals.
+ * Uses flowMiddleware for request decryption, signature validation, and response encryption.
+ * This is required for Meta's flow health check and all flow interactions.
  */
 
 import { Request, Response } from "express";
@@ -10,175 +11,155 @@ import { WithdrawalService } from "../../services/WithdrawalService";
 import { PointsRepository } from "../../repositories/PointsRepository";
 import { whatsappBusinessService } from "../../services";
 import { logger } from "../../utils/logger";
+import { flowMiddleware } from "../middlewares";
+import { redisClient } from "../../services/redis";
 
-interface ReferralWithdrawalFlowData {
-  amount?: string;
-  screen?: string;
-  error_msg?: string;
-  evmAddress?: string;
-  chain?: string;
-  token?: string;
-  currentBalance?: string;
-}
+async function referralWithdrawalFlowHandler(req: Request, res: Response) {
+  const { decryptedBody } = req.decryptedData!;
+  const { screen, data, action, flow_token } = decryptedBody;
 
-export async function handleReferralWithdrawalFlow(req: Request, res: Response) {
-  try {
-    const { from, flow_token, data, screen } = req.body;
-    const flowData = data as ReferralWithdrawalFlowData;
-    const currentScreen = screen || flowData?.screen;
+  logger.info("Referral withdrawal flow:", { action, screen, flow_token });
 
-    logger.info("Referral withdrawal flow submission:", {
-      from,
-      flow_token,
-      screen: currentScreen,
-      data: flowData,
-    });
+  // Meta health check — must respond with { data: { status: "active" } }
+  if (action === "ping") {
+    return { data: { status: "active" } };
+  }
 
-    switch (currentScreen) {
-      case "WITHDRAWAL_DETAILS":
-        return await handleWithdrawalDetails(req, res, flowData);
-      case "WITHDRAWAL_CONFIRMATION":
-        return await handleWithdrawalConfirmation(req, res, flowData);
-      case "ERROR":
-        return await handleFlowError(req, res, flowData);
+  // Client-side error notification
+  if (data?.error) {
+    logger.warn("Referral withdrawal flow client error:", data);
+    return { data: { status: "Error", acknowledged: true } };
+  }
+
+  // INIT — flow is opening, return initial screen data (already populated by WhatsAppBusinessService)
+  if (action === "INIT") {
+    return {
+      screen: "WITHDRAWAL_DETAILS",
+      data: {},
+    };
+  }
+
+  if (action === "data_exchange") {
+    // Resolve user phone from flow_token stored in Redis
+    const userPhone = await redisClient.get(flow_token);
+    if (!userPhone) {
+      return {
+        screen: "WITHDRAWAL_DETAILS",
+        data: { error_message: "Session expired. Please restart the flow." },
+      };
+    }
+    const phone = userPhone.startsWith("+") ? userPhone : `+${userPhone}`;
+
+    switch (screen) {
+      case "WITHDRAWAL_DETAILS": {
+        const { amount, evmAddress, chain, token, currentBalance } = data;
+
+        // Validate amount
+        const parsedAmount = parseFloat(amount);
+        if (!amount || isNaN(parsedAmount) || parsedAmount < 20) {
+          return {
+            screen: "WITHDRAWAL_DETAILS",
+            data: {
+              error_message: `Minimum withdrawal is $20. You entered: ${amount ?? "nothing"}`,
+              currentBalance,
+              evmAddress,
+              chain,
+              token,
+            },
+          };
+        }
+
+        // Validate EVM address
+        if (!evmAddress) {
+          return {
+            screen: "WITHDRAWAL_DETAILS",
+            data: {
+              error_message: "No wallet address found. Please contact support.",
+              currentBalance,
+              chain,
+              token,
+            },
+          };
+        }
+
+        try {
+          const pointsRepository = new PointsRepository();
+          const withdrawalService = new WithdrawalService(pointsRepository);
+          const withdrawal = await withdrawalService.requestWithdrawal(
+            phone,
+            parsedAmount,
+            evmAddress,
+            chain || "base",
+            token || "USDT"
+          );
+
+          logger.info("Referral withdrawal request created:", {
+            withdrawalId: withdrawal.id,
+            phone,
+            parsedAmount,
+            evmAddress,
+          });
+
+          // Send WhatsApp confirmation message async (don't block flow response)
+          const shortAddress = `${evmAddress.substring(0, 6)}...${evmAddress.slice(-4)}`;
+          const dateStr = withdrawal.requestedAt.toISOString().split("T")[0];
+          whatsappBusinessService.sendNormalMessage(
+            [
+              "Withdrawal Request Submitted",
+              "",
+              `Amount: ${parsedAmount.toFixed(2)} ${token || "USDT"}`,
+              `Chain: ${chain || "Base"}`,
+              `Address: ${shortAddress}`,
+              `Status: Pending Review`,
+              `Requested: ${dateStr}`,
+              "",
+              "You'll be notified once the funds are sent.",
+              "Type *referral history* to check status anytime.",
+            ].join("\n"),
+            phone
+          );
+
+          // Advance to confirmation screen
+          return {
+            screen: "WITHDRAWAL_CONFIRMATION",
+            data: {
+              amount: parsedAmount.toFixed(2),
+              evmAddress,
+              chain: chain || "Base",
+              token: token || "USDT",
+              currentBalance,
+            },
+          };
+        } catch (error: any) {
+          logger.error("Error creating withdrawal request:", {
+            phone,
+            amount,
+            error: error.message,
+          });
+          return {
+            screen: "WITHDRAWAL_DETAILS",
+            data: {
+              error_message: error.message,
+              currentBalance,
+              evmAddress,
+              chain,
+              token,
+            },
+          };
+        }
+      }
+
       default:
-        logger.warn("Unknown referral withdrawal flow screen:", { screen: currentScreen });
-        return res.status(200).json({
-          success: false,
-          error: `Unknown screen: ${currentScreen}`,
-          message: "Flow screen not recognized",
-        });
+        logger.warn("Unhandled referral withdrawal screen:", { screen });
+        return {
+          screen,
+          data: { error_message: "Unexpected screen. Please restart the flow." },
+        };
     }
-  } catch (error: any) {
-    logger.error("Error handling referral withdrawal flow:", {
-      error: error.message,
-      stack: error.stack,
-      body: req.body,
-    });
-    return res.status(500).json({
-      success: false,
-      error: "Internal server error processing withdrawal request",
-    });
   }
+
+  logger.error("Unhandled referral withdrawal flow action:", { action, screen });
+  throw new Error(`Unhandled action: ${action}`);
 }
 
-async function handleWithdrawalDetails(
-  req: Request,
-  res: Response,
-  flowData: ReferralWithdrawalFlowData
-) {
-  const { from } = req.body;
-
-  try {
-    // Validate required fields
-    if (!flowData.amount || !from) {
-      logger.error("Missing required data in withdrawal details:", { amount: flowData.amount, from });
-      await whatsappBusinessService.sendNormalMessage(
-        "Missing required information. Please try again.\n\nType *referral* to restart.",
-        from
-      );
-      return res.status(200).json({ success: false, error: "Missing required withdrawal data" });
-    }
-
-    // Validate amount
-    const amount = parseFloat(flowData.amount);
-    if (isNaN(amount) || amount < 20) {
-      logger.error("Invalid withdrawal amount:", { amount: flowData.amount });
-      await whatsappBusinessService.sendNormalMessage(
-        `Minimum withdrawal is $20. You entered: ${flowData.amount}\n\nType *referral* to try again.`,
-        from
-      );
-      return res.status(200).json({ success: false, error: "Invalid withdrawal amount" });
-    }
-
-    // Validate EVM address
-    const evmAddress = flowData.evmAddress;
-    if (!evmAddress) {
-      logger.error("Missing evmAddress in withdrawal details:", { flowData });
-      await whatsappBusinessService.sendNormalMessage(
-        "No wallet address found. Please update your profile and try again.\n\nType *referral* to restart.",
-        from
-      );
-      return res.status(200).json({ success: false, error: "Missing EVM wallet address" });
-    }
-
-    const chain = flowData.chain || "base";
-    const token = flowData.token || "USDT";
-    const userId = from.startsWith("+") ? from : `+${from}`;
-
-    // Create withdrawal request
-    const pointsRepository = new PointsRepository();
-    const withdrawalService = new WithdrawalService(pointsRepository);
-    const withdrawal = await withdrawalService.requestWithdrawal(userId, amount, evmAddress, chain, token);
-
-    // Send confirmation to user
-    const shortAddress = `${evmAddress.substring(0, 6)}...${evmAddress.slice(-4)}`;
-    const dateStr = withdrawal.requestedAt.toISOString().split("T")[0];
-    const confirmMsg = [
-      "Withdrawal Request Submitted",
-      "",
-      `Amount: ${amount.toFixed(2)} ${token}`,
-      `Chain: ${chain}`,
-      `Address: ${shortAddress}`,
-      `Status: Pending Review`,
-      `Requested: ${dateStr}`,
-      "",
-      "Your withdrawal is being processed. You'll be notified once the funds are sent.",
-      "",
-      "Type *referral history* to check status anytime.",
-    ].join("\n");
-
-    await whatsappBusinessService.sendNormalMessage(confirmMsg, from);
-
-    logger.info("Referral withdrawal request created successfully:", {
-      withdrawalId: withdrawal.id,
-      userId,
-      amount,
-      evmAddress,
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: "Withdrawal request submitted successfully",
-      withdrawalId: withdrawal.id,
-    });
-  } catch (error: any) {
-    logger.error("Error creating withdrawal request:", {
-      userId: from,
-      amount: flowData.amount,
-      error: error.message,
-    });
-    await whatsappBusinessService.sendNormalMessage(
-      `Withdrawal request failed: ${error.message}\n\nType *referral* to try again.`,
-      from
-    );
-    return res.status(200).json({ success: false, error: error.message });
-  }
-}
-
-async function handleWithdrawalConfirmation(
-  req: Request,
-  res: Response,
-  flowData: ReferralWithdrawalFlowData
-) {
-  logger.info("Withdrawal confirmation received:", { flowData });
-  return res.status(200).json({ success: true, message: "Withdrawal confirmation received" });
-}
-
-async function handleFlowError(
-  req: Request,
-  res: Response,
-  flowData: ReferralWithdrawalFlowData
-) {
-  const { from } = req.body;
-  const errorMsg = flowData.error_msg || "Unknown error occurred in withdrawal flow";
-
-  logger.error("Flow error received:", { from, error_msg: errorMsg, flowData });
-
-  await whatsappBusinessService.sendNormalMessage(
-    `Withdrawal flow error: ${errorMsg}\n\nType *referral* to restart.`,
-    from
-  );
-
-  return res.status(200).json({ success: false, error: errorMsg, message: "Flow error handled" });
-}
+export const handleReferralWithdrawalFlow = flowMiddleware(referralWithdrawalFlowHandler);
