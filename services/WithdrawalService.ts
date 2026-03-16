@@ -223,6 +223,13 @@ export class WithdrawalService {
   }
 
   /**
+   * Get current balance for a user
+   */
+  async getUserBalance(userId: string): Promise<number> {
+    return this.pointsRepository.getBalance(userId);
+  }
+
+  /**
    * Get withdrawal history for a user
    * 
    * @param userId The user ID to query

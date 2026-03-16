@@ -10,6 +10,7 @@ import { WithdrawalService } from "../../services/WithdrawalService";
 import { PointsRepository } from "../../repositories/PointsRepository";
 import { User } from "../../models/User";
 import { whatsappBusinessService } from "../../services";
+import { logger } from "../../utils/logger";
 
 /**
  * Handle "referral" command
@@ -62,7 +63,15 @@ To view withdrawal history, type: *referral history*
 
     // Then send the withdrawal flow if user has balance
     if (dashboard.currentBalance >= 20) {
-      await whatsappBusinessService.sendReferralWithdrawalFlow(user.whatsappNumber, dashboard.currentBalance);
+      try {
+        await whatsappBusinessService.sendReferralWithdrawalFlow(user.whatsappNumber, dashboard.currentBalance);
+      } catch (flowError) {
+        logger.error("Failed to send referral withdrawal flow:", flowError);
+        await whatsappBusinessService.sendNormalMessage(
+          "To withdraw your earnings, please contact support or try again later.",
+          user.whatsappNumber
+        );
+      }
     }
 
     return ""; // Return empty since we've already sent the messages

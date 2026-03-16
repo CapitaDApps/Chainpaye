@@ -9,12 +9,14 @@
 import { Request, Response } from "express";
 import { WithdrawalService } from "../../services/WithdrawalService";
 import { PointsRepository } from "../../repositories/PointsRepository";
+import { CrossmintService } from "../../services/CrossmintService";
 import { whatsappBusinessService } from "../../services";
+import { User } from "../../models/User";
 import { logger } from "../../utils/logger";
 import { flowMiddleware } from "../middlewares";
 import { redisClient } from "../../services/redis";
 
-async function referralWithdrawalFlowHandler(req: Request, res: Response) {
+async function referralWithdrawalFlowHandler(req: Request, _res: Response) {
   const { decryptedBody } = req.decryptedData!;
   const { screen, data, action, flow_token } = decryptedBody;
 
@@ -31,16 +33,13 @@ async function referralWithdrawalFlowHandler(req: Request, res: Response) {
     return { data: { status: "Error", acknowledged: true } };
   }
 
-  // INIT — flow is opening, return initial screen data (already populated by WhatsAppBusinessService)
+  // INIT — flow opening, initial screen data already injected by sendReferralWithdrawalFlow
   if (action === "INIT") {
-    return {
-      screen: "WITHDRAWAL_DETAILS",
-      data: {},
-    };
+    return { screen: "WITHDRAWAL_DETAILS", data: {} };
   }
 
   if (action === "data_exchange") {
-    // Resolve user phone from flow_token stored in Redis
+    // Resolve phone from Redis flow_token
     const userPhone = await redisClient.get(flow_token);
     if (!userPhone) {
       return {
@@ -50,9 +49,19 @@ async function referralWithdrawalFlowHandler(req: Request, res: Response) {
     }
     const phone = userPhone.startsWith("+") ? userPhone : `+${userPhone}`;
 
+    // Resolve internal userId (UUID) — PointsBalance and ReferralRelationship use userId, not phone
+    const user = await User.findOne({ whatsappNumber: phone });
+    if (!user) {
+      return {
+        screen: "WITHDRAWAL_DETAILS",
+        data: { error_message: "Account not found. Please contact support." },
+      };
+    }
+    const userId = user.userId;
+
     switch (screen) {
       case "WITHDRAWAL_DETAILS": {
-        const { amount, evmAddress, chain, token, currentBalance } = data;
+        const { amount, chain, token, currentBalance } = data;
 
         // Validate amount
         const parsedAmount = parseFloat(amount);
@@ -62,20 +71,6 @@ async function referralWithdrawalFlowHandler(req: Request, res: Response) {
             data: {
               error_message: `Minimum withdrawal is $20. You entered: ${amount ?? "nothing"}`,
               currentBalance,
-              evmAddress,
-              chain,
-              token,
-            },
-          };
-        }
-
-        // Validate EVM address
-        if (!evmAddress) {
-          return {
-            screen: "WITHDRAWAL_DETAILS",
-            data: {
-              error_message: "No wallet address found. Please contact support.",
-              currentBalance,
               chain,
               token,
             },
@@ -83,10 +78,15 @@ async function referralWithdrawalFlowHandler(req: Request, res: Response) {
         }
 
         try {
+          // Fetch EVM address from Crossmint — same method used when sending the flow
+          const crossmintService = new CrossmintService();
+          const wallet = await crossmintService.getOrCreateWallet(userId, "base");
+          const evmAddress = wallet.address;
+
           const pointsRepository = new PointsRepository();
           const withdrawalService = new WithdrawalService(pointsRepository);
           const withdrawal = await withdrawalService.requestWithdrawal(
-            phone,
+            userId,
             parsedAmount,
             evmAddress,
             chain || "base",
@@ -95,12 +95,12 @@ async function referralWithdrawalFlowHandler(req: Request, res: Response) {
 
           logger.info("Referral withdrawal request created:", {
             withdrawalId: withdrawal.id,
-            phone,
+            userId,
             parsedAmount,
             evmAddress,
           });
 
-          // Send WhatsApp confirmation message async (don't block flow response)
+          // Send WhatsApp confirmation async — don't block flow response
           const shortAddress = `${evmAddress.substring(0, 6)}...${evmAddress.slice(-4)}`;
           const dateStr = withdrawal.requestedAt.toISOString().split("T")[0];
           whatsappBusinessService.sendNormalMessage(
@@ -119,7 +119,6 @@ async function referralWithdrawalFlowHandler(req: Request, res: Response) {
             phone
           );
 
-          // Advance to confirmation screen
           return {
             screen: "WITHDRAWAL_CONFIRMATION",
             data: {
@@ -132,7 +131,7 @@ async function referralWithdrawalFlowHandler(req: Request, res: Response) {
           };
         } catch (error: any) {
           logger.error("Error creating withdrawal request:", {
-            phone,
+            userId,
             amount,
             error: error.message,
           });
@@ -141,7 +140,6 @@ async function referralWithdrawalFlowHandler(req: Request, res: Response) {
             data: {
               error_message: error.message,
               currentBalance,
-              evmAddress,
               chain,
               token,
             },
