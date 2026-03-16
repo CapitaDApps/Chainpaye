@@ -38,10 +38,10 @@ export class WithdrawalService {
 
   constructor(
     pointsRepository: PointsRepository,
-    crossmintService: CrossmintService
+    crossmintService?: CrossmintService
   ) {
     this.pointsRepository = pointsRepository;
-    this.crossmintService = crossmintService;
+    this.crossmintService = crossmintService!;
   }
 
   /**
@@ -103,12 +103,21 @@ export class WithdrawalService {
    * 
    * @param userId The user ID requesting withdrawal
    * @param amount The amount to withdraw
+   * @param evmAddress The user's EVM wallet address
+   * @param chain The blockchain network (default: "base")
+   * @param token The token to receive (default: "USDT")
    * @returns Promise<IWithdrawalRequest> The created withdrawal request
    * @throws Error if validation fails
    * 
    * Validates: Requirements 5.1, 5.2, 5.3, 5.6
    */
-  async requestWithdrawal(userId: string, amount: number): Promise<IWithdrawalRequest> {
+  async requestWithdrawal(
+    userId: string,
+    amount: number,
+    evmAddress: string,
+    chain: string = "base",
+    token: string = "USDT"
+  ): Promise<IWithdrawalRequest> {
     // Validate withdrawal request
     const validation = await this.canWithdraw(userId, amount);
     if (!validation.canWithdraw) {
@@ -119,6 +128,10 @@ export class WithdrawalService {
     const withdrawalRequest = new WithdrawalRequest({
       userId,
       amount,
+      evmAddress,
+      chain,
+      token,
+      method: WithdrawalMethod.CRYPTO,
       status: WithdrawalStatus.PENDING,
       requestedAt: new Date(),
     });
@@ -128,16 +141,13 @@ export class WithdrawalService {
   }
 
   /**
-   * Approve a withdrawal request
-   * 
-   * Approves a withdrawal after the 24-hour delay period.
-   * Updates the status to 'approved' and sets the approvedAt timestamp.
-   * 
+   * Approve a withdrawal request (admin action)
+   *
+   * Marks a pending withdrawal as completed after the 24-hour delay period.
+   *
    * @param withdrawalId The withdrawal request ID to approve
    * @returns Promise<IWithdrawalRequest> The approved withdrawal request
    * @throws Error if withdrawal not found or not in pending status
-   * 
-   * Validates: Requirements 5.4
    */
   async approveWithdrawal(withdrawalId: string): Promise<IWithdrawalRequest> {
     const withdrawal = await WithdrawalRequest.findById(withdrawalId);
@@ -158,9 +168,8 @@ export class WithdrawalService {
       throw new Error("Withdrawal cannot be approved before 24-hour delay period");
     }
 
-    // Update status to approved
-    withdrawal.status = WithdrawalStatus.APPROVED;
-    withdrawal.approvedAt = new Date();
+    withdrawal.status = WithdrawalStatus.COMPLETED;
+    withdrawal.completedAt = new Date();
     await withdrawal.save();
 
     return withdrawal;
@@ -168,18 +177,12 @@ export class WithdrawalService {
 
   /**
    * Process an approved withdrawal
-   * 
-   * This method:
-   * 1. Debits points from the user's balance
-   * 2. Initiates bank transfer
-   * 3. Updates withdrawal status to 'completed'
-   * 4. Handles failures with rollback
-   * 
+   *
+   * Debits points from the user's balance and marks the withdrawal as completed.
+   *
    * @param withdrawalId The withdrawal request ID to process
    * @returns Promise<IWithdrawalRequest> The completed withdrawal request
-   * @throws Error if withdrawal not found or not in approved status
-   * 
-   * Validates: Requirements 5.5
+   * @throws Error if withdrawal not found or not in pending status
    */
   async processWithdrawal(withdrawalId: string): Promise<IWithdrawalRequest> {
     const withdrawal = await WithdrawalRequest.findById(withdrawalId);
@@ -188,12 +191,11 @@ export class WithdrawalService {
       throw new Error("Withdrawal request not found");
     }
 
-    if (withdrawal.status !== WithdrawalStatus.APPROVED) {
+    if (withdrawal.status !== WithdrawalStatus.PENDING) {
       throw new Error(`Cannot process withdrawal with status: ${withdrawal.status}`);
     }
 
     const session = await mongoose.startSession();
-    let bankTransferId: string | undefined;
 
     try {
       await session.withTransaction(async () => {
@@ -204,31 +206,16 @@ export class WithdrawalService {
           withdrawalId
         );
 
-        // Initiate bank transfer
-        if (this.bankTransferService) {
-          bankTransferId = await this.bankTransferService.initiateTransfer(
-            withdrawal.userId,
-            withdrawal.amount
-          );
-        } else {
-          // For testing/development: simulate successful transfer
-          bankTransferId = `MOCK_TRANSFER_${Date.now()}`;
-        }
-
-        // Update withdrawal status to completed
         withdrawal.status = WithdrawalStatus.COMPLETED;
         withdrawal.completedAt = new Date();
-        withdrawal.bankTransferId = bankTransferId;
         await withdrawal.save({ session });
       });
 
       return withdrawal;
     } catch (error) {
-      // Rollback: mark withdrawal as failed
       withdrawal.status = WithdrawalStatus.FAILED;
       withdrawal.failureReason = error instanceof Error ? error.message : "Unknown error";
       await withdrawal.save();
-
       throw new Error(`Withdrawal processing failed: ${withdrawal.failureReason}`);
     } finally {
       await session.endSession();
