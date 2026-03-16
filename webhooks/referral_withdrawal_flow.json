@@ -80,8 +80,7 @@
                     "evmAddress": "${data.evmAddress}",
                     "chain": "${data.chain}",
                     "token": "${data.token}",
-                    "currentBalance": "${data.currentBalance}",
-                    "screen": "WITHDRAWAL_DETAILS"
+                    "currentBalance": "${data.currentBalance}"
                   }
                 }
               }
@@ -112,9 +111,9 @@
           "type": "string",
           "__example__": "USDT"
         },
-        "status": {
+        "currentBalance": {
           "type": "string",
-          "__example__": "submitted"
+          "__example__": "125.50"
         }
       },
       "layout": {
@@ -150,8 +149,7 @@
                 "amount": "${data.amount}",
                 "evmAddress": "${data.evmAddress}",
                 "chain": "${data.chain}",
-                "token": "${data.token}",
-                "screen": "WITHDRAWAL_CONFIRMATION"
+                "token": "${data.token}"
               }
             }
           }
