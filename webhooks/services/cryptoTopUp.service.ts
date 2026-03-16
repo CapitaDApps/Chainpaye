@@ -138,20 +138,14 @@ async function processOfframpInBackground(
     try {
       const { TransactionService } = await import("../../services/TransactionService");
       
-      // Get transaction reference ID from Redis
-      const txnRefKey = `offramp-${userId}-*:txn_ref`;
-      const keys = await redisClient.keys(txnRefKey);
-      
-      if (keys.length > 0) {
-        // @ts-ignore - Redis get method returns string | null, but we handle null check below
-        const transactionRef = await redisClient.get(keys[0]);
-        if (transactionRef !== null) {
-          await TransactionService.updateOfframpStatus({
-            referenceId: transactionRef,
-            status: TransactionStatus.COMPLETED,
-            dexPayQuoteId: quoteId,
-          });
+      // Get transaction reference ID from Redis using the exact idempotency key
+      if (idempotencyKey) {
+        const transactionRef = await redisClient.get(`${idempotencyKey}:txn_ref`);
+        if (transactionRef) {
+          await TransactionService.completeOfframpTransaction(transactionRef, quoteId);
           logger.info(`[OFFRAMP-BG] Transaction status updated to completed: ${transactionRef}`);
+        } else {
+          logger.warn(`[OFFRAMP-BG] No transaction ref found in Redis for key: ${idempotencyKey}:txn_ref`);
         }
       }
     } catch (dbError) {
@@ -1181,22 +1175,20 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           try {
             const { TransactionService } = await import("../../services/TransactionService");
             
-            const offrampTransaction = await TransactionService.recordOfframp({
+            const offrampTransaction = await TransactionService.createOfframpTransaction({
               refId: `OFFRAMP-${user.userId}-${Date.now()}`,
               crossmintTxId: transferResult.transactionId || transferIdempotencyKey,
-              currency: normalizedAsset, // USDC or USDT
-              status: TransactionStatus.PROCESSING,
-              cryptoAmount: financials.totalInUsd - (parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75")), // USD amount (excluding fees)
-              ngnAmount: ngnAmount, // NGN amount to bank
-              fromUser: new Types.ObjectId(user.userId),
-              bankDetails: {
-                accountNumber: account_number,
-                accountName: finalRecipientName || "Beneficiary",
-                bankName: bank_name || "Bank",
-              },
+              userId: new Types.ObjectId(user.userId),
+              asset: normalizedAsset,
+              chain: crossmintChain,
+              cryptoAmount: financials.totalInUsd - (parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75")),
+              fees: parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75"),
+              ngnAmount: ngnAmount,
               exchangeRate: nairaRate,
-              fees: parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75"), // Flat fee in USD
-              chain: crossmintChain, // solana, bsc, base, etc.
+              accountNumber: account_number,
+              accountName: finalRecipientName || "Beneficiary",
+              bankName: bank_name || "Bank",
+              bankCode: bank_code,
             });
 
             logger.info(`[OFFRAMP] Transaction recorded in database: ${offrampTransaction.referenceId}`);

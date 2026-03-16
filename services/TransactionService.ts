@@ -5,6 +5,7 @@ import {
   TransactionStatus,
   TransactionType,
 } from "../models/Transaction";
+import { OfframpTransaction, OfframpStatus } from "../models/OfframpTransaction";
 import { CoinType, CurrencyType } from "../types/toronetService.types";
 
 export class TransactionService {
@@ -478,5 +479,68 @@ export class TransactionService {
       .lean();
 
     return transaction;
+  }
+
+  static async createOfframpTransaction({
+    refId,
+    crossmintTxId,
+    userId,
+    asset,
+    chain,
+    cryptoAmount,
+    fees,
+    ngnAmount,
+    exchangeRate,
+    accountNumber,
+    accountName,
+    bankName,
+    bankCode,
+  }: {
+    refId: string;
+    crossmintTxId: string;
+    userId: Types.ObjectId;
+    asset: string;
+    chain: string;
+    cryptoAmount: number;
+    fees: number;
+    ngnAmount: number;
+    exchangeRate: number;
+    accountNumber: string;
+    accountName: string;
+    bankName: string;
+    bankCode?: string;
+  }) {
+    return OfframpTransaction.create({
+      referenceId: refId,
+      crossmintTxId,
+      userId,
+      asset,
+      chain,
+      cryptoAmount,
+      fees,
+      ngnAmount,
+      exchangeRate,
+      accountNumber,
+      accountName,
+      bankName,
+      bankCode,
+      status: OfframpStatus.PROCESSING,
+    });
+  }
+
+  static async completeOfframpTransaction(referenceId: string, dexPayQuoteId: string) {
+    return OfframpTransaction.findOneAndUpdate(
+      { referenceId },
+      { status: OfframpStatus.COMPLETED, dexPayQuoteId, completedAt: new Date() },
+      { new: true }
+    );
+  }
+
+  static async failOfframpTransaction(referenceId: string, reason: string) {
+    return OfframpTransaction.findOneAndUpdate(
+      { referenceId },
+      { status: OfframpStatus.FAILED, failureReason: reason },
+      { new: true }
+    );
   }
 }
