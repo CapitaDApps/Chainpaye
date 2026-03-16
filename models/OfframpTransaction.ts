@@ -56,7 +56,6 @@ const OfframpTransactionSchema = new Schema<IOfframpTransaction>(
   { timestamps: true }
 );
 
-OfframpTransactionSchema.index({ referenceId: 1 });
 OfframpTransactionSchema.index({ userId: 1, createdAt: -1 });
 OfframpTransactionSchema.index({ status: 1 });
 
