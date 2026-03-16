@@ -781,9 +781,9 @@ USD: USD ${usdBalance.balance.toFixed(2)}`;
       throw new Error("User not found");
     }
 
-    // Get or create Base wallet to get EVM address
+    // Get or create EVM wallet to get EVM address
     const crossmintService = new (await import("./CrossmintService")).CrossmintService();
-    const wallet = await crossmintService.getOrCreateWallet(user.userId, "base");
+    const wallet = await crossmintService.getOrCreateWallet(user._id.toString(), "evm");
 
     await this.sendTextOnlyFlowWithDataById(
       to,

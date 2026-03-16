@@ -78,9 +78,9 @@ async function referralWithdrawalFlowHandler(req: Request, _res: Response) {
         }
 
         try {
-          // Fetch EVM address from Crossmint — same method used when sending the flow
+          // Fetch EVM address from Crossmint using _id and "evm" chain type
           const crossmintService = new CrossmintService();
-          const wallet = await crossmintService.getOrCreateWallet(userId, "base");
+          const wallet = await crossmintService.getOrCreateWallet(user._id.toString(), "evm");
           const evmAddress = wallet.address;
 
           const pointsRepository = new PointsRepository();
