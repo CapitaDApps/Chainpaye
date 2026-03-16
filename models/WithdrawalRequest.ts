@@ -1,6 +1,7 @@
 /**
  * WithdrawalRequest schema for ChainPaye referral system
- * This schema maintains an audit trail of all withdrawal requests
+ * This schema maintains an audit trail of all referral earnings withdrawal requests
+ * Updated for crypto withdrawals (USDT on Base chain)
  * Validates: Requirements 5.3, 9.5
  */
 
@@ -11,9 +12,15 @@ import mongoose, { Document, Schema } from "mongoose";
  */
 export enum WithdrawalStatus {
   PENDING = "pending",
-  APPROVED = "approved",
   COMPLETED = "completed",
   FAILED = "failed",
+}
+
+/**
+ * Withdrawal method enum
+ */
+export enum WithdrawalMethod {
+  CRYPTO = "crypto",
 }
 
 /**
@@ -22,12 +29,16 @@ export enum WithdrawalStatus {
 export interface IWithdrawalRequest extends Document {
   userId: string;
   amount: number;
+  method: WithdrawalMethod;
+  evmAddress: string;
+  chain: string;
+  token: string;
   status: WithdrawalStatus;
   requestedAt: Date;
-  approvedAt?: Date;
   completedAt?: Date;
   failureReason?: string;
-  bankTransferId?: string;
+  transactionHash?: string;
+  adminNotes?: string;
 }
 
 /**
@@ -44,8 +55,35 @@ const WithdrawalRequestSchema: Schema = new Schema(
     amount: {
       type: Number,
       required: true,
-      min: 100, // Minimum withdrawal amount is $100
+      min: 20, // Minimum withdrawal amount is $20
       description: "Amount to withdraw in USD (points)",
+    },
+    method: {
+      type: String,
+      required: true,
+      enum: Object.values(WithdrawalMethod),
+      default: WithdrawalMethod.CRYPTO,
+      description: "Withdrawal method (crypto only for referral earnings)",
+    },
+    evmAddress: {
+      type: String,
+      required: true,
+      trim: true,
+      description: "User's EVM wallet address for receiving USDT",
+    },
+    chain: {
+      type: String,
+      required: true,
+      trim: true,
+      default: "base",
+      description: "Blockchain network (Base)",
+    },
+    token: {
+      type: String,
+      required: true,
+      trim: true,
+      default: "USDT",
+      description: "Token to receive (USDT)",
     },
     status: {
       type: String,
@@ -60,23 +98,24 @@ const WithdrawalRequestSchema: Schema = new Schema(
       default: Date.now,
       description: "When the withdrawal was requested",
     },
-    approvedAt: {
-      type: Date,
-      description: "When the withdrawal was approved (after 24-hour delay)",
-    },
     completedAt: {
       type: Date,
-      description: "When the withdrawal was completed and bank transfer succeeded",
+      description: "When the withdrawal was completed and funds sent",
     },
     failureReason: {
       type: String,
       trim: true,
       description: "Reason for withdrawal failure if status is 'failed'",
     },
-    bankTransferId: {
+    transactionHash: {
       type: String,
       trim: true,
-      description: "Reference to the bank transfer transaction",
+      description: "Blockchain transaction hash for completed withdrawals",
+    },
+    adminNotes: {
+      type: String,
+      trim: true,
+      description: "Admin notes for internal tracking",
     },
   },
   {

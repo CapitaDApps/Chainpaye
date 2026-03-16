@@ -1,15 +1,16 @@
 /**
  * WithdrawalService
  * 
- * Service for processing withdrawal requests from the referral system.
- * Handles validation, request creation, approval, and bank transfer processing.
+ * Service for processing referral earnings withdrawal requests via crypto (USDT on Base).
+ * Handles validation, request creation, and admin-managed completion.
  * 
  * Validates: Requirements 5.1, 5.2, 5.3, 5.5, 5.6
  */
 
 import mongoose from "mongoose";
-import { WithdrawalRequest, IWithdrawalRequest, WithdrawalStatus } from "../models/WithdrawalRequest";
+import { WithdrawalRequest, IWithdrawalRequest, WithdrawalStatus, WithdrawalMethod } from "../models/WithdrawalRequest";
 import { PointsRepository } from "../repositories/PointsRepository";
+import { CrossmintService } from "./CrossmintService";
 
 /**
  * Validation result for withdrawal requests
@@ -20,25 +21,27 @@ export interface WithdrawalValidation {
 }
 
 /**
- * Interface for bank transfer service (to be implemented)
+ * Interface for creating withdrawal requests
  */
-export interface BankTransferService {
-  initiateTransfer(userId: string, amount: number): Promise<string>; // Returns transfer ID
+export interface CreateWithdrawalRequest {
+  userId: string;
+  amount: number;
+  evmAddress: string;
 }
 
 /**
- * Service for managing withdrawal requests
+ * Service for managing referral earnings withdrawal requests
  */
 export class WithdrawalService {
   private pointsRepository: PointsRepository;
-  private bankTransferService: BankTransferService | undefined;
+  private crossmintService: CrossmintService;
 
   constructor(
     pointsRepository: PointsRepository,
-    bankTransferService?: BankTransferService
+    crossmintService: CrossmintService
   ) {
     this.pointsRepository = pointsRepository;
-    this.bankTransferService = bankTransferService;
+    this.crossmintService = crossmintService;
   }
 
   /**

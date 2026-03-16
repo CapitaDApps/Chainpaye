@@ -763,6 +763,47 @@ USD: USD ${usdBalance.balance.toFixed(2)}`;
     //   await this.sendNormalMessage(accountnumber, to);
     // }
   }
+  async sendReferralWithdrawalFlow(to: string, currentBalance: number) {
+    const referralWithdrawalFlowId = WHATSAPP_CONFIG.FLOW_IDS.REFERRAL_WITHDRAWAL;
+    const referralWithdrawalScreenId = "WITHDRAWAL_DETAILS";
+
+    if (!referralWithdrawalFlowId) {
+      throw new Error(
+        "Missing WhatsApp referral withdrawal flow ID. Set WHATSAPP_REFERRAL_WITHDRAWAL_FLOW_ID (or staging equivalent).",
+      );
+    }
+
+    // Get user's EVM address from Crossmint
+    const phone = to.startsWith("+") ? to : `+${to}`;
+    const user = await User.findOne({ whatsappNumber: phone });
+    
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Get or create Base wallet to get EVM address
+    const crossmintService = new (await import("./CrossmintService")).CrossmintService();
+    const wallet = await crossmintService.getOrCreateWallet(user.userId, "base");
+
+    await this.sendTextOnlyFlowWithDataById(
+      to,
+      referralWithdrawalFlowId,
+      referralWithdrawalScreenId,
+      {
+        header: "Withdraw Earnings",
+        body: "Withdraw your referral earnings as USDT on Base chain directly to your wallet.",
+        cta: "Withdraw Earnings",
+      },
+      {
+        currentBalance: currentBalance.toFixed(2),
+        minAmount: "20",
+        chain: "Base",
+        token: "USDT",
+        evmAddress: wallet.address,
+      },
+    );
+  }
+
   async sendSupportMessage(to: string) {
     const message = `🆘 *Need Help?*
 

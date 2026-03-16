@@ -9,11 +9,12 @@ import { DashboardService } from "../../services/DashboardService";
 import { WithdrawalService } from "../../services/WithdrawalService";
 import { PointsRepository } from "../../repositories/PointsRepository";
 import { User } from "../../models/User";
+import { whatsappBusinessService } from "../../services";
 
 /**
  * Handle "referral" command
  * 
- * Displays user's referral dashboard with statistics.
+ * Displays user's referral dashboard with statistics and withdrawal option.
  * 
  * @param userId The user ID executing the command
  * @returns Promise<string> Formatted dashboard message
@@ -36,7 +37,7 @@ Type *kyc* to start verification.
     const dashboardService = new DashboardService();
     const dashboard = await dashboardService.getDashboard(userId);
 
-    return `
+    const message = `
 📊 *Your Referral Dashboard*
 
 🔗 *Referral Code:* ${dashboard.referralCode}
@@ -53,8 +54,18 @@ Type *kyc* to start verification.
 • Earnings are credited for 30 days after referred user signup
 • Minimum withdrawal: $20
 
-To withdraw earnings, type: *withdraw earnings*
+To view withdrawal history, type: *referral history*
      `.trim();
+
+    // Send the dashboard message first
+    await whatsappBusinessService.sendNormalMessage(message, user.whatsappNumber);
+
+    // Then send the withdrawal flow if user has balance
+    if (dashboard.currentBalance >= 20) {
+      await whatsappBusinessService.sendReferralWithdrawalFlow(user.whatsappNumber, dashboard.currentBalance);
+    }
+
+    return ""; // Return empty since we've already sent the messages
   } catch (error) {
     if (error instanceof Error) {
       return `❌ ${error.message}`;
@@ -64,38 +75,100 @@ To withdraw earnings, type: *withdraw earnings*
 }
 
 /**
- * Handle "withdraw [amount]" command
+ * Handle "referral history" command
  * 
- * Processes withdrawal request for user's referral earnings.
+ * Shows user's withdrawal history and current status.
+ * 
+ * @param userId The user ID executing the command
+ * @returns Promise<string> Formatted history message
+ */
+export async function handleReferralHistoryCommand(userId: string): Promise<string> {
+  try {
+    const pointsRepository = new PointsRepository();
+    const withdrawalService = new WithdrawalService(pointsRepository);
+
+    const [withdrawals, currentBalance] = await Promise.all([
+      withdrawalService.getWithdrawalHistory(userId),
+      withdrawalService.getUserBalance(userId)
+    ]);
+
+    if (withdrawals.length === 0) {
+      return `
+📋 *Withdrawal History*
+
+💰 *Current Balance:* $${currentBalance.toFixed(2)}
+
+No withdrawal requests found.
+
+Type *referral* to access your dashboard.
+      `.trim();
+    }
+
+    let historyText = `
+📋 *Withdrawal History*
+
+💰 *Current Balance:* $${currentBalance.toFixed(2)}
+
+*Recent Withdrawals:*
+`;
+
+    withdrawals.slice(0, 5).forEach((withdrawal, index) => {
+      const date = withdrawal.requestedAt.toISOString().split('T')[0];
+      const statusEmoji = withdrawal.status === 'completed' ? '✅' : 
+                         withdrawal.status === 'failed' ? '❌' : '⏳';
+      
+      historyText += `
+${index + 1}. ${statusEmoji} $${withdrawal.amount.toFixed(2)} - ${date}
+   Status: ${withdrawal.status.toUpperCase()}`;
+      
+      if (withdrawal.status === 'completed' && withdrawal.transactionHash) {
+        historyText += `
+   TX: ${withdrawal.transactionHash.substring(0, 10)}...`;
+      }
+      
+      if (withdrawal.status === 'failed' && withdrawal.failureReason) {
+        historyText += `
+   Reason: ${withdrawal.failureReason}`;
+      }
+    });
+
+    if (withdrawals.length > 5) {
+      historyText += `\n\n... and ${withdrawals.length - 5} more`;
+    }
+
+    historyText += `\n\nType *referral* to access your dashboard.`;
+
+    return historyText.trim();
+  } catch (error) {
+    if (error instanceof Error) {
+      return `❌ ${error.message}`;
+    }
+    return "❌ Failed to load withdrawal history. Please try again.";
+  }
+}
+
+/**
+ * Handle "withdraw [amount]" command (legacy support)
+ * 
+ * Redirects users to use the referral flow instead.
  * 
  * @param userId The user ID executing the command
  * @param amount The amount to withdraw
- * @returns Promise<string> Success or error message
+ * @returns Promise<string> Redirect message
  */
 export async function handleWithdrawCommand(
   userId: string,
   amount: number
 ): Promise<string> {
-  try {
-    const pointsRepository = new PointsRepository();
-    const withdrawalService = new WithdrawalService(pointsRepository);
+  return `
+💡 *Withdrawal Method Updated*
 
-    // Request withdrawal
-    const withdrawal = await withdrawalService.requestWithdrawal(userId, amount);
+Referral earnings withdrawals are now processed via crypto (USDT on Base chain).
 
-    return `
-✅ *Withdrawal Request Submitted*
+Type *referral* to access the new withdrawal flow.
 
-💰 Amount: $${amount.toFixed(2)}
-⏰ Status: Pending (24-hour approval period)
-📅 Requested: ${withdrawal.requestedAt.toISOString().split('T')[0]}
-
-Your withdrawal will be processed after the 24-hour security delay.
-    `.trim();
-  } catch (error) {
-    if (error instanceof Error) {
-      return `❌ ${error.message}`;
-    }
-    return "❌ Failed to process withdrawal request. Please try again.";
-  }
+✅ Instant processing
+✅ Lower fees
+✅ Direct to your wallet
+  `.trim();
 }

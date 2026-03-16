@@ -454,11 +454,39 @@ export async function commandRouteHandler(from: string, message: string) {
         }
 
         const dashboardMessage = await handleReferralCommand(user.userId);
-        await whatsappBusinessService.sendNormalMessage(dashboardMessage, from);
+        if (dashboardMessage) {
+          await whatsappBusinessService.sendNormalMessage(dashboardMessage, from);
+        }
       } catch (err) {
         console.error("Error showing referral dashboard:", err);
         await whatsappBusinessService.sendNormalMessage(
           "❌ *Error*\n\nCouldn't load your referral dashboard. Please try again later.",
+          from
+        );
+      }
+      break;
+
+    case "referral history":
+      // Show referral withdrawal history
+      try {
+        const phone = from.startsWith("+") ? from : `+${from}`;
+        const user = await User.findOne({ whatsappNumber: phone });
+
+        if (!user) {
+          await whatsappBusinessService.sendNormalMessage(
+            "❌ *Account Not Found*\n\nPlease create an account first.\n\nType *menu* to get started.",
+            from
+          );
+          return;
+        }
+
+        const { handleReferralHistoryCommand } = await import("./handlers/referralHandler");
+        const historyMessage = await handleReferralHistoryCommand(user.userId);
+        await whatsappBusinessService.sendNormalMessage(historyMessage, from);
+      } catch (err) {
+        console.error("Error showing referral history:", err);
+        await whatsappBusinessService.sendNormalMessage(
+          "❌ *Error*\n\nCouldn't load your withdrawal history. Please try again later.",
           from
         );
       }

@@ -332,3 +332,7 @@ app.use("/flow", userRateLimiter, flowRouter);
 // Transaction API routes
 import transactionRoutes from "../routes/transactionRoutes";
 app.use("/api/transactions", transactionRoutes);
+
+// Admin API routes
+import adminWithdrawalRoutes from "../routes/adminWithdrawal";
+app.use("/api/admin/referral-withdrawals", adminWithdrawalRoutes);

@@ -8,7 +8,7 @@ export { handleTransactionHistory } from "./transactionHandler";
 export { handleTransfer } from "./transferHandler";
 export { handleWithdrawal } from "./withdrawalHandler";
 export { handleStartCommand } from "./startCommandHandler";
-export { handleReferralCommand, handleWithdrawCommand } from "./referralHandler";
+export { handleReferralCommand, handleWithdrawCommand, handleReferralHistoryCommand } from "./referralHandler";
 export { handleUsdDeposit } from "./usdDepositHandler";
 
 export {

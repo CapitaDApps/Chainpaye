@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChainPaye - Referral Withdrawals Admin</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            color: #666;
+            margin-top: 0.5rem;
+        }
+        
+        .withdrawals-section {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .section-header {
+            background: #f8f9fa;
+            padding: 1rem 2rem;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .filter-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .filter-btn {
+            padding: 0.5rem 1rem;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .filter-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        
+        .withdrawals-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .withdrawals-table th,
+        .withdrawals-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .withdrawals-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+        }
+        
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-completed {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-failed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #218838;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+        
+        .modal-content {
+            background: white;
+            margin: 10% auto;
+            padding: 2rem;
+            border-radius: 8px;
+            max-width: 500px;
+            width: 90%;
+        }
+        
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+        
+        .form-textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+            min-height: 100px;
+            resize: vertical;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>ChainPaye - Referral Withdrawals Admin</h1>
+    </div>
+    
+    <div class="container">
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <div class="stat-number" id="totalWithdrawals">-</div>
+                <div class="stat-label">Total Requests</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="pendingWithdrawals">-</div>
+                <div class="stat-label">Pending</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="completedWithdrawals">-</div>
+                <div class="stat-label">Completed</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalAmount">$-</div>
+                <div class="stat-label">Total Processed</div>
+            </div>
+        </div>
+        
+        <div class="withdrawals-section">
+            <div class="section-header">
+                <h2>Withdrawal Requests</h2>
+                <div class="filter-buttons">
+                    <button class="filter-btn active" data-status="all">All</button>
+                    <button class="filter-btn" data-status="pending">Pending</button>
+                    <button class="filter-btn" data-status="completed">Completed</button>
+                    <button class="filter-btn" data-status="failed">Failed</button>
+                </div>
+            </div>
+            
+            <div id="withdrawalsContent">
+                <div class="loading">Loading withdrawals...</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Complete Withdrawal Modal -->
+    <div id="completeModal" class="modal">
+        <div class="modal-content">
+            <h3>Complete Withdrawal</h3>
+            <form id="completeForm">
+                <div class="form-group">
+                    <label class="form-label">Transaction Hash *</label>
+                    <input type="text" id="transactionHash" class="form-input" required 
+                           placeholder="0x..." />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Admin Notes (Optional)</label>
+                    <textarea id="adminNotes" class="form-textarea" 
+                              placeholder="Any additional notes..."></textarea>
+                </div>
+                <div class="action-buttons">
+                    <button type="submit" class="btn btn-success">Complete Withdrawal</button>
+                    <button type="button" class="btn" onclick="closeModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Fail Withdrawal Modal -->
+    <div id="failModal" class="modal">
+        <div class="modal-content">
+            <h3>Fail Withdrawal</h3>
+            <form id="failForm">
+                <div class="form-group">
+                    <label class="form-label">Failure Reason *</label>
+                    <textarea id="failureReason" class="form-textarea" required
+                              placeholder="Explain why this withdrawal failed..."></textarea>
+                </div>
+                <div class="action-buttons">
+                    <button type="submit" class="btn btn-danger">Mark as Failed</button>
+                    <button type="button" class="btn" onclick="closeModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let currentWithdrawalId = null;
+        let currentFilter = 'all';
+        
+        // Load data on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadStats();
+            loadWithdrawals();
+            
+            // Set up filter buttons
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    currentFilter = this.dataset.status;
+                    loadWithdrawals();
+                });
+            });
+            
+            // Set up forms
+            document.getElementById('completeForm').addEventListener('submit', handleCompleteSubmit);
+            document.getElementById('failForm').addEventListener('submit', handleFailSubmit);
+        });
+        
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/admin/referral-withdrawals/stats');
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('totalWithdrawals').textContent = data.data.total;
+                    document.getElementById('pendingWithdrawals').textContent = data.data.pending;
+                    document.getElementById('completedWithdrawals').textContent = data.data.completed;
+                    document.getElementById('totalAmount').textContent = '$' + data.data.totalAmount;
+                }
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+        
+        async function loadWithdrawals() {
+            const content = document.getElementById('withdrawalsContent');
+            content.innerHTML = '<div class="loading">Loading withdrawals...</div>';
+            
+            try {
+                const url = currentFilter === 'all' 
+                    ? '/api/admin/referral-withdrawals'
+                    : `/api/admin/referral-withdrawals?status=${currentFilter}`;
+                    
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.success && data.data.length > 0) {
+                    content.innerHTML = createWithdrawalsTable(data.data);
+                } else {
+                    content.innerHTML = '<div class="loading">No withdrawals found.</div>';
+                }
+            } catch (error) {
+                console.error('Error loading withdrawals:', error);
+                content.innerHTML = '<div class="loading">Error loading withdrawals.</div>';
+            }
+        }
+        
+        function createWithdrawalsTable(withdrawals) {
+            const table = `
+                <table class="withdrawals-table">
+                    <thead>
+                        <tr>
+                            <th>User ID</th>
+                            <th>Amount</th>
+                            <th>Address</th>
+                            <th>Status</th>
+                            <th>Requested</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${withdrawals.map(w => `
+                            <tr>
+                                <td>${w.userId}</td>
+                                <td>$${w.amount.toFixed(2)} USDT</td>
+                                <td title="${w.evmAddress}">${w.evmAddress.substring(0, 6)}...${w.evmAddress.substring(w.evmAddress.length - 4)}</td>
+                                <td><span class="status-badge status-${w.status}">${w.status.toUpperCase()}</span></td>
+                                <td>${new Date(w.requestedAt).toLocaleDateString()}</td>
+                                <td>
+                                    ${w.status === 'pending' ? `
+                                        <div class="action-buttons">
+                                            <button class="btn btn-success" onclick="openCompleteModal('${w.id}')">Complete</button>
+                                            <button class="btn btn-danger" onclick="openFailModal('${w.id}')">Fail</button>
+                                        </div>
+                                    ` : w.transactionHash ? `
+                                        <a href="https://basescan.org/tx/${w.transactionHash}" target="_blank" class="btn">View TX</a>
+                                    ` : '-'}
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            return table;
+        }
+        
+        function openCompleteModal(withdrawalId) {
+            currentWithdrawalId = withdrawalId;
+            document.getElementById('completeModal').style.display = 'block';
+            document.getElementById('transactionHash').focus();
+        }
+        
+        function openFailModal(withdrawalId) {
+            currentWithdrawalId = withdrawalId;
+            document.getElementById('failModal').style.display = 'block';
+            document.getElementById('failureReason').focus();
+        }
+        
+        function closeModal() {
+            document.getElementById('completeModal').style.display = 'none';
+            document.getElementById('failModal').style.display = 'none';
+            currentWithdrawalId = null;
+            
+            // Reset forms
+            document.getElementById('completeForm').reset();
+            document.getElementById('failForm').reset();
+        }
+        
+        async function handleCompleteSubmit(e) {
+            e.preventDefault();
+            
+            const transactionHash = document.getElementById('transactionHash').value;
+            const adminNotes = document.getElementById('adminNotes').value;
+            
+            try {
+                const response = await fetch(`/api/admin/referral-withdrawals/${currentWithdrawalId}/complete`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        transactionHash,
+                        adminNotes: adminNotes || undefined,
+                    }),
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Withdrawal completed successfully!');
+                    closeModal();
+                    loadStats();
+                    loadWithdrawals();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Error completing withdrawal:', error);
+                alert('Error completing withdrawal. Please try again.');
+            }
+        }
+        
+        async function handleFailSubmit(e) {
+            e.preventDefault();
+            
+            const reason = document.getElementById('failureReason').value;
+            
+            try {
+                const response = await fetch(`/api/admin/referral-withdrawals/${currentWithdrawalId}/fail`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        reason,
+                    }),
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Withdrawal marked as failed.');
+                    closeModal();
+                    loadStats();
+                    loadWithdrawals();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Error failing withdrawal:', error);
+                alert('Error processing request. Please try again.');
+            }
+        }
+        
+        // Close modal when clicking outside
+        window.addEventListener('click', function(e) {
+            if (e.target.classList.contains('modal')) {
+                closeModal();
+            }
+        });
+        
+        // Auto-refresh every 30 seconds
+        setInterval(() => {
+            loadStats();
+            loadWithdrawals();
+        }, 30000);
+    </script>
+</body>
+</html>
