@@ -80,7 +80,8 @@
                     "evmAddress": "${data.evmAddress}",
                     "chain": "${data.chain}",
                     "token": "${data.token}",
-                    "currentBalance": "${data.currentBalance}"
+                    "currentBalance": "${data.currentBalance}",
+                    "screen": "WITHDRAWAL_DETAILS"
                   }
                 }
               }
@@ -88,8 +89,7 @@
           }
         ]
       }
-    }
-,
+    },
     {
       "id": "WITHDRAWAL_CONFIRMATION",
       "title": "Confirm Withdrawal",
@@ -112,9 +112,9 @@
           "type": "string",
           "__example__": "USDT"
         },
-        "currentBalance": {
+        "status": {
           "type": "string",
-          "__example__": "125.50"
+          "__example__": "submitted"
         }
       },
       "layout": {
@@ -150,7 +150,8 @@
                 "amount": "${data.amount}",
                 "evmAddress": "${data.evmAddress}",
                 "chain": "${data.chain}",
-                "token": "${data.token}"
+                "token": "${data.token}",
+                "screen": "WITHDRAWAL_CONFIRMATION"
               }
             }
           }
