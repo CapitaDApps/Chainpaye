@@ -5,272 +5,513 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ChainPaye Admin</title>
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0f2f5;color:#333}
-.header{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:1rem 2rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem}
-.header h1{font-size:1.3rem}
-.nav-tabs{display:flex;gap:.4rem;flex-wrap:wrap}
-.nav-tab{padding:.4rem 1rem;border-radius:4px;cursor:pointer;background:rgba(255,255,255,.15);color:#fff;border:none;font-size:.88rem;transition:background .2s}
-.nav-tab.active{background:rgba(255,255,255,.35);font-weight:600}
-.container{max-width:1350px;margin:0 auto;padding:1.5rem}
-.page{display:none}.page.active{display:block}
-.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:1.5rem}
-.stat-card{background:#fff;padding:1.1rem 1rem;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.07);text-align:center}
-.stat-number{font-size:1.7rem;font-weight:700;color:#667eea}
-.stat-number.green{color:#28a745}.stat-number.orange{color:#fd7e14}.stat-number.red{color:#dc3545}
-.stat-label{color:#777;margin-top:.25rem;font-size:.82rem}
-.two-col{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem}
-.card{background:#fff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.07);overflow:hidden;margin-bottom:1.25rem}
-.card-header{background:#f8f9fa;padding:.8rem 1.2rem;border-bottom:1px solid #e9ecef;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem}
-.card-header h2{font-size:.98rem;font-weight:600}
-.card-body{padding:1.1rem}
-.filters{display:flex;gap:.45rem;flex-wrap:wrap;align-items:center}
-.filter-btn{padding:.32rem .75rem;border:1px solid #ddd;background:#fff;border-radius:4px;cursor:pointer;font-size:.8rem}
-.filter-btn.active{background:#667eea;color:#fff;border-color:#667eea}
-select.fs{padding:.32rem .55rem;border:1px solid #ddd;border-radius:4px;font-size:.8rem;background:#fff}
-input.fs{padding:.32rem .55rem;border:1px solid #ddd;border-radius:4px;font-size:.8rem}
-table{width:100%;border-collapse:collapse}
-th,td{padding:.68rem .9rem;text-align:left;border-bottom:1px solid #e9ecef;font-size:.85rem}
-th{background:#f8f9fa;font-weight:600;white-space:nowrap}
-tr:last-child td{border-bottom:none}
-tr:hover td{background:#fafbff}
-.badge{padding:.16rem .55rem;border-radius:20px;font-size:.76rem;font-weight:500;white-space:nowrap}
-.badge-pending{background:#fff3cd;color:#856404}
-.badge-completed{background:#d4edda;color:#155724}
-.badge-failed{background:#f8d7da;color:#721c24}
-.badge-processing{background:#cce5ff;color:#004085}
-.badge-cancelled{background:#e2e3e5;color:#383d41}
-.badge-verified{background:#d4edda;color:#155724}
-.badge-unverified{background:#fff3cd;color:#856404}
-.btn{padding:.38rem .8rem;border:none;border-radius:4px;cursor:pointer;font-size:.82rem;transition:opacity .2s}
-.btn:hover{opacity:.85}
-.btn-primary{background:#667eea;color:#fff}
-.btn-success{background:#28a745;color:#fff}
-.btn-danger{background:#dc3545;color:#fff}
-.btn-outline{background:#fff;border:1px solid #ddd;color:#333}
-.btn-sm{padding:.26rem .55rem;font-size:.76rem}
-.action-btns{display:flex;gap:.3rem}
-.loading{text-align:center;padding:2rem;color:#bbb}
-.empty{text-align:center;padding:2rem;color:#ccc;font-size:.88rem}
-.search-row{display:flex;gap:.6rem;margin-bottom:1.2rem}
-.search-row input{flex:1;padding:.62rem 1rem;border:1px solid #ddd;border-radius:6px;font-size:.93rem}
-.user-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
-.profile-field{margin-bottom:.6rem}
-.profile-field label{font-size:.73rem;color:#aaa;display:block;margin-bottom:.12rem;text-transform:uppercase;letter-spacing:.04em}
-.profile-field span{font-size:.9rem;font-weight:500;word-break:break-all}
-.ref-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.7rem}
-.rs-card{background:#f8f9fa;border-radius:6px;padding:.8rem;text-align:center}
-.rs-value{font-size:1.25rem;font-weight:700;color:#667eea}
-.rs-label{font-size:.73rem;color:#888;margin-top:.18rem}
-.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:1000}
-.modal-content{background:#fff;margin:8% auto;padding:1.6rem;border-radius:8px;max-width:450px;width:90%}
-.modal-content h3{margin-bottom:1rem}
-.form-group{margin-bottom:.85rem}
-.form-label{display:block;margin-bottom:.3rem;font-weight:500;font-size:.86rem}
-.form-input{width:100%;padding:.62rem;border:1px solid #ddd;border-radius:4px;font-size:.9rem}
-textarea.form-input{min-height:75px;resize:vertical}
-a.tx-link{color:#667eea;text-decoration:none;font-size:.82rem}
-a.tx-link:hover{text-decoration:underline}
-.pagination{display:flex;gap:.4rem;align-items:center;justify-content:flex-end;padding:.7rem 1rem;border-top:1px solid #e9ecef}
-.page-btn{padding:.28rem .6rem;border:1px solid #ddd;background:#fff;border-radius:4px;cursor:pointer;font-size:.8rem}
-.page-btn:disabled{opacity:.35;cursor:default}
-.page-info{font-size:.8rem;color:#888;margin:0 .4rem}
-.divider{border:none;border-top:1px solid #e9ecef;margin:1rem 0}
-.trend{font-size:.75rem;margin-top:.15rem}
-.trend.up{color:#28a745}.trend.down{color:#dc3545}
+:root {
+  --primary: #5b4fcf;
+  --primary-dark: #4338a8;
+  --primary-light: #ede9ff;
+  --accent: #7c6ef5;
+  --success: #16a34a;
+  --success-bg: #dcfce7;
+  --warning: #d97706;
+  --warning-bg: #fef3c7;
+  --danger: #dc2626;
+  --danger-bg: #fee2e2;
+  --info: #0284c7;
+  --info-bg: #e0f2fe;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-700: #374151;
+  --gray-900: #111827;
+  --white: #ffffff;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
+  --shadow: 0 4px 6px -1px rgba(0,0,0,.08), 0 2px 4px -1px rgba(0,0,0,.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.08), 0 4px 6px -2px rgba(0,0,0,.04);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-xs: 6px;
+}
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior: smooth; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif; background: var(--gray-100); color: var(--gray-900); min-height: 100vh; }
+
+/* ── Sidebar ── */
+.sidebar {
+  position: fixed; top:0; left:0; height:100vh; width:240px;
+  background: linear-gradient(180deg, #1e1557 0%, #2d1f8a 50%, #3b2aad 100%);
+  display: flex; flex-direction: column; z-index: 100;
+  transition: transform .3s ease;
+}
+.sidebar-logo {
+  padding: 1.5rem 1.25rem 1rem;
+  display: flex; align-items: center; gap: .75rem;
+  border-bottom: 1px solid rgba(255,255,255,.1);
+}
+.sidebar-logo img { width: 38px; height: 38px; border-radius: 8px; object-fit: cover; }
+.sidebar-logo-text { color: #fff; font-size: 1.1rem; font-weight: 700; letter-spacing: -.02em; }
+.sidebar-logo-text span { color: #a78bfa; }
+.sidebar-nav { flex: 1; padding: 1rem 0; overflow-y: auto; }
+.nav-item {
+  display: flex; align-items: center; gap: .75rem;
+  padding: .7rem 1.25rem; color: rgba(255,255,255,.65);
+  cursor: pointer; font-size: .88rem; font-weight: 500;
+  border-left: 3px solid transparent; transition: all .2s;
+  user-select: none;
+}
+.nav-item:hover { color: #fff; background: rgba(255,255,255,.07); }
+.nav-item.active { color: #fff; background: rgba(255,255,255,.12); border-left-color: #a78bfa; }
+.nav-item .nav-icon { font-size: 1.1rem; width: 20px; text-align: center; flex-shrink: 0; }
+.sidebar-footer { padding: 1rem 1.25rem; border-top: 1px solid rgba(255,255,255,.1); }
+.sidebar-footer p { color: rgba(255,255,255,.4); font-size: .75rem; }
+
+/* ── Main layout ── */
+.main { margin-left: 240px; min-height: 100vh; display: flex; flex-direction: column; }
+.topbar {
+  background: var(--white); border-bottom: 1px solid var(--gray-200);
+  padding: .9rem 2rem; display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 50; box-shadow: var(--shadow-sm);
+}
+.topbar-left { display: flex; align-items: center; gap: .75rem; }
+.menu-toggle { display: none; background: none; border: none; cursor: pointer; padding: .25rem; color: var(--gray-700); font-size: 1.3rem; }
+.topbar-title { font-size: 1.05rem; font-weight: 600; color: var(--gray-900); }
+.topbar-right { display: flex; align-items: center; gap: .75rem; }
+.refresh-btn {
+  display: flex; align-items: center; gap: .4rem;
+  padding: .45rem .9rem; background: var(--primary-light); color: var(--primary);
+  border: none; border-radius: var(--radius-xs); cursor: pointer; font-size: .83rem; font-weight: 500;
+  transition: background .2s;
+}
+.refresh-btn:hover { background: #ddd6fe; }
+.live-dot { width: 8px; height: 8px; background: var(--success); border-radius: 50%; animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.content { flex: 1; padding: 1.75rem 2rem; }
+
+/* ── Page sections ── */
+.page { display: none; }
+.page.active { display: block; }
+.page-header { margin-bottom: 1.5rem; }
+.page-header h2 { font-size: 1.3rem; font-weight: 700; color: var(--gray-900); }
+.page-header p { color: var(--gray-500); font-size: .88rem; margin-top: .2rem; }
+
+/* ── Stat cards ── */
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+.stat-card {
+  background: var(--white); border-radius: var(--radius); padding: 1.25rem;
+  box-shadow: var(--shadow-sm); border: 1px solid var(--gray-200);
+  display: flex; flex-direction: column; gap: .5rem; transition: box-shadow .2s;
+}
+.stat-card:hover { box-shadow: var(--shadow); }
+.stat-card-top { display: flex; justify-content: space-between; align-items: flex-start; }
+.stat-icon { width: 40px; height: 40px; border-radius: var(--radius-xs); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+.stat-icon.purple { background: var(--primary-light); }
+.stat-icon.green { background: var(--success-bg); }
+.stat-icon.orange { background: var(--warning-bg); }
+.stat-icon.red { background: var(--danger-bg); }
+.stat-icon.blue { background: var(--info-bg); }
+.stat-value { font-size: 1.65rem; font-weight: 700; color: var(--gray-900); line-height: 1; }
+.stat-label { font-size: .8rem; color: var(--gray-500); font-weight: 500; }
+.stat-trend { font-size: .75rem; font-weight: 500; }
+.stat-trend.up { color: var(--success); }
+.stat-trend.neutral { color: var(--gray-400); }
+
+/* ── Cards ── */
+.card { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow-sm); border: 1px solid var(--gray-200); overflow: hidden; margin-bottom: 1.25rem; }
+.card-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--gray-200); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem; background: var(--white); }
+.card-header h3 { font-size: .95rem; font-weight: 600; color: var(--gray-900); }
+.card-body { padding: 1.25rem; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+
+/* ── Filters ── */
+.filters { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+.filter-pill {
+  padding: .32rem .8rem; border: 1.5px solid var(--gray-200); background: var(--white);
+  border-radius: 20px; cursor: pointer; font-size: .8rem; font-weight: 500; color: var(--gray-500);
+  transition: all .15s;
+}
+.filter-pill:hover { border-color: var(--primary); color: var(--primary); }
+.filter-pill.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.filter-select, .filter-input {
+  padding: .38rem .7rem; border: 1.5px solid var(--gray-200); border-radius: var(--radius-xs);
+  font-size: .82rem; background: var(--white); color: var(--gray-700); outline: none;
+  transition: border-color .15s;
+}
+.filter-select:focus, .filter-input:focus { border-color: var(--primary); }
+
+/* ── Table ── */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 600px; }
+thead th { background: var(--gray-50); padding: .7rem 1rem; text-align: left; font-size: .78rem; font-weight: 600; color: var(--gray-500); text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; border-bottom: 1px solid var(--gray-200); }
+tbody td { padding: .8rem 1rem; font-size: .86rem; color: var(--gray-700); border-bottom: 1px solid var(--gray-100); vertical-align: middle; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: var(--gray-50); }
+
+/* ── Badges ── */
+.badge { display: inline-flex; align-items: center; padding: .2rem .65rem; border-radius: 20px; font-size: .75rem; font-weight: 600; white-space: nowrap; }
+.badge-pending { background: var(--warning-bg); color: var(--warning); }
+.badge-completed { background: var(--success-bg); color: var(--success); }
+.badge-failed { background: var(--danger-bg); color: var(--danger); }
+.badge-processing { background: var(--info-bg); color: var(--info); }
+.badge-cancelled { background: var(--gray-100); color: var(--gray-500); }
+.badge-verified { background: var(--success-bg); color: var(--success); }
+.badge-unverified { background: var(--warning-bg); color: var(--warning); }
+.badge-type { background: #ede9ff; color: var(--primary); }
+
+/* ── Buttons ── */
+.btn { display: inline-flex; align-items: center; gap: .35rem; padding: .45rem .9rem; border: none; border-radius: var(--radius-xs); cursor: pointer; font-size: .83rem; font-weight: 500; transition: all .15s; white-space: nowrap; }
+.btn:hover { opacity: .88; transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-success { background: var(--success); color: #fff; }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-outline { background: var(--white); border: 1.5px solid var(--gray-200); color: var(--gray-700); }
+.btn-ghost { background: transparent; color: var(--primary); }
+.btn-sm { padding: .3rem .65rem; font-size: .78rem; }
+.btn-xs { padding: .2rem .5rem; font-size: .74rem; }
+
+/* ── Search ── */
+.search-row { display: flex; gap: .6rem; margin-bottom: 1.25rem; }
+.search-input-wrap { flex: 1; position: relative; }
+.search-input-wrap input { width: 100%; padding: .65rem 1rem .65rem 2.5rem; border: 1.5px solid var(--gray-200); border-radius: var(--radius-sm); font-size: .9rem; outline: none; transition: border-color .15s; }
+.search-input-wrap input:focus { border-color: var(--primary); }
+.search-icon { position: absolute; left: .8rem; top: 50%; transform: translateY(-50%); color: var(--gray-400); font-size: .95rem; pointer-events: none; }
+
+/* ── User detail ── */
+.user-profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+.profile-field label { font-size: .72rem; color: var(--gray-400); display: block; margin-bottom: .15rem; text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+.profile-field span { font-size: .88rem; font-weight: 500; color: var(--gray-900); word-break: break-all; }
+.ref-stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: .75rem; }
+.rs-card { background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: var(--radius-sm); padding: .9rem; text-align: center; }
+.rs-value { font-size: 1.2rem; font-weight: 700; color: var(--primary); }
+.rs-label { font-size: .73rem; color: var(--gray-500); margin-top: .2rem; font-weight: 500; }
+
+/* ── Pagination ── */
+.pagination { display: flex; align-items: center; justify-content: flex-end; gap: .4rem; padding: .85rem 1.25rem; border-top: 1px solid var(--gray-200); }
+.page-btn { padding: .32rem .65rem; border: 1.5px solid var(--gray-200); background: var(--white); border-radius: var(--radius-xs); cursor: pointer; font-size: .8rem; font-weight: 500; color: var(--gray-700); transition: all .15s; }
+.page-btn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+.page-btn:disabled { opacity: .35; cursor: default; }
+.page-info { font-size: .8rem; color: var(--gray-500); margin: 0 .5rem; }
+
+/* ── Modal ── */
+.modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 200; align-items: center; justify-content: center; padding: 1rem; }
+.modal.open { display: flex; }
+.modal-box { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow-lg); width: 100%; max-width: 460px; overflow: hidden; animation: slideUp .2s ease; }
+@keyframes slideUp { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
+.modal-header { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--gray-200); display: flex; justify-content: space-between; align-items: center; }
+.modal-header h3 { font-size: 1rem; font-weight: 600; }
+.modal-close { background: none; border: none; cursor: pointer; color: var(--gray-400); font-size: 1.2rem; line-height: 1; padding: .2rem; }
+.modal-close:hover { color: var(--gray-700); }
+.modal-body { padding: 1.5rem; }
+.modal-footer { padding: 1rem 1.5rem; border-top: 1px solid var(--gray-200); display: flex; gap: .5rem; justify-content: flex-end; }
+.form-group { margin-bottom: 1rem; }
+.form-label { display: block; margin-bottom: .4rem; font-weight: 500; font-size: .85rem; color: var(--gray-700); }
+.form-input { width: 100%; padding: .65rem .85rem; border: 1.5px solid var(--gray-200); border-radius: var(--radius-xs); font-size: .9rem; outline: none; transition: border-color .15s; }
+.form-input:focus { border-color: var(--primary); }
+textarea.form-input { min-height: 80px; resize: vertical; }
+
+/* ── Misc ── */
+.loading { text-align: center; padding: 3rem; color: var(--gray-400); font-size: .9rem; }
+.loading::before { content: ''; display: block; width: 32px; height: 32px; border: 3px solid var(--gray-200); border-top-color: var(--primary); border-radius: 50%; animation: spin .7s linear infinite; margin: 0 auto 1rem; }
+@keyframes spin { to{transform:rotate(360deg)} }
+.empty { text-align: center; padding: 3rem; color: var(--gray-400); font-size: .88rem; }
+.empty::before { content: '📭'; display: block; font-size: 2rem; margin-bottom: .75rem; }
+a.tx-link { color: var(--primary); text-decoration: none; font-size: .82rem; font-weight: 500; }
+a.tx-link:hover { text-decoration: underline; }
+.mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: .78rem; }
+.action-btns { display: flex; gap: .3rem; }
+.divider { border: none; border-top: 1px solid var(--gray-200); margin: 1rem 0; }
+
+/* ── Responsive ── */
+@media (max-width: 1024px) {
+  .sidebar { transform: translateX(-100%); }
+  .sidebar.open { transform: translateX(0); }
+  .main { margin-left: 0; }
+  .menu-toggle { display: block; }
+  .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 99; }
+  .sidebar-overlay.open { display: block; }
+  .two-col { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+  .content { padding: 1rem; }
+  .topbar { padding: .75rem 1rem; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: .75rem; }
+  .user-profile-grid { grid-template-columns: 1fr; }
+  .search-row { flex-wrap: wrap; }
+  .filters { gap: .35rem; }
+}
+@media (max-width: 480px) {
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+  .stat-value { font-size: 1.35rem; }
+}
 </style>
 </head>
 <body>
-<div class="header">
-  <h1>ChainPaye Admin</h1>
-  <div class="nav-tabs">
-    <button class="nav-tab active" onclick="switchTab('overview',this)">Overview</button>
-    <button class="nav-tab" onclick="switchTab('withdrawals',this)">Withdrawals</button>
-    <button class="nav-tab" onclick="switchTab('users',this)">Users</button>
-    <button class="nav-tab" onclick="switchTab('transactions',this)">Transactions</button>
-    <button class="nav-tab" onclick="switchTab('offramp',this)">Off-Ramp</button>
-  </div>
-</div>
-<div class="container">
 
-<!-- ===== OVERVIEW TAB ===== -->
-<div id="tab-overview" class="page active">
-  <div class="stats-grid">
-    <div class="stat-card"><div class="stat-number" id="ovTotalUsers">-</div><div class="stat-label">Total Users</div><div class="trend" id="ovNew7d"></div></div>
-    <div class="stat-card"><div class="stat-number green" id="ovVerified">-</div><div class="stat-label">Verified Users</div></div>
-    <div class="stat-card"><div class="stat-number orange" id="ovNewToday">-</div><div class="stat-label">New Today</div></div>
-    <div class="stat-card"><div class="stat-number" id="ovNew30d">-</div><div class="stat-label">New (30 days)</div></div>
-    <div class="stat-card"><div class="stat-number" id="ovTxVolume">-</div><div class="stat-label">Tx Volume (USD)</div></div>
-    <div class="stat-card"><div class="stat-number green" id="ovTxFees">-</div><div class="stat-label">Tx Fees Collected</div></div>
-    <div class="stat-card"><div class="stat-number" id="ovOfframpVol">-</div><div class="stat-label">Off-Ramp Crypto (USD)</div></div>
-    <div class="stat-card"><div class="stat-number green" id="ovOfframpFees">-</div><div class="stat-label">Off-Ramp Fees</div></div>
-    <div class="stat-card"><div class="stat-number orange" id="ovPendingW">-</div><div class="stat-label">Pending Withdrawals $</div></div>
-    <div class="stat-card"><div class="stat-number green" id="ovCompletedW">-</div><div class="stat-label">Completed Withdrawals $</div></div>
-    <div class="stat-card"><div class="stat-number orange" id="ovOutstandingBal">-</div><div class="stat-label">Outstanding Referral Balance</div></div>
-    <div class="stat-card"><div class="stat-number" id="ovTotalEarned">-</div><div class="stat-label">Total Referral Earned (ever)</div></div>
-  </div>
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 
-  <div class="two-col">
-    <div class="card">
-      <div class="card-header"><h2>Transaction Breakdown</h2></div>
-      <div id="ovTxBreakdown"><div class="loading">-</div></div>
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <img src="/logo-icon.jpg" alt="ChainPaye" />
+    <span class="sidebar-logo-text">Chain<span>Paye</span></span>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-item active" onclick="switchTab('overview',this)" data-tab="overview">
+      <span class="nav-icon">📊</span> Overview
     </div>
-    <div class="card">
-      <div class="card-header"><h2>Off-Ramp Breakdown</h2></div>
-      <div id="ovOfframpBreakdown"><div class="loading">-</div></div>
+    <div class="nav-item" onclick="switchTab('withdrawals',this)" data-tab="withdrawals">
+      <span class="nav-icon">💸</span> Withdrawals
     </div>
+    <div class="nav-item" onclick="switchTab('users',this)" data-tab="users">
+      <span class="nav-icon">👥</span> Users
+    </div>
+    <div class="nav-item" onclick="switchTab('transactions',this)" data-tab="transactions">
+      <span class="nav-icon">🔄</span> Transactions
+    </div>
+    <div class="nav-item" onclick="switchTab('offramp',this)" data-tab="offramp">
+      <span class="nav-icon">🏦</span> Off-Ramp
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <p>ChainPaye Admin v1.0</p>
   </div>
+</aside>
 
-  <div class="card">
-    <div class="card-header"><h2>Recent Signups</h2><button class="btn btn-outline btn-sm" onclick="loadOverview()">↻ Refresh</button></div>
-    <div id="ovRecentSignups"><div class="loading">-</div></div>
-  </div>
-</div>
+<div class="main">
+  <header class="topbar">
+    <div class="topbar-left">
+      <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+      <span class="topbar-title" id="topbarTitle">Overview</span>
+    </div>
+    <div class="topbar-right">
+      <div class="live-dot" title="Live data"></div>
+      <button class="refresh-btn" onclick="refreshCurrent()">↻ Refresh</button>
+    </div>
+  </header>
 
-<!-- ===== WITHDRAWALS TAB ===== -->
-<div id="tab-withdrawals" class="page">
-  <div class="stats-grid">
-    <div class="stat-card"><div class="stat-number" id="wTotal">-</div><div class="stat-label">Total Requests</div></div>
-    <div class="stat-card"><div class="stat-number orange" id="wPending">-</div><div class="stat-label">Pending</div></div>
-    <div class="stat-card"><div class="stat-number green" id="wCompleted">-</div><div class="stat-label">Completed</div></div>
-    <div class="stat-card"><div class="stat-number green" id="wAmount">$-</div><div class="stat-label">Total Processed</div></div>
-  </div>
-  <div class="card">
-    <div class="card-header">
-      <h2>Withdrawal Requests</h2>
-      <div class="filters">
-        <button class="filter-btn active" data-wstatus="all">All</button>
-        <button class="filter-btn" data-wstatus="pending">Pending</button>
-        <button class="filter-btn" data-wstatus="completed">Completed</button>
-        <button class="filter-btn" data-wstatus="failed">Failed</button>
+  <main class="content">
+
+    <!-- ===== OVERVIEW ===== -->
+    <div id="tab-overview" class="page active">
+      <div class="page-header">
+        <h2>Dashboard Overview</h2>
+        <p>Real-time metrics across all ChainPaye activity</p>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-card-top"><div><div class="stat-label">Total Users</div><div class="stat-value" id="ovTotalUsers">—</div></div><div class="stat-icon purple">👤</div></div>
+          <div class="stat-trend up" id="ovNew7d"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top"><div><div class="stat-label">Verified Users</div><div class="stat-value" id="ovVerified">—</div></div><div class="stat-icon green">✅</div></div>
+          <div class="stat-trend neutral" id="ovUnverified"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top"><div><div class="stat-label">New Today</div><div class="stat-value" id="ovNewToday">—</div></div><div class="stat-icon orange">🆕</div></div>
+          <div class="stat-trend neutral" id="ovNew30d"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top"><div><div class="stat-label">Tx Volume (USD)</div><div class="stat-value" id="ovTxVolume">—</div></div><div class="stat-icon blue">💱</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top"><div><div class="stat-label">Tx Fees Collected</div><div class="stat-value" id="ovTxFees">—</div></div><div class="stat-icon green">💰</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top"><div><div class="stat-label">Off-Ramp Crypto</div><div class="stat-value" id="ovOfframpVol">—</div></div><div class="stat-icon purple">🔁</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top"><div><div class="stat-label">Off-Ramp Fees</div><div class="stat-value" id="ovOfframpFees">—</div></div><div class="stat-icon green">💵</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top"><div><div class="stat-label">Pending Withdrawals</div><div class="stat-value" id="ovPendingW">—</div></div><div class="stat-icon orange">⏳</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top"><div><div class="stat-label">Completed Withdrawals</div><div class="stat-value" id="ovCompletedW">—</div></div><div class="stat-icon green">✔️</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top"><div><div class="stat-label">Outstanding Balance</div><div class="stat-value" id="ovOutstandingBal">—</div></div><div class="stat-icon orange">🏦</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top"><div><div class="stat-label">Total Referral Earned</div><div class="stat-value" id="ovTotalEarned">—</div></div><div class="stat-icon purple">🎯</div></div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-header"><h3>Transaction Breakdown</h3></div>
+          <div id="ovTxBreakdown"><div class="loading"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>Off-Ramp Breakdown</h3></div>
+          <div id="ovOfframpBreakdown"><div class="loading"></div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3>Recent Signups</h3></div>
+        <div id="ovRecentSignups"><div class="loading"></div></div>
       </div>
     </div>
-    <div id="withdrawalsContent"><div class="loading">Loading…</div></div>
-  </div>
-</div>
 
-<!-- ===== USERS TAB ===== -->
-<div id="tab-users" class="page">
-  <div class="search-row">
-    <input type="text" id="userSearchInput" placeholder="Search by name, phone, userId, referral code or email…" />
-    <button class="btn btn-primary" onclick="searchUsers()">Search</button>
-    <button class="btn btn-outline" onclick="loadAllUsers(1)">Show All</button>
-  </div>
-  <div id="usersListArea"></div>
-  <div id="userDetailPanel" style="display:none">
-    <div class="card">
-      <div class="card-header"><h2 id="userDetailName">User Profile</h2><button class="btn btn-outline btn-sm" onclick="closeUserDetail()">✕ Close</button></div>
-      <div class="card-body"><div class="user-grid" id="userProfileFields"></div></div>
-    </div>
-    <div class="card">
-      <div class="card-header"><h2>Referral Stats</h2></div>
-      <div class="card-body"><div class="ref-stats" id="referralStatsGrid"></div></div>
-    </div>
-    <div class="card"><div class="card-header"><h2>Recent Referrals</h2></div><div id="recentReferralsContent"><div class="loading">-</div></div></div>
-    <div class="card"><div class="card-header"><h2>Recent Withdrawals</h2></div><div id="recentWithdrawalsContent"><div class="loading">-</div></div></div>
-  </div>
-</div>
-
-<!-- ===== TRANSACTIONS TAB ===== -->
-<div id="tab-transactions" class="page">
-  <div class="stats-grid">
-    <div class="stat-card"><div class="stat-number" id="txTotal">-</div><div class="stat-label">Total</div></div>
-    <div class="stat-card"><div class="stat-number green" id="txCompleted">-</div><div class="stat-label">Completed</div></div>
-    <div class="stat-card"><div class="stat-number orange" id="txPending">-</div><div class="stat-label">Pending</div></div>
-    <div class="stat-card"><div class="stat-number red" id="txFailed">-</div><div class="stat-label">Failed</div></div>
-  </div>
-  <div class="card">
-    <div class="card-header">
-      <h2>Transactions</h2>
-      <div class="filters">
-        <select class="fs" id="txStatusFilter" onchange="loadTransactions(1)">
-          <option value="">All Status</option>
-          <option value="pending">Pending</option>
-          <option value="processing">Processing</option>
-          <option value="completed">Completed</option>
-          <option value="failed">Failed</option>
-          <option value="cancelled">Cancelled</option>
-        </select>
-        <select class="fs" id="txTypeFilter" onchange="loadTransactions(1)">
-          <option value="">All Types</option>
-          <option value="payment">Payment</option>
-          <option value="transfer">Transfer</option>
-          <option value="deposit">Deposit</option>
-          <option value="withdrawal">Withdrawal</option>
-          <option value="conversion">Conversion</option>
-          <option value="off_ramp">Off-Ramp</option>
-          <option value="direct_transfer">Direct Transfer</option>
-        </select>
-        <input class="fs" type="text" id="txUserFilter" placeholder="User ObjectId…" style="width:190px" />
-        <button class="btn btn-primary btn-sm" onclick="loadTransactions(1)">Filter</button>
-        <button class="btn btn-outline btn-sm" onclick="clearTxFilters()">Clear</button>
+    <!-- ===== WITHDRAWALS ===== -->
+    <div id="tab-withdrawals" class="page">
+      <div class="page-header"><h2>Withdrawal Requests</h2><p>Manage referral earnings withdrawals</p></div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-card-top"><div><div class="stat-label">Total Requests</div><div class="stat-value" id="wTotal">—</div></div><div class="stat-icon purple">📋</div></div></div>
+        <div class="stat-card"><div class="stat-card-top"><div><div class="stat-label">Pending</div><div class="stat-value" id="wPending">—</div></div><div class="stat-icon orange">⏳</div></div></div>
+        <div class="stat-card"><div class="stat-card-top"><div><div class="stat-label">Completed</div><div class="stat-value" id="wCompleted">—</div></div><div class="stat-icon green">✅</div></div></div>
+        <div class="stat-card"><div class="stat-card-top"><div><div class="stat-label">Total Processed</div><div class="stat-value" id="wAmount">—</div></div><div class="stat-icon green">💰</div></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3>All Requests</h3>
+          <div class="filters">
+            <button class="filter-pill active" data-wstatus="all">All</button>
+            <button class="filter-pill" data-wstatus="pending">Pending</button>
+            <button class="filter-pill" data-wstatus="completed">Completed</button>
+            <button class="filter-pill" data-wstatus="failed">Failed</button>
+          </div>
+        </div>
+        <div class="table-wrap" id="withdrawalsContent"><div class="loading"></div></div>
       </div>
     </div>
-    <div id="transactionsContent"><div class="loading">Loading…</div></div>
-    <div class="pagination" id="txPagination" style="display:none">
-      <button class="page-btn" id="txPrevBtn" onclick="loadTransactions(txPage-1)">‹ Prev</button>
-      <span class="page-info" id="txPageInfo"></span>
-      <button class="page-btn" id="txNextBtn" onclick="loadTransactions(txPage+1)">Next ›</button>
-    </div>
-  </div>
-</div>
 
-<!-- ===== OFF-RAMP TAB ===== -->
-<div id="tab-offramp" class="page">
-  <div class="stats-grid">
-    <div class="stat-card"><div class="stat-number" id="orTotal">-</div><div class="stat-label">Total</div></div>
-    <div class="stat-card"><div class="stat-number green" id="orCompleted">-</div><div class="stat-label">Completed</div></div>
-    <div class="stat-card"><div class="stat-number orange" id="orProcessing">-</div><div class="stat-label">Processing</div></div>
-    <div class="stat-card"><div class="stat-number red" id="orFailed">-</div><div class="stat-label">Failed</div></div>
-    <div class="stat-card"><div class="stat-number" id="orCryptoVol">-</div><div class="stat-label">Crypto Volume (USD)</div></div>
-    <div class="stat-card"><div class="stat-number" id="orNgnVol">-</div><div class="stat-label">NGN Disbursed</div></div>
-    <div class="stat-card"><div class="stat-number green" id="orFees">-</div><div class="stat-label">Fees Collected (USD)</div></div>
-  </div>
-  <div class="card">
-    <div class="card-header">
-      <h2>Off-Ramp Transactions</h2>
-      <div class="filters">
-        <select class="fs" id="orStatusFilter" onchange="loadOfframp(1)">
-          <option value="">All Status</option>
-          <option value="processing">Processing</option>
-          <option value="completed">Completed</option>
-          <option value="failed">Failed</option>
-        </select>
-        <input class="fs" type="text" id="orAssetFilter" placeholder="Asset (USDC/USDT)…" style="width:150px" />
-        <input class="fs" type="text" id="orChainFilter" placeholder="Chain (base/bsc)…" style="width:140px" />
-        <button class="btn btn-primary btn-sm" onclick="loadOfframp(1)">Filter</button>
-        <button class="btn btn-outline btn-sm" onclick="clearOrFilters()">Clear</button>
+    <!-- ===== USERS ===== -->
+    <div id="tab-users" class="page">
+      <div class="page-header"><h2>Users</h2><p>Search and inspect user accounts</p></div>
+      <div class="search-row">
+        <div class="search-input-wrap">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="userSearchInput" placeholder="Search by name, phone, userId, referral code or email…" />
+        </div>
+        <button class="btn btn-primary" onclick="searchUsers()">Search</button>
+        <button class="btn btn-outline" onclick="loadAllUsers(1)">All Users</button>
+      </div>
+      <div id="usersListArea"></div>
+      <div id="userDetailPanel" style="display:none">
+        <div class="card">
+          <div class="card-header"><h3 id="userDetailName">User Profile</h3><button class="btn btn-outline btn-sm" onclick="closeUserDetail()">✕ Close</button></div>
+          <div class="card-body"><div class="user-profile-grid" id="userProfileFields"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>Referral Stats</h3></div>
+          <div class="card-body"><div class="ref-stats-grid" id="referralStatsGrid"></div></div>
+        </div>
+        <div class="card"><div class="card-header"><h3>Recent Referrals</h3></div><div id="recentReferralsContent"><div class="loading"></div></div></div>
+        <div class="card"><div class="card-header"><h3>Recent Withdrawals</h3></div><div id="recentWithdrawalsContent"><div class="loading"></div></div></div>
       </div>
     </div>
-    <div id="offrampContent"><div class="loading">Loading…</div></div>
-    <div class="pagination" id="orPagination" style="display:none">
-      <button class="page-btn" id="orPrevBtn" onclick="loadOfframp(orPage-1)">‹ Prev</button>
-      <span class="page-info" id="orPageInfo"></span>
-      <button class="page-btn" id="orNextBtn" onclick="loadOfframp(orPage+1)">Next ›</button>
-    </div>
-  </div>
-</div>
 
-</div><!-- /container -->
+    <!-- ===== TRANSACTIONS ===== -->
+    <div id="tab-transactions" class="page">
+      <div class="page-header"><h2>Transactions</h2><p>All platform transactions with filters</p></div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-card-top"><div><div class="stat-label">Total</div><div class="stat-value" id="txTotal">—</div></div><div class="stat-icon purple">🔄</div></div></div>
+        <div class="stat-card"><div class="stat-card-top"><div><div class="stat-label">Completed</div><div class="stat-value" id="txCompleted">—</div></div><div class="stat-icon green">✅</div></div></div>
+        <div class="stat-card"><div class="stat-card-top"><div><div class="stat-label">Pending</div><div class="stat-value" id="txPending">—</div></div><div class="stat-icon orange">⏳</div></div></div>
+        <div class="stat-card"><div class="stat-card-top"><div><div class="stat-label">Failed</div><div class="stat-value" id="txFailed">—</div></div><div class="stat-icon red">❌</div></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3>All Transactions</h3>
+          <div class="filters">
+            <select class="filter-select" id="txStatusFilter" onchange="loadTransactions(1)">
+              <option value="">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="processing">Processing</option>
+              <option value="completed">Completed</option>
+              <option value="failed">Failed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+            <select class="filter-select" id="txTypeFilter" onchange="loadTransactions(1)">
+              <option value="">All Types</option>
+              <option value="payment">Payment</option>
+              <option value="transfer">Transfer</option>
+              <option value="deposit">Deposit</option>
+              <option value="withdrawal">Withdrawal</option>
+              <option value="conversion">Conversion</option>
+              <option value="off_ramp">Off-Ramp</option>
+              <option value="direct_transfer">Direct Transfer</option>
+            </select>
+            <input class="filter-input" type="text" id="txUserFilter" placeholder="User ObjectId…" style="width:180px" />
+            <button class="btn btn-primary btn-sm" onclick="loadTransactions(1)">Apply</button>
+            <button class="btn btn-outline btn-sm" onclick="clearTxFilters()">Clear</button>
+          </div>
+        </div>
+        <div class="table-wrap" id="transactionsContent"><div class="loading"></div></div>
+        <div class="pagination" id="txPagination" style="display:none">
+          <button class="page-btn" id="txPrevBtn" onclick="loadTransactions(txPage-1)">‹ Prev</button>
+          <span class="page-info" id="txPageInfo"></span>
+          <button class="page-btn" id="txNextBtn" onclick="loadTransactions(txPage+1)">Next ›</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== OFF-RAMP ===== -->
+    <div id="tab-offramp" class="page">
+      <div class="page-header"><h2>Off-Ramp Transactions</h2><p>Crypto to fiat conversion records</p></div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-card-top"><div><div class="stat-label">Total</div><div class="stat-value" id="orTotal">—</div></div><div class="stat-icon purple">🏦</div></div></div>
+        <div class="stat-card"><div class="stat-card-top"><div><div class="stat-label">Completed</div><div class="stat-value" id="orCompleted">—</div></div><div class="stat-icon green">✅</div></div></div>
+        <div class="stat-card"><div class="stat-card-top"><div><div class="stat-label">Processing</div><div class="stat-value" id="orProcessing">—</div></div><div class="stat-icon blue">⚙️</div></div></div>
+        <div class="stat-card"><div class="stat-card-top"><div><div class="stat-label">Failed</div><div class="stat-value" id="orFailed">—</div></div><div class="stat-icon red">❌</div></div></div>
+        <div class="stat-card"><div class="stat-card-top"><div><div class="stat-label">Crypto Volume</div><div class="stat-value" id="orCryptoVol">—</div></div><div class="stat-icon blue">💱</div></div></div>
+        <div class="stat-card"><div class="stat-card-top"><div><div class="stat-label">NGN Disbursed</div><div class="stat-value" id="orNgnVol">—</div></div><div class="stat-icon purple">🇳🇬</div></div></div>
+        <div class="stat-card"><div class="stat-card-top"><div><div class="stat-label">Fees Collected</div><div class="stat-value" id="orFees">—</div></div><div class="stat-icon green">💰</div></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3>All Off-Ramp Records</h3>
+          <div class="filters">
+            <select class="filter-select" id="orStatusFilter" onchange="loadOfframp(1)">
+              <option value="">All Status</option>
+              <option value="processing">Processing</option>
+              <option value="completed">Completed</option>
+              <option value="failed">Failed</option>
+            </select>
+            <input class="filter-input" type="text" id="orAssetFilter" placeholder="Asset (USDC/USDT)" style="width:140px" />
+            <input class="filter-input" type="text" id="orChainFilter" placeholder="Chain (base/bsc)" style="width:135px" />
+            <button class="btn btn-primary btn-sm" onclick="loadOfframp(1)">Apply</button>
+            <button class="btn btn-outline btn-sm" onclick="clearOrFilters()">Clear</button>
+          </div>
+        </div>
+        <div class="table-wrap" id="offrampContent"><div class="loading"></div></div>
+        <div class="pagination" id="orPagination" style="display:none">
+          <button class="page-btn" id="orPrevBtn" onclick="loadOfframp(orPage-1)">‹ Prev</button>
+          <span class="page-info" id="orPageInfo"></span>
+          <button class="page-btn" id="orNextBtn" onclick="loadOfframp(orPage+1)">Next ›</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
 
 <!-- Complete Modal -->
 <div id="completeModal" class="modal">
-  <div class="modal-content">
-    <h3>Complete Withdrawal</h3>
+  <div class="modal-box">
+    <div class="modal-header"><h3>Complete Withdrawal</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
     <form id="completeForm">
-      <div class="form-group"><label class="form-label">Transaction Hash *</label><input type="text" id="txHash" class="form-input" required placeholder="0x…" /></div>
-      <div class="form-group"><label class="form-label">Admin Notes</label><textarea id="adminNotes" class="form-input" placeholder="Optional…"></textarea></div>
-      <div class="action-btns"><button type="submit" class="btn btn-success">Complete</button><button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button></div>
+      <div class="modal-body">
+        <div class="form-group"><label class="form-label">Transaction Hash *</label><input type="text" id="txHash" class="form-input" required placeholder="0x…" /></div>
+        <div class="form-group"><label class="form-label">Admin Notes (optional)</label><textarea id="adminNotes" class="form-input" placeholder="Internal notes…"></textarea></div>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button><button type="submit" class="btn btn-success">Mark Complete</button></div>
     </form>
   </div>
 </div>
+
 <!-- Fail Modal -->
 <div id="failModal" class="modal">
-  <div class="modal-content">
-    <h3>Fail Withdrawal</h3>
+  <div class="modal-box">
+    <div class="modal-header"><h3>Fail Withdrawal</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
     <form id="failForm">
-      <div class="form-group"><label class="form-label">Failure Reason *</label><textarea id="failReason" class="form-input" required placeholder="Reason…"></textarea></div>
-      <div class="action-btns"><button type="submit" class="btn btn-danger">Mark Failed</button><button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button></div>
+      <div class="modal-body">
+        <div class="form-group"><label class="form-label">Failure Reason *</label><textarea id="failReason" class="form-input" required placeholder="Describe the reason…"></textarea></div>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button><button type="submit" class="btn btn-danger">Mark Failed</button></div>
     </form>
   </div>
 </div>
@@ -280,21 +521,34 @@ a.tx-link:hover{text-decoration:underline}
 let currentWithdrawalId = null, wFilter = 'all';
 let txPage = 1, txTotalPages = 1;
 let orPage = 1, orTotalPages = 1;
+const tabLoaded = {};
+const tabTitles = { overview:'Overview', withdrawals:'Withdrawals', users:'Users', transactions:'Transactions', offramp:'Off-Ramp' };
 
 // ── Helpers ────────────────────────────────────────────────────
-async function apiFetch(url, opts) {
-  const r = await fetch(url, opts); return r.json();
+async function apiFetch(url, opts) { const r = await fetch(url, opts); return r.json(); }
+function fmt(n, d=2) { return Number(n||0).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—'; }
+function truncate(s, n=8) { return s ? s.slice(0,n)+'…'+s.slice(-4) : '—'; }
+
+// ── Sidebar ────────────────────────────────────────────────────
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebarOverlay').classList.toggle('open');
 }
-function fmt(n, decimals=2) { return Number(n||0).toLocaleString('en-US',{minimumFractionDigits:decimals,maximumFractionDigits:decimals}); }
-function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '-'; }
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('open');
+}
 
 // ── Tab switching ──────────────────────────────────────────────
-const tabLoaded = {};
-function switchTab(tab, btn) {
+function switchTab(tab, el) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
-  if (btn) btn.classList.add('active');
+  if (el) el.classList.add('active');
+  else document.querySelector(`[data-tab="${tab}"]`)?.classList.add('active');
+  document.getElementById('topbarTitle').textContent = tabTitles[tab] || tab;
+  closeSidebar();
   if (!tabLoaded[tab]) {
     tabLoaded[tab] = true;
     if (tab === 'transactions') loadTransactions(1);
@@ -302,6 +556,15 @@ function switchTab(tab, btn) {
     if (tab === 'users') loadAllUsers(1);
     if (tab === 'withdrawals') { loadWStats(); loadWithdrawals(); }
   }
+}
+
+function refreshCurrent() {
+  const active = document.querySelector('.page.active')?.id?.replace('tab-','');
+  if (active === 'overview') loadOverview();
+  if (active === 'withdrawals') { loadWStats(); loadWithdrawals(); }
+  if (active === 'users') loadAllUsers(1);
+  if (active === 'transactions') loadTransactions(txPage);
+  if (active === 'offramp') loadOfframp(orPage);
 }
 
 // ── Init ───────────────────────────────────────────────────────
@@ -327,11 +590,12 @@ async function loadOverview() {
     if (!d.success) return;
     const { users, transactions, offramp, withdrawals, referralEarnings, recentSignups } = d.data;
 
-    document.getElementById('ovTotalUsers').textContent = users.total;
-    document.getElementById('ovNew7d').innerHTML = `<span class="trend up">+${users.new7d} this week</span>`;
-    document.getElementById('ovVerified').textContent = users.verified;
+    document.getElementById('ovTotalUsers').textContent = users.total.toLocaleString();
+    document.getElementById('ovNew7d').textContent = `+${users.new7d} this week`;
+    document.getElementById('ovVerified').textContent = users.verified.toLocaleString();
+    document.getElementById('ovUnverified').textContent = `${users.unverified} unverified`;
     document.getElementById('ovNewToday').textContent = users.newToday;
-    document.getElementById('ovNew30d').textContent = users.new30d;
+    document.getElementById('ovNew30d').textContent = `${users.new30d} this month`;
     document.getElementById('ovTxVolume').textContent = '$' + fmt(transactions.totalVolume);
     document.getElementById('ovTxFees').textContent = '$' + fmt(transactions.totalFees);
     document.getElementById('ovOfframpVol').textContent = '$' + fmt(offramp.totalCryptoVolume);
@@ -341,28 +605,23 @@ async function loadOverview() {
     document.getElementById('ovOutstandingBal').textContent = '$' + fmt(referralEarnings.totalOutstandingBalance);
     document.getElementById('ovTotalEarned').textContent = '$' + fmt(referralEarnings.totalEverEarned);
 
-    // Tx breakdown table
-    const txRows = Object.entries(transactions.byStatus).map(([s, v]) =>
-      `<tr><td><span class="badge badge-${s}">${s.toUpperCase()}</span></td><td>${v.count}</td><td>$${fmt(v.volume)}</td><td>$${fmt(v.fees)}</td></tr>`).join('');
+    const txRows = Object.entries(transactions.byStatus).map(([s,v]) =>
+      `<tr><td><span class="badge badge-${s}">${s.toUpperCase()}</span></td><td>${v.count.toLocaleString()}</td><td>$${fmt(v.volume)}</td><td>$${fmt(v.fees)}</td></tr>`).join('');
     document.getElementById('ovTxBreakdown').innerHTML = txRows
-      ? `<table><thead><tr><th>Status</th><th>Count</th><th>Volume</th><th>Fees</th></tr></thead><tbody>${txRows}</tbody></table>`
+      ? `<div class="table-wrap"><table><thead><tr><th>Status</th><th>Count</th><th>Volume</th><th>Fees</th></tr></thead><tbody>${txRows}</tbody></table></div>`
       : '<div class="empty">No transactions yet.</div>';
 
-    // Offramp breakdown table
-    const orRows = Object.entries(offramp.byStatus).map(([s, v]) =>
+    const orRows = Object.entries(offramp.byStatus).map(([s,v]) =>
       `<tr><td><span class="badge badge-${s}">${s.toUpperCase()}</span></td><td>${v.count}</td><td>$${fmt(v.cryptoVolume)}</td><td>₦${fmt(v.ngnVolume,0)}</td><td>$${fmt(v.fees)}</td></tr>`).join('');
     document.getElementById('ovOfframpBreakdown').innerHTML = orRows
-      ? `<table><thead><tr><th>Status</th><th>Count</th><th>Crypto (USD)</th><th>NGN Sent</th><th>Fees</th></tr></thead><tbody>${orRows}</tbody></table>`
+      ? `<div class="table-wrap"><table><thead><tr><th>Status</th><th>Count</th><th>Crypto (USD)</th><th>NGN Sent</th><th>Fees</th></tr></thead><tbody>${orRows}</tbody></table></div>`
       : '<div class="empty">No off-ramp transactions yet.</div>';
 
-    // Recent signups
     document.getElementById('ovRecentSignups').innerHTML = recentSignups.length
-      ? `<table><thead><tr><th>Name</th><th>Phone</th><th>Country</th><th>Verified</th><th>Joined</th></tr></thead><tbody>
-         ${recentSignups.map(u=>`<tr>
-           <td>${u.fullName}</td><td>${u.whatsappNumber}</td><td>${u.country}</td>
-           <td><span class="badge badge-${u.isVerified?'verified':'unverified'}">${u.isVerified?'Yes':'No'}</span></td>
-           <td>${fmtDate(u.createdAt)}</td>
-         </tr>`).join('')}</tbody></table>`
+      ? `<div class="table-wrap"><table><thead><tr><th>Name</th><th>Phone</th><th>Country</th><th>Verified</th><th>Joined</th></tr></thead><tbody>
+         ${recentSignups.map(u=>`<tr><td>${u.fullName}</td><td>${u.whatsappNumber}</td><td>${u.country}</td>
+         <td><span class="badge badge-${u.isVerified?'verified':'unverified'}">${u.isVerified?'Yes':'No'}</span></td>
+         <td>${fmtDate(u.createdAt)}</td></tr>`).join('')}</tbody></table></div>`
       : '<div class="empty">No signups yet.</div>';
   } catch(e) { console.error(e); }
 }
@@ -384,29 +643,29 @@ async function loadWStats() {
 
 async function loadWithdrawals() {
   const el = document.getElementById('withdrawalsContent');
-  el.innerHTML = '<div class="loading">Loading…</div>';
+  el.innerHTML = '<div class="loading"></div>';
   try {
     const url = wFilter === 'all' ? '/api/admin/referral-withdrawals' : `/api/admin/referral-withdrawals?status=${wFilter}`;
     const d = await apiFetch(url);
     if (d.success && d.data.length > 0) {
-      el.innerHTML = `<table><thead><tr><th>User ID</th><th>Amount</th><th>Address</th><th>Chain</th><th>Status</th><th>Requested</th><th>Actions</th></tr></thead>
+      el.innerHTML = `<table><thead><tr><th>User</th><th>Amount</th><th>Address</th><th>Chain</th><th>Status</th><th>Requested</th><th>Actions</th></tr></thead>
       <tbody>${d.data.map(w=>`<tr>
-        <td><button class="btn btn-outline btn-sm" onclick="openUserFromWithdrawal('${w.userId}')">${w.userId.slice(0,12)}…</button></td>
-        <td>${fmt(w.amount)} ${w.token||'USDT'}</td>
-        <td title="${w.evmAddress}">${w.evmAddress.slice(0,6)}…${w.evmAddress.slice(-4)}</td>
+        <td><button class="btn btn-ghost btn-xs" onclick="openUserFromWithdrawal('${w.userId}')">${truncate(w.userId,10)}</button></td>
+        <td><strong>${fmt(w.amount)}</strong> <span style="color:var(--gray-400);font-size:.78rem">${w.token||'USDT'}</span></td>
+        <td class="mono" title="${w.evmAddress}">${truncate(w.evmAddress)}</td>
         <td>${w.chain||'Base'}</td>
         <td><span class="badge badge-${w.status}">${w.status.toUpperCase()}</span></td>
         <td>${fmtDate(w.requestedAt)}</td>
         <td>${w.status==='pending'
-          ?`<div class="action-btns"><button class="btn btn-success btn-sm" onclick="openCompleteModal('${w.id}')">Complete</button><button class="btn btn-danger btn-sm" onclick="openFailModal('${w.id}')">Fail</button></div>`
-          :w.transactionHash?`<a class="tx-link" href="https://basescan.org/tx/${w.transactionHash}" target="_blank">View TX</a>`:'-'}</td>
+          ?`<div class="action-btns"><button class="btn btn-success btn-xs" onclick="openCompleteModal('${w.id}')">✓ Complete</button><button class="btn btn-danger btn-xs" onclick="openFailModal('${w.id}')">✕ Fail</button></div>`
+          :w.transactionHash?`<a class="tx-link" href="https://basescan.org/tx/${w.transactionHash}" target="_blank">View TX ↗</a>`:'—'}</td>
       </tr>`).join('')}</tbody></table>`;
     } else { el.innerHTML = '<div class="empty">No withdrawals found.</div>'; }
-  } catch(e) { el.innerHTML = '<div class="empty">Error loading data.</div>'; }
+  } catch(e) { el.innerHTML = '<div class="empty">Failed to load withdrawals.</div>'; }
 }
 
 function openUserFromWithdrawal(userId) {
-  switchTab('users', document.querySelectorAll('.nav-tab')[2]);
+  switchTab('users', null);
   loadUserDetail(userId);
 }
 
@@ -414,7 +673,7 @@ function openUserFromWithdrawal(userId) {
 async function loadAllUsers(page) {
   page = page || 1;
   const el = document.getElementById('usersListArea');
-  el.innerHTML = '<div class="loading">Loading users…</div>';
+  el.innerHTML = '<div class="loading"></div>';
   document.getElementById('userDetailPanel').style.display = 'none';
   try {
     const limit = 50, offset = (page-1)*limit;
@@ -429,7 +688,7 @@ async function searchUsers() {
   const q = document.getElementById('userSearchInput').value.trim();
   if (q.length < 2) return;
   const el = document.getElementById('usersListArea');
-  el.innerHTML = '<div class="loading">Searching…</div>';
+  el.innerHTML = '<div class="loading"></div>';
   document.getElementById('userDetailPanel').style.display = 'none';
   try {
     const d = await apiFetch(`/api/admin/users/search?q=${encodeURIComponent(q)}`);
@@ -440,25 +699,28 @@ async function searchUsers() {
 
 function buildUsersTable(users, total, page, totalPages) {
   const rows = users.map(u=>`<tr>
-    <td>${u.fullName}</td><td>${u.whatsappNumber}</td><td>${u.country}</td>
-    <td><span class="badge badge-${u.isVerified?'verified':'unverified'}">${u.isVerified?'Yes':'No'}</span></td>
-    <td>${u.referralCode||'-'}</td><td>${fmtDate(u.createdAt)}</td>
-    <td><button class="btn btn-primary btn-sm" onclick="loadUserDetail('${u.userId}')">View</button></td>
+    <td><strong>${u.fullName}</strong></td>
+    <td>${u.whatsappNumber}</td>
+    <td>${u.country}</td>
+    <td><span class="badge badge-${u.isVerified?'verified':'unverified'}">${u.isVerified?'Verified':'Unverified'}</span></td>
+    <td><span class="mono" style="font-size:.8rem">${u.referralCode||'—'}</span></td>
+    <td>${fmtDate(u.createdAt)}</td>
+    <td><button class="btn btn-primary btn-xs" onclick="loadUserDetail('${u.userId}')">View →</button></td>
   </tr>`).join('');
   const pager = totalPages > 1
     ? `<div class="pagination"><button class="page-btn" ${page<=1?'disabled':''} onclick="loadAllUsers(${page-1})">‹ Prev</button>
-       <span class="page-info">Page ${page} of ${totalPages} (${total} users)</span>
+       <span class="page-info">Page ${page} of ${totalPages} · ${total.toLocaleString()} users</span>
        <button class="page-btn" ${page>=totalPages?'disabled':''} onclick="loadAllUsers(${page+1})">Next ›</button></div>`
-    : `<div style="padding:.5rem 1rem;font-size:.8rem;color:#888">${total} user${total!==1?'s':''}</div>`;
-  return `<div class="card"><div class="card-header"><h2>Users (${total})</h2></div>
-  <table><thead><tr><th>Name</th><th>Phone</th><th>Country</th><th>Verified</th><th>Referral Code</th><th>Joined</th><th></th></tr></thead>
-  <tbody>${rows}</tbody></table>${pager}</div>`;
+    : `<div style="padding:.6rem 1.25rem;font-size:.8rem;color:var(--gray-400)">${total.toLocaleString()} user${total!==1?'s':''}</div>`;
+  return `<div class="card"><div class="card-header"><h3>Users (${total.toLocaleString()})</h3></div>
+  <div class="table-wrap"><table><thead><tr><th>Name</th><th>Phone</th><th>Country</th><th>Status</th><th>Referral Code</th><th>Joined</th><th></th></tr></thead>
+  <tbody>${rows}</tbody></table></div>${pager}</div>`;
 }
 
 async function loadUserDetail(userId) {
   document.getElementById('userDetailPanel').style.display = 'none';
   const el = document.getElementById('usersListArea');
-  el.innerHTML = '<div class="loading">Loading user…</div>';
+  el.innerHTML = '<div class="loading"></div>';
   try {
     const d = await apiFetch(`/api/admin/users/${encodeURIComponent(userId)}`);
     if (!d.success) { el.innerHTML = `<div class="empty">${d.error}</div>`; return; }
@@ -472,9 +734,9 @@ async function loadUserDetail(userId) {
 function renderUserDetail(data) {
   const u = data.user, s = data.referralStats;
   document.getElementById('userDetailName').textContent = u.fullName;
-  const fields = [['Full Name',u.fullName],['User ID',u.userId],['WhatsApp',u.whatsappNumber],['Email',u.email||'-'],
-    ['Country',u.country],['Currency',u.currency],['Verified',u.isVerified?'✅ Yes':'❌ No'],['Referral Code',u.referralCode||'-'],
-    ['Referred By',u.referredBy||'-'],['Referred At',u.referredAt?fmtDate(u.referredAt):'-'],['Joined',fmtDate(u.createdAt)],['Updated',fmtDate(u.updatedAt)]];
+  const fields = [['Full Name',u.fullName],['User ID',u.userId],['WhatsApp',u.whatsappNumber],['Email',u.email||'—'],
+    ['Country',u.country],['Currency',u.currency],['Verified',u.isVerified?'✅ Yes':'❌ No'],['Referral Code',u.referralCode||'—'],
+    ['Referred By',u.referredBy||'—'],['Referred At',u.referredAt?fmtDate(u.referredAt):'—'],['Joined',fmtDate(u.createdAt)],['Updated',fmtDate(u.updatedAt)]];
   document.getElementById('userProfileFields').innerHTML = fields.map(([l,v])=>
     `<div class="profile-field"><label>${l}</label><span>${v}</span></div>`).join('');
   document.getElementById('referralStatsGrid').innerHTML = [
@@ -484,16 +746,18 @@ function renderUserDetail(data) {
   ].map(([l,v])=>`<div class="rs-card"><div class="rs-value">${v}</div><div class="rs-label">${l}</div></div>`).join('');
   const refs = data.recentReferrals;
   document.getElementById('recentReferralsContent').innerHTML = refs.length
-    ? `<table><thead><tr><th>Referred User ID</th><th>Created</th><th>Expires</th></tr></thead><tbody>
-       ${refs.map(r=>`<tr><td>${r.referredUserId}</td><td>${fmtDate(r.createdAt)}</td><td>${fmtDate(r.expiresAt)}</td></tr>`).join('')}</tbody></table>`
+    ? `<div class="table-wrap"><table><thead><tr><th>Referred User ID</th><th>Created</th><th>Expires</th></tr></thead><tbody>
+       ${refs.map(r=>`<tr><td class="mono">${r.referredUserId}</td><td>${fmtDate(r.createdAt)}</td><td>${fmtDate(r.expiresAt)}</td></tr>`).join('')}</tbody></table></div>`
     : '<div class="empty">No referrals yet.</div>';
   const wds = data.recentWithdrawals;
   document.getElementById('recentWithdrawalsContent').innerHTML = wds.length
-    ? `<table><thead><tr><th>Amount</th><th>Status</th><th>Address</th><th>Requested</th><th>TX</th></tr></thead><tbody>
-       ${wds.map(w=>`<tr><td>${fmt(w.amount)} ${w.token||'USDT'}</td><td><span class="badge badge-${w.status}">${w.status.toUpperCase()}</span></td>
-       <td title="${w.evmAddress}">${w.evmAddress.slice(0,6)}…${w.evmAddress.slice(-4)}</td><td>${fmtDate(w.requestedAt)}</td>
-       <td>${w.transactionHash?`<a class="tx-link" href="https://basescan.org/tx/${w.transactionHash}" target="_blank">View</a>`:'-'}</td></tr>`).join('')}
-       </tbody></table>`
+    ? `<div class="table-wrap"><table><thead><tr><th>Amount</th><th>Status</th><th>Address</th><th>Requested</th><th>TX</th></tr></thead><tbody>
+       ${wds.map(w=>`<tr><td><strong>${fmt(w.amount)}</strong> ${w.token||'USDT'}</td>
+       <td><span class="badge badge-${w.status}">${w.status.toUpperCase()}</span></td>
+       <td class="mono" title="${w.evmAddress}">${truncate(w.evmAddress)}</td>
+       <td>${fmtDate(w.requestedAt)}</td>
+       <td>${w.transactionHash?`<a class="tx-link" href="https://basescan.org/tx/${w.transactionHash}" target="_blank">View ↗</a>`:'—'}</td></tr>`).join('')}
+       </tbody></table></div>`
     : '<div class="empty">No withdrawals yet.</div>';
 }
 
@@ -507,9 +771,9 @@ function closeUserDetail() {
 <script>
 // ── Transactions ───────────────────────────────────────────────
 async function loadTransactions(page) {
-  page = page || 1; txPage = page;
+  page = page||1; txPage = page;
   const el = document.getElementById('transactionsContent');
-  el.innerHTML = '<div class="loading">Loading…</div>';
+  el.innerHTML = '<div class="loading"></div>';
   const status = document.getElementById('txStatusFilter').value;
   const type = document.getElementById('txTypeFilter').value;
   const userId = document.getElementById('txUserFilter').value.trim();
@@ -528,33 +792,35 @@ async function loadTransactions(page) {
     <tbody>${transactions.map(t=>{
       const from = t.fromUser?(t.fromUser.firstName||'')+' '+(t.fromUser.lastName||''):'-';
       return `<tr>
-        <td style="font-size:.76rem;font-family:monospace">${t.referenceId}</td>
-        <td><span class="badge" style="background:#e8eaf6;color:#3949ab">${t.type.replace('_',' ').toUpperCase()}</span></td>
+        <td class="mono">${t.referenceId}</td>
+        <td><span class="badge badge-type">${t.type.replace('_',' ').toUpperCase()}</span></td>
         <td><span class="badge badge-${t.status}">${t.status.toUpperCase()}</span></td>
-        <td>${fmt(t.amount)}</td><td>${t.currency}</td>
-        <td>${from.trim()||'-'}</td><td>${fmtDate(t.createdAt)}</td>
-        <td>${t.hash?`<a class="tx-link" href="https://basescan.org/tx/${t.hash}" target="_blank">TX</a>`:t.failureReason?`<span title="${t.failureReason}" style="color:#dc3545;cursor:help">⚠</span>`:'-'}</td>
+        <td><strong>${fmt(t.amount)}</strong></td>
+        <td style="color:var(--gray-500)">${t.currency}</td>
+        <td>${from.trim()||'—'}</td>
+        <td>${fmtDate(t.createdAt)}</td>
+        <td>${t.hash?`<a class="tx-link" href="https://basescan.org/tx/${t.hash}" target="_blank">TX ↗</a>`:t.failureReason?`<span title="${t.failureReason}" style="color:var(--danger);cursor:help">⚠ Failed</span>`:'—'}</td>
       </tr>`;
     }).join('')}</tbody></table>`;
     const pg = document.getElementById('txPagination');
     pg.style.display='flex';
-    document.getElementById('txPageInfo').textContent=`Page ${page} of ${txTotalPages} (${pagination.total} total)`;
+    document.getElementById('txPageInfo').textContent=`Page ${page} of ${txTotalPages} · ${pagination.total.toLocaleString()} total`;
     document.getElementById('txPrevBtn').disabled = page<=1;
     document.getElementById('txNextBtn').disabled = page>=txTotalPages;
   } catch(e) { el.innerHTML = '<div class="empty">Error loading transactions.</div>'; }
 }
 
 async function updateTxStats(total) {
-  document.getElementById('txTotal').textContent = total;
+  document.getElementById('txTotal').textContent = total.toLocaleString();
   try {
     const [comp,pend,fail] = await Promise.all([
       apiFetch('/api/admin/transactions?status=completed&limit=1'),
       apiFetch('/api/admin/transactions?status=pending&limit=1'),
       apiFetch('/api/admin/transactions?status=failed&limit=1'),
     ]);
-    document.getElementById('txCompleted').textContent = comp.data?.pagination?.total??'-';
-    document.getElementById('txPending').textContent = pend.data?.pagination?.total??'-';
-    document.getElementById('txFailed').textContent = fail.data?.pagination?.total??'-';
+    document.getElementById('txCompleted').textContent = (comp.data?.pagination?.total||0).toLocaleString();
+    document.getElementById('txPending').textContent = (pend.data?.pagination?.total||0).toLocaleString();
+    document.getElementById('txFailed').textContent = (fail.data?.pagination?.total||0).toLocaleString();
   } catch(e) {}
 }
 
@@ -567,9 +833,9 @@ function clearTxFilters() {
 
 // ── Off-Ramp ───────────────────────────────────────────────────
 async function loadOfframp(page) {
-  page = page || 1; orPage = page;
+  page = page||1; orPage = page;
   const el = document.getElementById('offrampContent');
-  el.innerHTML = '<div class="loading">Loading…</div>';
+  el.innerHTML = '<div class="loading"></div>';
   const status = document.getElementById('orStatusFilter').value;
   const asset = document.getElementById('orAssetFilter').value.trim();
   const chain = document.getElementById('orChainFilter').value.trim();
@@ -586,23 +852,24 @@ async function loadOfframp(page) {
     if (!data.length) { el.innerHTML = '<div class="empty">No off-ramp transactions found.</div>'; document.getElementById('orPagination').style.display='none'; return; }
     el.innerHTML = `<table><thead><tr><th>Reference</th><th>User</th><th>Asset</th><th>Chain</th><th>Crypto (USD)</th><th>NGN Sent</th><th>Fee</th><th>Rate</th><th>Bank</th><th>Status</th><th>Date</th></tr></thead>
     <tbody>${data.map(t=>{
-      const user = t.userId?(t.userId.fullName||t.userId.whatsappNumber||'-'):'-';
+      const user = t.userId?(t.userId.fullName||t.userId.whatsappNumber||'—'):'—';
       return `<tr>
-        <td style="font-size:.76rem;font-family:monospace">${t.referenceId}</td>
+        <td class="mono">${t.referenceId}</td>
         <td>${user}</td>
-        <td>${t.asset}</td><td>${t.chain}</td>
-        <td>$${fmt(t.cryptoAmount)}</td>
+        <td><span class="badge badge-type">${t.asset}</span></td>
+        <td style="color:var(--gray-500)">${t.chain}</td>
+        <td><strong>$${fmt(t.cryptoAmount)}</strong></td>
         <td>₦${fmt(t.ngnAmount,0)}</td>
-        <td>$${fmt(t.fees)}</td>
-        <td>₦${fmt(t.exchangeRate,0)}</td>
-        <td title="${t.accountNumber} — ${t.accountName}">${t.bankName}</td>
+        <td style="color:var(--success)">$${fmt(t.fees)}</td>
+        <td style="color:var(--gray-500)">₦${fmt(t.exchangeRate,0)}</td>
+        <td title="${t.accountNumber} · ${t.accountName}">${t.bankName}</td>
         <td><span class="badge badge-${t.status}">${t.status.toUpperCase()}</span></td>
         <td>${fmtDate(t.createdAt)}</td>
       </tr>`;
     }).join('')}</tbody></table>`;
     const pg = document.getElementById('orPagination');
     pg.style.display='flex';
-    document.getElementById('orPageInfo').textContent=`Page ${page} of ${orTotalPages} (${pagination.total} total)`;
+    document.getElementById('orPageInfo').textContent=`Page ${page} of ${orTotalPages} · ${pagination.total.toLocaleString()} total`;
     document.getElementById('orPrevBtn').disabled = page<=1;
     document.getElementById('orNextBtn').disabled = page>=orTotalPages;
   } catch(e) { el.innerHTML = '<div class="empty">Error loading off-ramp data.</div>'; }
@@ -610,13 +877,12 @@ async function loadOfframp(page) {
 
 function updateOrStats(d) {
   const all = d.data;
-  const byStatus = {};
-  all.forEach(t => { byStatus[t.status] = byStatus[t.status]||{count:0,crypto:0,ngn:0,fees:0}; byStatus[t.status].count++; byStatus[t.status].crypto+=t.cryptoAmount; byStatus[t.status].ngn+=t.ngnAmount; byStatus[t.status].fees+=t.fees; });
-  document.getElementById('orTotal').textContent = d.pagination.total;
-  document.getElementById('orCompleted').textContent = byStatus['completed']?.count??0;
-  document.getElementById('orProcessing').textContent = byStatus['processing']?.count??0;
-  document.getElementById('orFailed').textContent = byStatus['failed']?.count??0;
-  // For full totals we'd need a separate stats endpoint; show page totals for now
+  const by = {};
+  all.forEach(t => { by[t.status]=by[t.status]||{count:0,crypto:0,ngn:0,fees:0}; by[t.status].count++; by[t.status].crypto+=t.cryptoAmount; by[t.status].ngn+=t.ngnAmount; by[t.status].fees+=t.fees; });
+  document.getElementById('orTotal').textContent = d.pagination.total.toLocaleString();
+  document.getElementById('orCompleted').textContent = (by['completed']?.count||0).toLocaleString();
+  document.getElementById('orProcessing').textContent = (by['processing']?.count||0).toLocaleString();
+  document.getElementById('orFailed').textContent = (by['failed']?.count||0).toLocaleString();
   const pageCrypto = all.reduce((s,t)=>s+t.cryptoAmount,0);
   const pageNgn = all.reduce((s,t)=>s+t.ngnAmount,0);
   const pageFees = all.reduce((s,t)=>s+t.fees,0);
@@ -633,11 +899,11 @@ function clearOrFilters() {
 }
 
 // ── Withdrawal modals ──────────────────────────────────────────
-function openCompleteModal(id) { currentWithdrawalId=id; document.getElementById('completeModal').style.display='block'; }
-function openFailModal(id) { currentWithdrawalId=id; document.getElementById('failModal').style.display='block'; }
+function openCompleteModal(id) { currentWithdrawalId=id; document.getElementById('completeModal').classList.add('open'); }
+function openFailModal(id) { currentWithdrawalId=id; document.getElementById('failModal').classList.add('open'); }
 function closeModal() {
-  document.getElementById('completeModal').style.display='none';
-  document.getElementById('failModal').style.display='none';
+  document.getElementById('completeModal').classList.remove('open');
+  document.getElementById('failModal').classList.remove('open');
   document.getElementById('completeForm').reset();
   document.getElementById('failForm').reset();
   currentWithdrawalId=null;
@@ -646,7 +912,7 @@ async function handleCompleteSubmit(e) {
   e.preventDefault();
   try {
     const d = await apiFetch(`/api/admin/referral-withdrawals/${currentWithdrawalId}/complete`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({transactionHash:document.getElementById('txHash').value,adminNotes:document.getElementById('adminNotes').value||undefined})});
-    if (d.success) { alert('Completed!'); closeModal(); loadWStats(); loadWithdrawals(); }
+    if (d.success) { closeModal(); loadWStats(); loadWithdrawals(); }
     else alert('Error: '+d.error);
   } catch(e) { alert('Request failed.'); }
 }
@@ -654,7 +920,7 @@ async function handleFailSubmit(e) {
   e.preventDefault();
   try {
     const d = await apiFetch(`/api/admin/referral-withdrawals/${currentWithdrawalId}/fail`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:document.getElementById('failReason').value})});
-    if (d.success) { alert('Marked as failed.'); closeModal(); loadWStats(); loadWithdrawals(); }
+    if (d.success) { closeModal(); loadWStats(); loadWithdrawals(); }
     else alert('Error: '+d.error);
   } catch(e) { alert('Request failed.'); }
 }
