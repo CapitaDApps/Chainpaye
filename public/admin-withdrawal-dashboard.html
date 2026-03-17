@@ -1,508 +1,664 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ChainPaye - Referral Withdrawals Admin</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background-color: #f5f5f5;
-            color: #333;
-        }
-        
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 1rem 2rem;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
-        
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-bottom: 2rem;
-        }
-        
-        .stat-card {
-            background: white;
-            padding: 1.5rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            text-align: center;
-        }
-        
-        .stat-number {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #667eea;
-        }
-        
-        .stat-label {
-            color: #666;
-            margin-top: 0.5rem;
-        }
-        
-        .withdrawals-section {
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-        
-        .section-header {
-            background: #f8f9fa;
-            padding: 1rem 2rem;
-            border-bottom: 1px solid #e9ecef;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .filter-buttons {
-            display: flex;
-            gap: 0.5rem;
-        }
-        
-        .filter-btn {
-            padding: 0.5rem 1rem;
-            border: 1px solid #ddd;
-            background: white;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .filter-btn.active {
-            background: #667eea;
-            color: white;
-            border-color: #667eea;
-        }
-        
-        .withdrawals-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        
-        .withdrawals-table th,
-        .withdrawals-table td {
-            padding: 1rem;
-            text-align: left;
-            border-bottom: 1px solid #e9ecef;
-        }
-        
-        .withdrawals-table th {
-            background: #f8f9fa;
-            font-weight: 600;
-        }
-        
-        .status-badge {
-            padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.875rem;
-            font-weight: 500;
-        }
-        
-        .status-pending {
-            background: #fff3cd;
-            color: #856404;
-        }
-        
-        .status-completed {
-            background: #d4edda;
-            color: #155724;
-        }
-        
-        .status-failed {
-            background: #f8d7da;
-            color: #721c24;
-        }
-        
-        .action-buttons {
-            display: flex;
-            gap: 0.5rem;
-        }
-        
-        .btn {
-            padding: 0.5rem 1rem;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.875rem;
-            transition: all 0.2s;
-        }
-        
-        .btn-success {
-            background: #28a745;
-            color: white;
-        }
-        
-        .btn-success:hover {
-            background: #218838;
-        }
-        
-        .btn-danger {
-            background: #dc3545;
-            color: white;
-        }
-        
-        .btn-danger:hover {
-            background: #c82333;
-        }
-        
-        .loading {
-            text-align: center;
-            padding: 2rem;
-            color: #666;
-        }
-        
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            z-index: 1000;
-        }
-        
-        .modal-content {
-            background: white;
-            margin: 10% auto;
-            padding: 2rem;
-            border-radius: 8px;
-            max-width: 500px;
-            width: 90%;
-        }
-        
-        .form-group {
-            margin-bottom: 1rem;
-        }
-        
-        .form-label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 500;
-        }
-        
-        .form-input {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 1rem;
-        }
-        
-        .form-textarea {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 1rem;
-            min-height: 100px;
-            resize: vertical;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChainPaye Admin</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0f2f5;color:#333}
+.header{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:1rem 2rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem}
+.header h1{font-size:1.3rem}
+.nav-tabs{display:flex;gap:.4rem;flex-wrap:wrap}
+.nav-tab{padding:.4rem 1rem;border-radius:4px;cursor:pointer;background:rgba(255,255,255,.15);color:#fff;border:none;font-size:.88rem;transition:background .2s}
+.nav-tab.active{background:rgba(255,255,255,.35);font-weight:600}
+.container{max-width:1350px;margin:0 auto;padding:1.5rem}
+.page{display:none}.page.active{display:block}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:1.5rem}
+.stat-card{background:#fff;padding:1.1rem 1rem;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.07);text-align:center}
+.stat-number{font-size:1.7rem;font-weight:700;color:#667eea}
+.stat-number.green{color:#28a745}.stat-number.orange{color:#fd7e14}.stat-number.red{color:#dc3545}
+.stat-label{color:#777;margin-top:.25rem;font-size:.82rem}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem}
+.card{background:#fff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.07);overflow:hidden;margin-bottom:1.25rem}
+.card-header{background:#f8f9fa;padding:.8rem 1.2rem;border-bottom:1px solid #e9ecef;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem}
+.card-header h2{font-size:.98rem;font-weight:600}
+.card-body{padding:1.1rem}
+.filters{display:flex;gap:.45rem;flex-wrap:wrap;align-items:center}
+.filter-btn{padding:.32rem .75rem;border:1px solid #ddd;background:#fff;border-radius:4px;cursor:pointer;font-size:.8rem}
+.filter-btn.active{background:#667eea;color:#fff;border-color:#667eea}
+select.fs{padding:.32rem .55rem;border:1px solid #ddd;border-radius:4px;font-size:.8rem;background:#fff}
+input.fs{padding:.32rem .55rem;border:1px solid #ddd;border-radius:4px;font-size:.8rem}
+table{width:100%;border-collapse:collapse}
+th,td{padding:.68rem .9rem;text-align:left;border-bottom:1px solid #e9ecef;font-size:.85rem}
+th{background:#f8f9fa;font-weight:600;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#fafbff}
+.badge{padding:.16rem .55rem;border-radius:20px;font-size:.76rem;font-weight:500;white-space:nowrap}
+.badge-pending{background:#fff3cd;color:#856404}
+.badge-completed{background:#d4edda;color:#155724}
+.badge-failed{background:#f8d7da;color:#721c24}
+.badge-processing{background:#cce5ff;color:#004085}
+.badge-cancelled{background:#e2e3e5;color:#383d41}
+.badge-verified{background:#d4edda;color:#155724}
+.badge-unverified{background:#fff3cd;color:#856404}
+.btn{padding:.38rem .8rem;border:none;border-radius:4px;cursor:pointer;font-size:.82rem;transition:opacity .2s}
+.btn:hover{opacity:.85}
+.btn-primary{background:#667eea;color:#fff}
+.btn-success{background:#28a745;color:#fff}
+.btn-danger{background:#dc3545;color:#fff}
+.btn-outline{background:#fff;border:1px solid #ddd;color:#333}
+.btn-sm{padding:.26rem .55rem;font-size:.76rem}
+.action-btns{display:flex;gap:.3rem}
+.loading{text-align:center;padding:2rem;color:#bbb}
+.empty{text-align:center;padding:2rem;color:#ccc;font-size:.88rem}
+.search-row{display:flex;gap:.6rem;margin-bottom:1.2rem}
+.search-row input{flex:1;padding:.62rem 1rem;border:1px solid #ddd;border-radius:6px;font-size:.93rem}
+.user-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.profile-field{margin-bottom:.6rem}
+.profile-field label{font-size:.73rem;color:#aaa;display:block;margin-bottom:.12rem;text-transform:uppercase;letter-spacing:.04em}
+.profile-field span{font-size:.9rem;font-weight:500;word-break:break-all}
+.ref-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.7rem}
+.rs-card{background:#f8f9fa;border-radius:6px;padding:.8rem;text-align:center}
+.rs-value{font-size:1.25rem;font-weight:700;color:#667eea}
+.rs-label{font-size:.73rem;color:#888;margin-top:.18rem}
+.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:1000}
+.modal-content{background:#fff;margin:8% auto;padding:1.6rem;border-radius:8px;max-width:450px;width:90%}
+.modal-content h3{margin-bottom:1rem}
+.form-group{margin-bottom:.85rem}
+.form-label{display:block;margin-bottom:.3rem;font-weight:500;font-size:.86rem}
+.form-input{width:100%;padding:.62rem;border:1px solid #ddd;border-radius:4px;font-size:.9rem}
+textarea.form-input{min-height:75px;resize:vertical}
+a.tx-link{color:#667eea;text-decoration:none;font-size:.82rem}
+a.tx-link:hover{text-decoration:underline}
+.pagination{display:flex;gap:.4rem;align-items:center;justify-content:flex-end;padding:.7rem 1rem;border-top:1px solid #e9ecef}
+.page-btn{padding:.28rem .6rem;border:1px solid #ddd;background:#fff;border-radius:4px;cursor:pointer;font-size:.8rem}
+.page-btn:disabled{opacity:.35;cursor:default}
+.page-info{font-size:.8rem;color:#888;margin:0 .4rem}
+.divider{border:none;border-top:1px solid #e9ecef;margin:1rem 0}
+.trend{font-size:.75rem;margin-top:.15rem}
+.trend.up{color:#28a745}.trend.down{color:#dc3545}
+</style>
 </head>
 <body>
-    <div class="header">
-        <h1>ChainPaye - Referral Withdrawals Admin</h1>
-    </div>
-    
-    <div class="container">
-        <div class="stats-grid" id="statsGrid">
-            <div class="stat-card">
-                <div class="stat-number" id="totalWithdrawals">-</div>
-                <div class="stat-label">Total Requests</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="pendingWithdrawals">-</div>
-                <div class="stat-label">Pending</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="completedWithdrawals">-</div>
-                <div class="stat-label">Completed</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="totalAmount">$-</div>
-                <div class="stat-label">Total Processed</div>
-            </div>
-        </div>
-        
-        <div class="withdrawals-section">
-            <div class="section-header">
-                <h2>Withdrawal Requests</h2>
-                <div class="filter-buttons">
-                    <button class="filter-btn active" data-status="all">All</button>
-                    <button class="filter-btn" data-status="pending">Pending</button>
-                    <button class="filter-btn" data-status="completed">Completed</button>
-                    <button class="filter-btn" data-status="failed">Failed</button>
-                </div>
-            </div>
-            
-            <div id="withdrawalsContent">
-                <div class="loading">Loading withdrawals...</div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Complete Withdrawal Modal -->
-    <div id="completeModal" class="modal">
-        <div class="modal-content">
-            <h3>Complete Withdrawal</h3>
-            <form id="completeForm">
-                <div class="form-group">
-                    <label class="form-label">Transaction Hash *</label>
-                    <input type="text" id="transactionHash" class="form-input" required 
-                           placeholder="0x..." />
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Admin Notes (Optional)</label>
-                    <textarea id="adminNotes" class="form-textarea" 
-                              placeholder="Any additional notes..."></textarea>
-                </div>
-                <div class="action-buttons">
-                    <button type="submit" class="btn btn-success">Complete Withdrawal</button>
-                    <button type="button" class="btn" onclick="closeModal()">Cancel</button>
-                </div>
-            </form>
-        </div>
-    </div>
-    
-    <!-- Fail Withdrawal Modal -->
-    <div id="failModal" class="modal">
-        <div class="modal-content">
-            <h3>Fail Withdrawal</h3>
-            <form id="failForm">
-                <div class="form-group">
-                    <label class="form-label">Failure Reason *</label>
-                    <textarea id="failureReason" class="form-textarea" required
-                              placeholder="Explain why this withdrawal failed..."></textarea>
-                </div>
-                <div class="action-buttons">
-                    <button type="submit" class="btn btn-danger">Mark as Failed</button>
-                    <button type="button" class="btn" onclick="closeModal()">Cancel</button>
-                </div>
-            </form>
-        </div>
-    </div>
+<div class="header">
+  <h1>ChainPaye Admin</h1>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="switchTab('overview',this)">Overview</button>
+    <button class="nav-tab" onclick="switchTab('withdrawals',this)">Withdrawals</button>
+    <button class="nav-tab" onclick="switchTab('users',this)">Users</button>
+    <button class="nav-tab" onclick="switchTab('transactions',this)">Transactions</button>
+    <button class="nav-tab" onclick="switchTab('offramp',this)">Off-Ramp</button>
+  </div>
+</div>
+<div class="container">
 
-    <script>
-        let currentWithdrawalId = null;
-        let currentFilter = 'all';
-        
-        // Load data on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            loadStats();
-            loadWithdrawals();
-            
-            // Set up filter buttons
-            document.querySelectorAll('.filter-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-                    this.classList.add('active');
-                    currentFilter = this.dataset.status;
-                    loadWithdrawals();
-                });
-            });
-            
-            // Set up forms
-            document.getElementById('completeForm').addEventListener('submit', handleCompleteSubmit);
-            document.getElementById('failForm').addEventListener('submit', handleFailSubmit);
-        });
-        
-        async function loadStats() {
-            try {
-                const response = await fetch('/api/admin/referral-withdrawals/stats');
-                const data = await response.json();
-                
-                if (data.success) {
-                    document.getElementById('totalWithdrawals').textContent = data.data.total;
-                    document.getElementById('pendingWithdrawals').textContent = data.data.pending;
-                    document.getElementById('completedWithdrawals').textContent = data.data.completed;
-                    document.getElementById('totalAmount').textContent = '$' + data.data.totalAmount;
-                }
-            } catch (error) {
-                console.error('Error loading stats:', error);
-            }
-        }
-        
-        async function loadWithdrawals() {
-            const content = document.getElementById('withdrawalsContent');
-            content.innerHTML = '<div class="loading">Loading withdrawals...</div>';
-            
-            try {
-                const url = currentFilter === 'all' 
-                    ? '/api/admin/referral-withdrawals'
-                    : `/api/admin/referral-withdrawals?status=${currentFilter}`;
-                    
-                const response = await fetch(url);
-                const data = await response.json();
-                
-                if (data.success && data.data.length > 0) {
-                    content.innerHTML = createWithdrawalsTable(data.data);
-                } else {
-                    content.innerHTML = '<div class="loading">No withdrawals found.</div>';
-                }
-            } catch (error) {
-                console.error('Error loading withdrawals:', error);
-                content.innerHTML = '<div class="loading">Error loading withdrawals.</div>';
-            }
-        }
-        
-        function createWithdrawalsTable(withdrawals) {
-            const table = `
-                <table class="withdrawals-table">
-                    <thead>
-                        <tr>
-                            <th>User ID</th>
-                            <th>Amount</th>
-                            <th>Address</th>
-                            <th>Status</th>
-                            <th>Requested</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${withdrawals.map(w => `
-                            <tr>
-                                <td>${w.userId}</td>
-                                <td>$${w.amount.toFixed(2)} USDT</td>
-                                <td title="${w.evmAddress}">${w.evmAddress.substring(0, 6)}...${w.evmAddress.substring(w.evmAddress.length - 4)}</td>
-                                <td><span class="status-badge status-${w.status}">${w.status.toUpperCase()}</span></td>
-                                <td>${new Date(w.requestedAt).toLocaleDateString()}</td>
-                                <td>
-                                    ${w.status === 'pending' ? `
-                                        <div class="action-buttons">
-                                            <button class="btn btn-success" onclick="openCompleteModal('${w.id}')">Complete</button>
-                                            <button class="btn btn-danger" onclick="openFailModal('${w.id}')">Fail</button>
-                                        </div>
-                                    ` : w.transactionHash ? `
-                                        <a href="https://basescan.org/tx/${w.transactionHash}" target="_blank" class="btn">View TX</a>
-                                    ` : '-'}
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            `;
-            return table;
-        }
-        
-        function openCompleteModal(withdrawalId) {
-            currentWithdrawalId = withdrawalId;
-            document.getElementById('completeModal').style.display = 'block';
-            document.getElementById('transactionHash').focus();
-        }
-        
-        function openFailModal(withdrawalId) {
-            currentWithdrawalId = withdrawalId;
-            document.getElementById('failModal').style.display = 'block';
-            document.getElementById('failureReason').focus();
-        }
-        
-        function closeModal() {
-            document.getElementById('completeModal').style.display = 'none';
-            document.getElementById('failModal').style.display = 'none';
-            currentWithdrawalId = null;
-            
-            // Reset forms
-            document.getElementById('completeForm').reset();
-            document.getElementById('failForm').reset();
-        }
-        
-        async function handleCompleteSubmit(e) {
-            e.preventDefault();
-            
-            const transactionHash = document.getElementById('transactionHash').value;
-            const adminNotes = document.getElementById('adminNotes').value;
-            
-            try {
-                const response = await fetch(`/api/admin/referral-withdrawals/${currentWithdrawalId}/complete`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        transactionHash,
-                        adminNotes: adminNotes || undefined,
-                    }),
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    alert('Withdrawal completed successfully!');
-                    closeModal();
-                    loadStats();
-                    loadWithdrawals();
-                } else {
-                    alert('Error: ' + data.error);
-                }
-            } catch (error) {
-                console.error('Error completing withdrawal:', error);
-                alert('Error completing withdrawal. Please try again.');
-            }
-        }
-        
-        async function handleFailSubmit(e) {
-            e.preventDefault();
-            
-            const reason = document.getElementById('failureReason').value;
-            
-            try {
-                const response = await fetch(`/api/admin/referral-withdrawals/${currentWithdrawalId}/fail`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        reason,
-                    }),
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    alert('Withdrawal marked as failed.');
-                    closeModal();
-                    loadStats();
-                    loadWithdrawals();
-                } else {
-                    alert('Error: ' + data.error);
-                }
-            } catch (error) {
-                console.error('Error failing withdrawal:', error);
-                alert('Error processing request. Please try again.');
-            }
-        }
-        
-        // Close modal when clicking outside
-        window.addEventListener('click', function(e) {
-            if (e.target.classList.contains('modal')) {
-                closeModal();
-            }
-        });
-        
-        // Auto-refresh every 30 seconds
-        setInterval(() => {
-            loadStats();
-            loadWithdrawals();
-        }, 30000);
-    </script>
+<!-- ===== OVERVIEW TAB ===== -->
+<div id="tab-overview" class="page active">
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-number" id="ovTotalUsers">-</div><div class="stat-label">Total Users</div><div class="trend" id="ovNew7d"></div></div>
+    <div class="stat-card"><div class="stat-number green" id="ovVerified">-</div><div class="stat-label">Verified Users</div></div>
+    <div class="stat-card"><div class="stat-number orange" id="ovNewToday">-</div><div class="stat-label">New Today</div></div>
+    <div class="stat-card"><div class="stat-number" id="ovNew30d">-</div><div class="stat-label">New (30 days)</div></div>
+    <div class="stat-card"><div class="stat-number" id="ovTxVolume">-</div><div class="stat-label">Tx Volume (USD)</div></div>
+    <div class="stat-card"><div class="stat-number green" id="ovTxFees">-</div><div class="stat-label">Tx Fees Collected</div></div>
+    <div class="stat-card"><div class="stat-number" id="ovOfframpVol">-</div><div class="stat-label">Off-Ramp Crypto (USD)</div></div>
+    <div class="stat-card"><div class="stat-number green" id="ovOfframpFees">-</div><div class="stat-label">Off-Ramp Fees</div></div>
+    <div class="stat-card"><div class="stat-number orange" id="ovPendingW">-</div><div class="stat-label">Pending Withdrawals $</div></div>
+    <div class="stat-card"><div class="stat-number green" id="ovCompletedW">-</div><div class="stat-label">Completed Withdrawals $</div></div>
+    <div class="stat-card"><div class="stat-number orange" id="ovOutstandingBal">-</div><div class="stat-label">Outstanding Referral Balance</div></div>
+    <div class="stat-card"><div class="stat-number" id="ovTotalEarned">-</div><div class="stat-label">Total Referral Earned (ever)</div></div>
+  </div>
+
+  <div class="two-col">
+    <div class="card">
+      <div class="card-header"><h2>Transaction Breakdown</h2></div>
+      <div id="ovTxBreakdown"><div class="loading">-</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h2>Off-Ramp Breakdown</h2></div>
+      <div id="ovOfframpBreakdown"><div class="loading">-</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h2>Recent Signups</h2><button class="btn btn-outline btn-sm" onclick="loadOverview()">↻ Refresh</button></div>
+    <div id="ovRecentSignups"><div class="loading">-</div></div>
+  </div>
+</div>
+
+<!-- ===== WITHDRAWALS TAB ===== -->
+<div id="tab-withdrawals" class="page">
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-number" id="wTotal">-</div><div class="stat-label">Total Requests</div></div>
+    <div class="stat-card"><div class="stat-number orange" id="wPending">-</div><div class="stat-label">Pending</div></div>
+    <div class="stat-card"><div class="stat-number green" id="wCompleted">-</div><div class="stat-label">Completed</div></div>
+    <div class="stat-card"><div class="stat-number green" id="wAmount">$-</div><div class="stat-label">Total Processed</div></div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <h2>Withdrawal Requests</h2>
+      <div class="filters">
+        <button class="filter-btn active" data-wstatus="all">All</button>
+        <button class="filter-btn" data-wstatus="pending">Pending</button>
+        <button class="filter-btn" data-wstatus="completed">Completed</button>
+        <button class="filter-btn" data-wstatus="failed">Failed</button>
+      </div>
+    </div>
+    <div id="withdrawalsContent"><div class="loading">Loading…</div></div>
+  </div>
+</div>
+
+<!-- ===== USERS TAB ===== -->
+<div id="tab-users" class="page">
+  <div class="search-row">
+    <input type="text" id="userSearchInput" placeholder="Search by name, phone, userId, referral code or email…" />
+    <button class="btn btn-primary" onclick="searchUsers()">Search</button>
+    <button class="btn btn-outline" onclick="loadAllUsers(1)">Show All</button>
+  </div>
+  <div id="usersListArea"></div>
+  <div id="userDetailPanel" style="display:none">
+    <div class="card">
+      <div class="card-header"><h2 id="userDetailName">User Profile</h2><button class="btn btn-outline btn-sm" onclick="closeUserDetail()">✕ Close</button></div>
+      <div class="card-body"><div class="user-grid" id="userProfileFields"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h2>Referral Stats</h2></div>
+      <div class="card-body"><div class="ref-stats" id="referralStatsGrid"></div></div>
+    </div>
+    <div class="card"><div class="card-header"><h2>Recent Referrals</h2></div><div id="recentReferralsContent"><div class="loading">-</div></div></div>
+    <div class="card"><div class="card-header"><h2>Recent Withdrawals</h2></div><div id="recentWithdrawalsContent"><div class="loading">-</div></div></div>
+  </div>
+</div>
+
+<!-- ===== TRANSACTIONS TAB ===== -->
+<div id="tab-transactions" class="page">
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-number" id="txTotal">-</div><div class="stat-label">Total</div></div>
+    <div class="stat-card"><div class="stat-number green" id="txCompleted">-</div><div class="stat-label">Completed</div></div>
+    <div class="stat-card"><div class="stat-number orange" id="txPending">-</div><div class="stat-label">Pending</div></div>
+    <div class="stat-card"><div class="stat-number red" id="txFailed">-</div><div class="stat-label">Failed</div></div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <h2>Transactions</h2>
+      <div class="filters">
+        <select class="fs" id="txStatusFilter" onchange="loadTransactions(1)">
+          <option value="">All Status</option>
+          <option value="pending">Pending</option>
+          <option value="processing">Processing</option>
+          <option value="completed">Completed</option>
+          <option value="failed">Failed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <select class="fs" id="txTypeFilter" onchange="loadTransactions(1)">
+          <option value="">All Types</option>
+          <option value="payment">Payment</option>
+          <option value="transfer">Transfer</option>
+          <option value="deposit">Deposit</option>
+          <option value="withdrawal">Withdrawal</option>
+          <option value="conversion">Conversion</option>
+          <option value="off_ramp">Off-Ramp</option>
+          <option value="direct_transfer">Direct Transfer</option>
+        </select>
+        <input class="fs" type="text" id="txUserFilter" placeholder="User ObjectId…" style="width:190px" />
+        <button class="btn btn-primary btn-sm" onclick="loadTransactions(1)">Filter</button>
+        <button class="btn btn-outline btn-sm" onclick="clearTxFilters()">Clear</button>
+      </div>
+    </div>
+    <div id="transactionsContent"><div class="loading">Loading…</div></div>
+    <div class="pagination" id="txPagination" style="display:none">
+      <button class="page-btn" id="txPrevBtn" onclick="loadTransactions(txPage-1)">‹ Prev</button>
+      <span class="page-info" id="txPageInfo"></span>
+      <button class="page-btn" id="txNextBtn" onclick="loadTransactions(txPage+1)">Next ›</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== OFF-RAMP TAB ===== -->
+<div id="tab-offramp" class="page">
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-number" id="orTotal">-</div><div class="stat-label">Total</div></div>
+    <div class="stat-card"><div class="stat-number green" id="orCompleted">-</div><div class="stat-label">Completed</div></div>
+    <div class="stat-card"><div class="stat-number orange" id="orProcessing">-</div><div class="stat-label">Processing</div></div>
+    <div class="stat-card"><div class="stat-number red" id="orFailed">-</div><div class="stat-label">Failed</div></div>
+    <div class="stat-card"><div class="stat-number" id="orCryptoVol">-</div><div class="stat-label">Crypto Volume (USD)</div></div>
+    <div class="stat-card"><div class="stat-number" id="orNgnVol">-</div><div class="stat-label">NGN Disbursed</div></div>
+    <div class="stat-card"><div class="stat-number green" id="orFees">-</div><div class="stat-label">Fees Collected (USD)</div></div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <h2>Off-Ramp Transactions</h2>
+      <div class="filters">
+        <select class="fs" id="orStatusFilter" onchange="loadOfframp(1)">
+          <option value="">All Status</option>
+          <option value="processing">Processing</option>
+          <option value="completed">Completed</option>
+          <option value="failed">Failed</option>
+        </select>
+        <input class="fs" type="text" id="orAssetFilter" placeholder="Asset (USDC/USDT)…" style="width:150px" />
+        <input class="fs" type="text" id="orChainFilter" placeholder="Chain (base/bsc)…" style="width:140px" />
+        <button class="btn btn-primary btn-sm" onclick="loadOfframp(1)">Filter</button>
+        <button class="btn btn-outline btn-sm" onclick="clearOrFilters()">Clear</button>
+      </div>
+    </div>
+    <div id="offrampContent"><div class="loading">Loading…</div></div>
+    <div class="pagination" id="orPagination" style="display:none">
+      <button class="page-btn" id="orPrevBtn" onclick="loadOfframp(orPage-1)">‹ Prev</button>
+      <span class="page-info" id="orPageInfo"></span>
+      <button class="page-btn" id="orNextBtn" onclick="loadOfframp(orPage+1)">Next ›</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<!-- Complete Modal -->
+<div id="completeModal" class="modal">
+  <div class="modal-content">
+    <h3>Complete Withdrawal</h3>
+    <form id="completeForm">
+      <div class="form-group"><label class="form-label">Transaction Hash *</label><input type="text" id="txHash" class="form-input" required placeholder="0x…" /></div>
+      <div class="form-group"><label class="form-label">Admin Notes</label><textarea id="adminNotes" class="form-input" placeholder="Optional…"></textarea></div>
+      <div class="action-btns"><button type="submit" class="btn btn-success">Complete</button><button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button></div>
+    </form>
+  </div>
+</div>
+<!-- Fail Modal -->
+<div id="failModal" class="modal">
+  <div class="modal-content">
+    <h3>Fail Withdrawal</h3>
+    <form id="failForm">
+      <div class="form-group"><label class="form-label">Failure Reason *</label><textarea id="failReason" class="form-input" required placeholder="Reason…"></textarea></div>
+      <div class="action-btns"><button type="submit" class="btn btn-danger">Mark Failed</button><button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button></div>
+    </form>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────
+let currentWithdrawalId = null, wFilter = 'all';
+let txPage = 1, txTotalPages = 1;
+let orPage = 1, orTotalPages = 1;
+
+// ── Helpers ────────────────────────────────────────────────────
+async function apiFetch(url, opts) {
+  const r = await fetch(url, opts); return r.json();
+}
+function fmt(n, decimals=2) { return Number(n||0).toLocaleString('en-US',{minimumFractionDigits:decimals,maximumFractionDigits:decimals}); }
+function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '-'; }
+
+// ── Tab switching ──────────────────────────────────────────────
+const tabLoaded = {};
+function switchTab(tab, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (!tabLoaded[tab]) {
+    tabLoaded[tab] = true;
+    if (tab === 'transactions') loadTransactions(1);
+    if (tab === 'offramp') loadOfframp(1);
+    if (tab === 'users') loadAllUsers(1);
+    if (tab === 'withdrawals') { loadWStats(); loadWithdrawals(); }
+  }
+}
+
+// ── Init ───────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  tabLoaded['overview'] = true;
+  loadOverview();
+  document.querySelectorAll('[data-wstatus]').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('[data-wstatus]').forEach(b => b.classList.remove('active'));
+      this.classList.add('active'); wFilter = this.dataset.wstatus; loadWithdrawals();
+    });
+  });
+  document.getElementById('completeForm').addEventListener('submit', handleCompleteSubmit);
+  document.getElementById('failForm').addEventListener('submit', handleFailSubmit);
+  document.getElementById('userSearchInput').addEventListener('keydown', e => { if (e.key==='Enter') searchUsers(); });
+  setInterval(loadOverview, 60000);
+});
+
+// ── Overview ───────────────────────────────────────────────────
+async function loadOverview() {
+  try {
+    const d = await apiFetch('/api/admin/overview');
+    if (!d.success) return;
+    const { users, transactions, offramp, withdrawals, referralEarnings, recentSignups } = d.data;
+
+    document.getElementById('ovTotalUsers').textContent = users.total;
+    document.getElementById('ovNew7d').innerHTML = `<span class="trend up">+${users.new7d} this week</span>`;
+    document.getElementById('ovVerified').textContent = users.verified;
+    document.getElementById('ovNewToday').textContent = users.newToday;
+    document.getElementById('ovNew30d').textContent = users.new30d;
+    document.getElementById('ovTxVolume').textContent = '$' + fmt(transactions.totalVolume);
+    document.getElementById('ovTxFees').textContent = '$' + fmt(transactions.totalFees);
+    document.getElementById('ovOfframpVol').textContent = '$' + fmt(offramp.totalCryptoVolume);
+    document.getElementById('ovOfframpFees').textContent = '$' + fmt(offramp.totalFees);
+    document.getElementById('ovPendingW').textContent = '$' + fmt(withdrawals.pendingAmount);
+    document.getElementById('ovCompletedW').textContent = '$' + fmt(withdrawals.completedAmount);
+    document.getElementById('ovOutstandingBal').textContent = '$' + fmt(referralEarnings.totalOutstandingBalance);
+    document.getElementById('ovTotalEarned').textContent = '$' + fmt(referralEarnings.totalEverEarned);
+
+    // Tx breakdown table
+    const txRows = Object.entries(transactions.byStatus).map(([s, v]) =>
+      `<tr><td><span class="badge badge-${s}">${s.toUpperCase()}</span></td><td>${v.count}</td><td>$${fmt(v.volume)}</td><td>$${fmt(v.fees)}</td></tr>`).join('');
+    document.getElementById('ovTxBreakdown').innerHTML = txRows
+      ? `<table><thead><tr><th>Status</th><th>Count</th><th>Volume</th><th>Fees</th></tr></thead><tbody>${txRows}</tbody></table>`
+      : '<div class="empty">No transactions yet.</div>';
+
+    // Offramp breakdown table
+    const orRows = Object.entries(offramp.byStatus).map(([s, v]) =>
+      `<tr><td><span class="badge badge-${s}">${s.toUpperCase()}</span></td><td>${v.count}</td><td>$${fmt(v.cryptoVolume)}</td><td>₦${fmt(v.ngnVolume,0)}</td><td>$${fmt(v.fees)}</td></tr>`).join('');
+    document.getElementById('ovOfframpBreakdown').innerHTML = orRows
+      ? `<table><thead><tr><th>Status</th><th>Count</th><th>Crypto (USD)</th><th>NGN Sent</th><th>Fees</th></tr></thead><tbody>${orRows}</tbody></table>`
+      : '<div class="empty">No off-ramp transactions yet.</div>';
+
+    // Recent signups
+    document.getElementById('ovRecentSignups').innerHTML = recentSignups.length
+      ? `<table><thead><tr><th>Name</th><th>Phone</th><th>Country</th><th>Verified</th><th>Joined</th></tr></thead><tbody>
+         ${recentSignups.map(u=>`<tr>
+           <td>${u.fullName}</td><td>${u.whatsappNumber}</td><td>${u.country}</td>
+           <td><span class="badge badge-${u.isVerified?'verified':'unverified'}">${u.isVerified?'Yes':'No'}</span></td>
+           <td>${fmtDate(u.createdAt)}</td>
+         </tr>`).join('')}</tbody></table>`
+      : '<div class="empty">No signups yet.</div>';
+  } catch(e) { console.error(e); }
+}
+</script>
+
+<script>
+// ── Withdrawals ────────────────────────────────────────────────
+async function loadWStats() {
+  try {
+    const d = await apiFetch('/api/admin/referral-withdrawals/stats');
+    if (d.success) {
+      document.getElementById('wTotal').textContent = d.data.total;
+      document.getElementById('wPending').textContent = d.data.pending;
+      document.getElementById('wCompleted').textContent = d.data.completed;
+      document.getElementById('wAmount').textContent = '$' + fmt(d.data.totalAmount);
+    }
+  } catch(e) {}
+}
+
+async function loadWithdrawals() {
+  const el = document.getElementById('withdrawalsContent');
+  el.innerHTML = '<div class="loading">Loading…</div>';
+  try {
+    const url = wFilter === 'all' ? '/api/admin/referral-withdrawals' : `/api/admin/referral-withdrawals?status=${wFilter}`;
+    const d = await apiFetch(url);
+    if (d.success && d.data.length > 0) {
+      el.innerHTML = `<table><thead><tr><th>User ID</th><th>Amount</th><th>Address</th><th>Chain</th><th>Status</th><th>Requested</th><th>Actions</th></tr></thead>
+      <tbody>${d.data.map(w=>`<tr>
+        <td><button class="btn btn-outline btn-sm" onclick="openUserFromWithdrawal('${w.userId}')">${w.userId.slice(0,12)}…</button></td>
+        <td>${fmt(w.amount)} ${w.token||'USDT'}</td>
+        <td title="${w.evmAddress}">${w.evmAddress.slice(0,6)}…${w.evmAddress.slice(-4)}</td>
+        <td>${w.chain||'Base'}</td>
+        <td><span class="badge badge-${w.status}">${w.status.toUpperCase()}</span></td>
+        <td>${fmtDate(w.requestedAt)}</td>
+        <td>${w.status==='pending'
+          ?`<div class="action-btns"><button class="btn btn-success btn-sm" onclick="openCompleteModal('${w.id}')">Complete</button><button class="btn btn-danger btn-sm" onclick="openFailModal('${w.id}')">Fail</button></div>`
+          :w.transactionHash?`<a class="tx-link" href="https://basescan.org/tx/${w.transactionHash}" target="_blank">View TX</a>`:'-'}</td>
+      </tr>`).join('')}</tbody></table>`;
+    } else { el.innerHTML = '<div class="empty">No withdrawals found.</div>'; }
+  } catch(e) { el.innerHTML = '<div class="empty">Error loading data.</div>'; }
+}
+
+function openUserFromWithdrawal(userId) {
+  switchTab('users', document.querySelectorAll('.nav-tab')[2]);
+  loadUserDetail(userId);
+}
+
+// ── Users ──────────────────────────────────────────────────────
+async function loadAllUsers(page) {
+  page = page || 1;
+  const el = document.getElementById('usersListArea');
+  el.innerHTML = '<div class="loading">Loading users…</div>';
+  document.getElementById('userDetailPanel').style.display = 'none';
+  try {
+    const limit = 50, offset = (page-1)*limit;
+    const d = await apiFetch(`/api/admin/users?limit=${limit}&offset=${offset}`);
+    if (!d.success) { el.innerHTML = '<div class="empty">Error loading users.</div>'; return; }
+    const totalPages = Math.ceil(d.total / limit) || 1;
+    el.innerHTML = buildUsersTable(d.users, d.total, page, totalPages);
+  } catch(e) { el.innerHTML = '<div class="empty">Error loading users.</div>'; }
+}
+
+async function searchUsers() {
+  const q = document.getElementById('userSearchInput').value.trim();
+  if (q.length < 2) return;
+  const el = document.getElementById('usersListArea');
+  el.innerHTML = '<div class="loading">Searching…</div>';
+  document.getElementById('userDetailPanel').style.display = 'none';
+  try {
+    const d = await apiFetch(`/api/admin/users/search?q=${encodeURIComponent(q)}`);
+    if (!d.success || d.users.length === 0) { el.innerHTML = '<div class="empty">No users found.</div>'; return; }
+    el.innerHTML = buildUsersTable(d.users, d.count, 1, 1);
+  } catch(e) { el.innerHTML = '<div class="empty">Error searching.</div>'; }
+}
+
+function buildUsersTable(users, total, page, totalPages) {
+  const rows = users.map(u=>`<tr>
+    <td>${u.fullName}</td><td>${u.whatsappNumber}</td><td>${u.country}</td>
+    <td><span class="badge badge-${u.isVerified?'verified':'unverified'}">${u.isVerified?'Yes':'No'}</span></td>
+    <td>${u.referralCode||'-'}</td><td>${fmtDate(u.createdAt)}</td>
+    <td><button class="btn btn-primary btn-sm" onclick="loadUserDetail('${u.userId}')">View</button></td>
+  </tr>`).join('');
+  const pager = totalPages > 1
+    ? `<div class="pagination"><button class="page-btn" ${page<=1?'disabled':''} onclick="loadAllUsers(${page-1})">‹ Prev</button>
+       <span class="page-info">Page ${page} of ${totalPages} (${total} users)</span>
+       <button class="page-btn" ${page>=totalPages?'disabled':''} onclick="loadAllUsers(${page+1})">Next ›</button></div>`
+    : `<div style="padding:.5rem 1rem;font-size:.8rem;color:#888">${total} user${total!==1?'s':''}</div>`;
+  return `<div class="card"><div class="card-header"><h2>Users (${total})</h2></div>
+  <table><thead><tr><th>Name</th><th>Phone</th><th>Country</th><th>Verified</th><th>Referral Code</th><th>Joined</th><th></th></tr></thead>
+  <tbody>${rows}</tbody></table>${pager}</div>`;
+}
+
+async function loadUserDetail(userId) {
+  document.getElementById('userDetailPanel').style.display = 'none';
+  const el = document.getElementById('usersListArea');
+  el.innerHTML = '<div class="loading">Loading user…</div>';
+  try {
+    const d = await apiFetch(`/api/admin/users/${encodeURIComponent(userId)}`);
+    if (!d.success) { el.innerHTML = `<div class="empty">${d.error}</div>`; return; }
+    el.innerHTML = '';
+    renderUserDetail(d);
+    document.getElementById('userDetailPanel').style.display = 'block';
+    document.getElementById('userDetailPanel').scrollIntoView({behavior:'smooth'});
+  } catch(e) { el.innerHTML = '<div class="empty">Error loading user.</div>'; }
+}
+
+function renderUserDetail(data) {
+  const u = data.user, s = data.referralStats;
+  document.getElementById('userDetailName').textContent = u.fullName;
+  const fields = [['Full Name',u.fullName],['User ID',u.userId],['WhatsApp',u.whatsappNumber],['Email',u.email||'-'],
+    ['Country',u.country],['Currency',u.currency],['Verified',u.isVerified?'✅ Yes':'❌ No'],['Referral Code',u.referralCode||'-'],
+    ['Referred By',u.referredBy||'-'],['Referred At',u.referredAt?fmtDate(u.referredAt):'-'],['Joined',fmtDate(u.createdAt)],['Updated',fmtDate(u.updatedAt)]];
+  document.getElementById('userProfileFields').innerHTML = fields.map(([l,v])=>
+    `<div class="profile-field"><label>${l}</label><span>${v}</span></div>`).join('');
+  document.getElementById('referralStatsGrid').innerHTML = [
+    ['Users Referred',s.totalReferred],['Current Balance','$'+fmt(s.currentBalance)],
+    ['Total Earned','$'+fmt(s.totalEarned)],['Total Volume','$'+fmt(s.totalVolume)],
+    ['Total Fees','$'+fmt(s.totalFees)],['Earnings Txns',s.earningsTransactionCount],
+  ].map(([l,v])=>`<div class="rs-card"><div class="rs-value">${v}</div><div class="rs-label">${l}</div></div>`).join('');
+  const refs = data.recentReferrals;
+  document.getElementById('recentReferralsContent').innerHTML = refs.length
+    ? `<table><thead><tr><th>Referred User ID</th><th>Created</th><th>Expires</th></tr></thead><tbody>
+       ${refs.map(r=>`<tr><td>${r.referredUserId}</td><td>${fmtDate(r.createdAt)}</td><td>${fmtDate(r.expiresAt)}</td></tr>`).join('')}</tbody></table>`
+    : '<div class="empty">No referrals yet.</div>';
+  const wds = data.recentWithdrawals;
+  document.getElementById('recentWithdrawalsContent').innerHTML = wds.length
+    ? `<table><thead><tr><th>Amount</th><th>Status</th><th>Address</th><th>Requested</th><th>TX</th></tr></thead><tbody>
+       ${wds.map(w=>`<tr><td>${fmt(w.amount)} ${w.token||'USDT'}</td><td><span class="badge badge-${w.status}">${w.status.toUpperCase()}</span></td>
+       <td title="${w.evmAddress}">${w.evmAddress.slice(0,6)}…${w.evmAddress.slice(-4)}</td><td>${fmtDate(w.requestedAt)}</td>
+       <td>${w.transactionHash?`<a class="tx-link" href="https://basescan.org/tx/${w.transactionHash}" target="_blank">View</a>`:'-'}</td></tr>`).join('')}
+       </tbody></table>`
+    : '<div class="empty">No withdrawals yet.</div>';
+}
+
+function closeUserDetail() {
+  document.getElementById('userDetailPanel').style.display = 'none';
+  document.getElementById('usersListArea').innerHTML = '';
+  document.getElementById('userSearchInput').value = '';
+}
+</script>
+
+<script>
+// ── Transactions ───────────────────────────────────────────────
+async function loadTransactions(page) {
+  page = page || 1; txPage = page;
+  const el = document.getElementById('transactionsContent');
+  el.innerHTML = '<div class="loading">Loading…</div>';
+  const status = document.getElementById('txStatusFilter').value;
+  const type = document.getElementById('txTypeFilter').value;
+  const userId = document.getElementById('txUserFilter').value.trim();
+  const p = new URLSearchParams({page, limit:25});
+  if (status) p.set('status',status);
+  if (type) p.set('type',type);
+  if (userId) p.set('userId',userId);
+  try {
+    const d = await apiFetch(`/api/admin/transactions?${p}`);
+    if (!d.success) { el.innerHTML = '<div class="empty">Error loading.</div>'; return; }
+    const { transactions, pagination } = d.data;
+    txTotalPages = pagination.pages || 1;
+    if (page===1 && !status && !type && !userId) updateTxStats(pagination.total);
+    if (!transactions.length) { el.innerHTML = '<div class="empty">No transactions found.</div>'; document.getElementById('txPagination').style.display='none'; return; }
+    el.innerHTML = `<table><thead><tr><th>Reference</th><th>Type</th><th>Status</th><th>Amount</th><th>Currency</th><th>From</th><th>Date</th><th></th></tr></thead>
+    <tbody>${transactions.map(t=>{
+      const from = t.fromUser?(t.fromUser.firstName||'')+' '+(t.fromUser.lastName||''):'-';
+      return `<tr>
+        <td style="font-size:.76rem;font-family:monospace">${t.referenceId}</td>
+        <td><span class="badge" style="background:#e8eaf6;color:#3949ab">${t.type.replace('_',' ').toUpperCase()}</span></td>
+        <td><span class="badge badge-${t.status}">${t.status.toUpperCase()}</span></td>
+        <td>${fmt(t.amount)}</td><td>${t.currency}</td>
+        <td>${from.trim()||'-'}</td><td>${fmtDate(t.createdAt)}</td>
+        <td>${t.hash?`<a class="tx-link" href="https://basescan.org/tx/${t.hash}" target="_blank">TX</a>`:t.failureReason?`<span title="${t.failureReason}" style="color:#dc3545;cursor:help">⚠</span>`:'-'}</td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+    const pg = document.getElementById('txPagination');
+    pg.style.display='flex';
+    document.getElementById('txPageInfo').textContent=`Page ${page} of ${txTotalPages} (${pagination.total} total)`;
+    document.getElementById('txPrevBtn').disabled = page<=1;
+    document.getElementById('txNextBtn').disabled = page>=txTotalPages;
+  } catch(e) { el.innerHTML = '<div class="empty">Error loading transactions.</div>'; }
+}
+
+async function updateTxStats(total) {
+  document.getElementById('txTotal').textContent = total;
+  try {
+    const [comp,pend,fail] = await Promise.all([
+      apiFetch('/api/admin/transactions?status=completed&limit=1'),
+      apiFetch('/api/admin/transactions?status=pending&limit=1'),
+      apiFetch('/api/admin/transactions?status=failed&limit=1'),
+    ]);
+    document.getElementById('txCompleted').textContent = comp.data?.pagination?.total??'-';
+    document.getElementById('txPending').textContent = pend.data?.pagination?.total??'-';
+    document.getElementById('txFailed').textContent = fail.data?.pagination?.total??'-';
+  } catch(e) {}
+}
+
+function clearTxFilters() {
+  document.getElementById('txStatusFilter').value='';
+  document.getElementById('txTypeFilter').value='';
+  document.getElementById('txUserFilter').value='';
+  loadTransactions(1);
+}
+
+// ── Off-Ramp ───────────────────────────────────────────────────
+async function loadOfframp(page) {
+  page = page || 1; orPage = page;
+  const el = document.getElementById('offrampContent');
+  el.innerHTML = '<div class="loading">Loading…</div>';
+  const status = document.getElementById('orStatusFilter').value;
+  const asset = document.getElementById('orAssetFilter').value.trim();
+  const chain = document.getElementById('orChainFilter').value.trim();
+  const p = new URLSearchParams({page, limit:25});
+  if (status) p.set('status',status);
+  if (asset) p.set('asset',asset);
+  if (chain) p.set('chain',chain);
+  try {
+    const d = await apiFetch(`/api/admin/offramp?${p}`);
+    if (!d.success) { el.innerHTML = '<div class="empty">Error loading.</div>'; return; }
+    const { data, pagination } = d;
+    orTotalPages = pagination.pages || 1;
+    if (page===1 && !status && !asset && !chain) updateOrStats(d);
+    if (!data.length) { el.innerHTML = '<div class="empty">No off-ramp transactions found.</div>'; document.getElementById('orPagination').style.display='none'; return; }
+    el.innerHTML = `<table><thead><tr><th>Reference</th><th>User</th><th>Asset</th><th>Chain</th><th>Crypto (USD)</th><th>NGN Sent</th><th>Fee</th><th>Rate</th><th>Bank</th><th>Status</th><th>Date</th></tr></thead>
+    <tbody>${data.map(t=>{
+      const user = t.userId?(t.userId.fullName||t.userId.whatsappNumber||'-'):'-';
+      return `<tr>
+        <td style="font-size:.76rem;font-family:monospace">${t.referenceId}</td>
+        <td>${user}</td>
+        <td>${t.asset}</td><td>${t.chain}</td>
+        <td>$${fmt(t.cryptoAmount)}</td>
+        <td>₦${fmt(t.ngnAmount,0)}</td>
+        <td>$${fmt(t.fees)}</td>
+        <td>₦${fmt(t.exchangeRate,0)}</td>
+        <td title="${t.accountNumber} — ${t.accountName}">${t.bankName}</td>
+        <td><span class="badge badge-${t.status}">${t.status.toUpperCase()}</span></td>
+        <td>${fmtDate(t.createdAt)}</td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+    const pg = document.getElementById('orPagination');
+    pg.style.display='flex';
+    document.getElementById('orPageInfo').textContent=`Page ${page} of ${orTotalPages} (${pagination.total} total)`;
+    document.getElementById('orPrevBtn').disabled = page<=1;
+    document.getElementById('orNextBtn').disabled = page>=orTotalPages;
+  } catch(e) { el.innerHTML = '<div class="empty">Error loading off-ramp data.</div>'; }
+}
+
+function updateOrStats(d) {
+  const all = d.data;
+  const byStatus = {};
+  all.forEach(t => { byStatus[t.status] = byStatus[t.status]||{count:0,crypto:0,ngn:0,fees:0}; byStatus[t.status].count++; byStatus[t.status].crypto+=t.cryptoAmount; byStatus[t.status].ngn+=t.ngnAmount; byStatus[t.status].fees+=t.fees; });
+  document.getElementById('orTotal').textContent = d.pagination.total;
+  document.getElementById('orCompleted').textContent = byStatus['completed']?.count??0;
+  document.getElementById('orProcessing').textContent = byStatus['processing']?.count??0;
+  document.getElementById('orFailed').textContent = byStatus['failed']?.count??0;
+  // For full totals we'd need a separate stats endpoint; show page totals for now
+  const pageCrypto = all.reduce((s,t)=>s+t.cryptoAmount,0);
+  const pageNgn = all.reduce((s,t)=>s+t.ngnAmount,0);
+  const pageFees = all.reduce((s,t)=>s+t.fees,0);
+  document.getElementById('orCryptoVol').textContent = '$'+fmt(pageCrypto);
+  document.getElementById('orNgnVol').textContent = '₦'+fmt(pageNgn,0);
+  document.getElementById('orFees').textContent = '$'+fmt(pageFees);
+}
+
+function clearOrFilters() {
+  document.getElementById('orStatusFilter').value='';
+  document.getElementById('orAssetFilter').value='';
+  document.getElementById('orChainFilter').value='';
+  loadOfframp(1);
+}
+
+// ── Withdrawal modals ──────────────────────────────────────────
+function openCompleteModal(id) { currentWithdrawalId=id; document.getElementById('completeModal').style.display='block'; }
+function openFailModal(id) { currentWithdrawalId=id; document.getElementById('failModal').style.display='block'; }
+function closeModal() {
+  document.getElementById('completeModal').style.display='none';
+  document.getElementById('failModal').style.display='none';
+  document.getElementById('completeForm').reset();
+  document.getElementById('failForm').reset();
+  currentWithdrawalId=null;
+}
+async function handleCompleteSubmit(e) {
+  e.preventDefault();
+  try {
+    const d = await apiFetch(`/api/admin/referral-withdrawals/${currentWithdrawalId}/complete`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({transactionHash:document.getElementById('txHash').value,adminNotes:document.getElementById('adminNotes').value||undefined})});
+    if (d.success) { alert('Completed!'); closeModal(); loadWStats(); loadWithdrawals(); }
+    else alert('Error: '+d.error);
+  } catch(e) { alert('Request failed.'); }
+}
+async function handleFailSubmit(e) {
+  e.preventDefault();
+  try {
+    const d = await apiFetch(`/api/admin/referral-withdrawals/${currentWithdrawalId}/fail`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:document.getElementById('failReason').value})});
+    if (d.success) { alert('Marked as failed.'); closeModal(); loadWStats(); loadWithdrawals(); }
+    else alert('Error: '+d.error);
+  } catch(e) { alert('Request failed.'); }
+}
+window.addEventListener('click', e => { if (e.target.classList.contains('modal')) closeModal(); });
+</script>
 </body>
 </html>

@@ -336,3 +336,22 @@ app.use("/api/transactions", transactionRoutes);
 // Admin API routes
 import adminWithdrawalRoutes from "../routes/adminWithdrawal";
 app.use("/api/admin/referral-withdrawals", adminWithdrawalRoutes);
+
+import adminUserRoutes from "../routes/adminUser";
+app.use("/api/admin/users", adminUserRoutes);
+
+// Admin overview
+import { getOverview } from "../controllers/adminOverviewController";
+app.get("/api/admin/overview", getOverview);
+
+// Admin offramp
+import { getOfframpTransactions } from "../controllers/adminOfframpController";
+app.get("/api/admin/offramp", getOfframpTransactions);
+
+// Admin transactions — reuse existing controller, mount at /api/admin/transactions
+import { getAdminTransactionHistory, getTransactionDetails } from "../controllers/transactionController";
+import { Router as TxRouter } from "express";
+const adminTxRouter = TxRouter();
+adminTxRouter.get("/", getAdminTransactionHistory);
+adminTxRouter.get("/:referenceId", getTransactionDetails);
+app.use("/api/admin/transactions", adminTxRouter);

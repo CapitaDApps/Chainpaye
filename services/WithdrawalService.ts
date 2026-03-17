@@ -253,4 +253,45 @@ export class WithdrawalService {
       requestedAt: { $lte: twentyFourHoursAgo },
     });
   }
+
+  // ── Admin methods ────────────────────────────────────────────────────────────
+
+  // Alias kept for backward compat
+  async getPendingWithdrawals(): Promise<IWithdrawalRequest[]> {
+    return WithdrawalRequest.find({ status: WithdrawalStatus.PENDING }).sort({ requestedAt: -1 });
+  }
+
+  async getAllWithdrawals(limit = 100, offset = 0): Promise<IWithdrawalRequest[]> {
+    return WithdrawalRequest.find().sort({ requestedAt: -1 }).skip(offset).limit(limit);
+  }
+
+  async completeWithdrawal(withdrawalId: string, transactionHash: string, adminNotes?: string): Promise<IWithdrawalRequest> {
+    const withdrawal = await WithdrawalRequest.findById(withdrawalId);
+    if (!withdrawal) throw new Error("Withdrawal request not found");
+    if (withdrawal.status !== WithdrawalStatus.PENDING) throw new Error(`Cannot complete withdrawal with status: ${withdrawal.status}`);
+
+    // Debit points from user balance
+    await this.pointsRepository.debitPoints(withdrawal.userId, withdrawal.amount, withdrawalId);
+
+    withdrawal.status = WithdrawalStatus.COMPLETED;
+    withdrawal.completedAt = new Date();
+    withdrawal.transactionHash = transactionHash;
+    if (adminNotes) (withdrawal as any).adminNotes = adminNotes;
+    await withdrawal.save();
+    return withdrawal;
+  }
+
+  async failWithdrawal(withdrawalId: string, reason: string): Promise<IWithdrawalRequest> {
+    const withdrawal = await WithdrawalRequest.findById(withdrawalId);
+    if (!withdrawal) throw new Error("Withdrawal request not found");
+    if (withdrawal.status !== WithdrawalStatus.PENDING) throw new Error(`Cannot fail withdrawal with status: ${withdrawal.status}`);
+
+    // Restore balance
+    await this.pointsRepository.creditPoints(withdrawal.userId, withdrawal.amount, `refund-${withdrawalId}`);
+
+    withdrawal.status = WithdrawalStatus.FAILED;
+    withdrawal.failureReason = reason;
+    await withdrawal.save();
+    return withdrawal;
+  }
 }
