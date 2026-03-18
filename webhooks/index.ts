@@ -18,7 +18,7 @@ app.use(
       directives: {
         defaultSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        scriptSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", "data:", "https:"],
       },
     },
@@ -343,6 +343,10 @@ app.use("/api/admin/users", adminUserRoutes);
 // Admin overview
 import { getOverview } from "../controllers/adminOverviewController";
 app.get("/api/admin/overview", getOverview);
+
+// Admin leaderboard
+import { getLeaderboard } from "../controllers/adminLeaderboardController";
+app.get("/api/admin/leaderboard", getLeaderboard);
 
 // Admin offramp
 import { getOfframpTransactions } from "../controllers/adminOfframpController";
