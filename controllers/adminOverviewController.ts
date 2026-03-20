@@ -23,6 +23,8 @@ export async function getOverview(_req: Request, res: Response) {
       offrampStats,
       withdrawalStats,
       referralBalanceStats,
+      usdFlowStats,
+      ngnFlowStats,
       recentSignups,
     ] = await Promise.all([
       User.countDocuments(),
@@ -31,7 +33,7 @@ export async function getOverview(_req: Request, res: Response) {
       User.countDocuments({ createdAt: { $gte: startOf7Days } }),
       User.countDocuments({ createdAt: { $gte: startOf30Days } }),
 
-      // Transaction volume & fee aggregation
+      // Transaction volume & fee aggregation (all statuses)
       Transaction.aggregate([
         { $group: {
           _id: "$status",
@@ -70,6 +72,31 @@ export async function getOverview(_req: Request, res: Response) {
         }},
       ]),
 
+      // Completed USD tx volume (incoming = CREDIT, outgoing = DEBIT)
+      Transaction.aggregate([
+        { $match: { status: TransactionStatus.COMPLETED, currency: "USD" } },
+        {
+          $group: {
+            _id: "$entryType",
+            count: { $sum: 1 },
+            volume: { $sum: "$amount" },
+            fees: { $sum: "$fees" },
+          },
+        },
+      ]),
+
+      // Completed NGN tx volume (incoming = CREDIT, outgoing = DEBIT)
+      Transaction.aggregate([
+        { $match: { status: TransactionStatus.COMPLETED, currency: "NGN" } },
+        {
+          $group: {
+            _id: "$entryType",
+            count: { $sum: 1 },
+            volume: { $sum: "$amount" },
+          },
+        },
+      ]),
+
       // Last 5 signups
       User.find()
         .select("fullName whatsappNumber country isVerified createdAt")
@@ -86,6 +113,22 @@ export async function getOverview(_req: Request, res: Response) {
     const totalTxCount = txStats.reduce((s, r) => s + r.count, 0);
     const totalTxVolume = txStats.reduce((s, r) => s + r.volume, 0);
     const totalTxFees = txStats.reduce((s, r) => s + r.fees, 0);
+
+    // Completed USD volume only
+    const completedUsdRow = txStats.find((r) => r._id === TransactionStatus.COMPLETED);
+    // We'll use usdFlowStats for the accurate completed USD figure
+    const usdFlowByEntry: Record<string, { count: number; volume: number; fees: number }> = {};
+    for (const row of usdFlowStats) {
+      usdFlowByEntry[row._id ?? "UNKNOWN"] = { count: row.count, volume: row.volume, fees: row.fees };
+    }
+    const completedUsdVolume =
+      (usdFlowByEntry["CREDIT"]?.volume ?? 0) + (usdFlowByEntry["DEBIT"]?.volume ?? 0);
+
+    // NGN flow
+    const ngnFlowByEntry: Record<string, { count: number; volume: number }> = {};
+    for (const row of ngnFlowStats) {
+      ngnFlowByEntry[row._id ?? "UNKNOWN"] = { count: row.count, volume: row.volume };
+    }
 
     // Flatten offramp stats
     const offrampByStatus: Record<string, any> = {};
@@ -119,6 +162,7 @@ export async function getOverview(_req: Request, res: Response) {
         transactions: {
           total: totalTxCount,
           totalVolume: totalTxVolume,
+          completedUsdVolume,
           totalFees: totalTxFees,
           byStatus: txByStatus,
         },
@@ -138,11 +182,42 @@ export async function getOverview(_req: Request, res: Response) {
           totalOutstandingBalance: rb.totalCurrentBalance,
           totalEverEarned: rb.totalEverEarned,
         },
+        moneyFlow: {
+          usd: {
+            incoming: {
+              volume: usdFlowByEntry["CREDIT"]?.volume ?? 0,
+              count: usdFlowByEntry["CREDIT"]?.count ?? 0,
+              fees: usdFlowByEntry["CREDIT"]?.fees ?? 0,
+            },
+            outgoing: {
+              volume: usdFlowByEntry["DEBIT"]?.volume ?? 0,
+              count: usdFlowByEntry["DEBIT"]?.count ?? 0,
+              fees: usdFlowByEntry["DEBIT"]?.fees ?? 0,
+            },
+            netInApp:
+              (usdFlowByEntry["CREDIT"]?.volume ?? 0) -
+              (usdFlowByEntry["DEBIT"]?.volume ?? 0),
+          },
+          ngn: {
+            incoming: {
+              volume: ngnFlowByEntry["CREDIT"]?.volume ?? 0,
+              count: ngnFlowByEntry["CREDIT"]?.count ?? 0,
+            },
+            outgoing: {
+              volume: ngnFlowByEntry["DEBIT"]?.volume ?? 0,
+              count: ngnFlowByEntry["DEBIT"]?.count ?? 0,
+            },
+            netInApp:
+              (ngnFlowByEntry["CREDIT"]?.volume ?? 0) -
+              (ngnFlowByEntry["DEBIT"]?.volume ?? 0),
+          },
+        },
         recentSignups,
       },
     });
   } catch (error: any) {
-    logger.error("Error fetching admin overview:", error.message);
-    return res.status(500).json({ success: false, error: error.message });
+    console.error("Error fetching admin overview:", error);
+    logger.error("Error fetching admin overview:", error?.message || String(error));
+    return res.status(500).json({ success: false, error: error?.message || String(error) });
   }
 }

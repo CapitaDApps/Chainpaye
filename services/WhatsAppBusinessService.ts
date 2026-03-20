@@ -385,12 +385,12 @@ What can I do for you?
           {
             id:"other_menu_ngn_deposit",
             title:"Deposit NGN",
-            description:"Fund you NGN wallet"
+            description:"Fund your NGN wallet"
           },
           {
             id:"other_menu_USD_deposit",
             title:"Deposit USD",
-            description:"Fund you USD wallet"
+            description:"Fund your USD wallet"
           },
           {
             id:"other_menu_withdraw",
@@ -811,6 +811,7 @@ For support, please DM our team:
 
 *📞 Brain:* +2348106535142
 *📞 Ben:* +2348130348865
+*📞 Eddy:* +2348130348865
 
 Our team is ready to assist you!`;
 

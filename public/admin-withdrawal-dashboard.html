@@ -317,6 +317,7 @@ a.tx-link:hover { text-decoration: underline; }
         </div>
         <div class="stat-card">
           <div class="stat-card-top"><div><div class="stat-label">Tx Volume (USD)</div><div class="stat-value" id="ovTxVolume">—</div></div><div class="stat-icon blue">💱</div></div>
+          <div class="stat-trend neutral">Completed USD only</div>
         </div>
         <div class="stat-card">
           <div class="stat-card-top"><div><div class="stat-label">Tx Fees Collected</div><div class="stat-value" id="ovTxFees">—</div></div><div class="stat-icon green">💰</div></div>
@@ -349,6 +350,67 @@ a.tx-link:hover { text-decoration: underline; }
         <div class="card">
           <div class="card-header"><h3>Off-Ramp Breakdown</h3></div>
           <div id="ovOfframpBreakdown"><div class="loading"></div></div>
+        </div>
+      </div>
+
+      <!-- Money Flow -->
+      <div class="card" style="margin-bottom:1.25rem">
+        <div class="card-header"><h3>💰 Money Flow — Completed Transactions</h3></div>
+        <div class="card-body">
+          <div class="two-col">
+            <!-- USD -->
+            <div>
+              <div style="font-weight:600;font-size:.9rem;margin-bottom:.75rem;color:var(--gray-700)">USD Flow</div>
+              <div class="ref-stats-grid">
+                <div class="rs-card">
+                  <div class="rs-value" id="mfUsdIn" style="color:var(--success)">—</div>
+                  <div class="rs-label">Incoming (Credits)</div>
+                </div>
+                <div class="rs-card">
+                  <div class="rs-value" id="mfUsdOut" style="color:var(--danger)">—</div>
+                  <div class="rs-label">Outgoing (Debits)</div>
+                </div>
+                <div class="rs-card">
+                  <div class="rs-value" id="mfUsdNet" style="color:var(--primary)">—</div>
+                  <div class="rs-label">Net in App</div>
+                </div>
+                <div class="rs-card">
+                  <div class="rs-value" id="mfUsdInCount" style="color:var(--gray-700)">—</div>
+                  <div class="rs-label">Incoming Txns</div>
+                </div>
+                <div class="rs-card">
+                  <div class="rs-value" id="mfUsdOutCount" style="color:var(--gray-700)">—</div>
+                  <div class="rs-label">Outgoing Txns</div>
+                </div>
+              </div>
+            </div>
+            <!-- NGN -->
+            <div>
+              <div style="font-weight:600;font-size:.9rem;margin-bottom:.75rem;color:var(--gray-700)">NGN Flow</div>
+              <div class="ref-stats-grid">
+                <div class="rs-card">
+                  <div class="rs-value" id="mfNgnIn" style="color:var(--success)">—</div>
+                  <div class="rs-label">Incoming (Credits)</div>
+                </div>
+                <div class="rs-card">
+                  <div class="rs-value" id="mfNgnOut" style="color:var(--danger)">—</div>
+                  <div class="rs-label">Outgoing (Debits)</div>
+                </div>
+                <div class="rs-card">
+                  <div class="rs-value" id="mfNgnNet" style="color:var(--primary)">—</div>
+                  <div class="rs-label">Net in App</div>
+                </div>
+                <div class="rs-card">
+                  <div class="rs-value" id="mfNgnInCount" style="color:var(--gray-700)">—</div>
+                  <div class="rs-label">Incoming Txns</div>
+                </div>
+                <div class="rs-card">
+                  <div class="rs-value" id="mfNgnOutCount" style="color:var(--gray-700)">—</div>
+                  <div class="rs-label">Outgoing Txns</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -619,7 +681,7 @@ async function loadOverview() {
   try {
     const d = await apiFetch('/api/admin/overview');
     if (!d.success) return;
-    const { users, transactions, offramp, withdrawals, referralEarnings, recentSignups } = d.data;
+    const { users, transactions, offramp, withdrawals, referralEarnings, moneyFlow, recentSignups } = d.data;
 
     document.getElementById('ovTotalUsers').textContent = users.total.toLocaleString();
     document.getElementById('ovNew7d').textContent = `+${users.new7d} this week`;
@@ -627,7 +689,7 @@ async function loadOverview() {
     document.getElementById('ovUnverified').textContent = `${users.unverified} unverified`;
     document.getElementById('ovNewToday').textContent = users.newToday;
     document.getElementById('ovNew30d').textContent = `${users.new30d} this month`;
-    document.getElementById('ovTxVolume').textContent = '$' + fmt(transactions.totalVolume);
+    document.getElementById('ovTxVolume').textContent = '$' + fmt(transactions.completedUsdVolume);
     document.getElementById('ovTxFees').textContent = '$' + fmt(transactions.totalFees);
     document.getElementById('ovOfframpVol').textContent = '$' + fmt(offramp.totalCryptoVolume);
     document.getElementById('ovOfframpFees').textContent = '$' + fmt(offramp.totalFees);
@@ -654,6 +716,26 @@ async function loadOverview() {
          <td><span class="badge badge-${u.isVerified?'verified':'unverified'}">${u.isVerified?'Yes':'No'}</span></td>
          <td>${fmtDate(u.createdAt)}</td></tr>`).join('')}</tbody></table></div>`
       : '<div class="empty">No signups yet.</div>';
+
+    // Money flow
+    if (moneyFlow) {
+      const usd = moneyFlow.usd, ngn = moneyFlow.ngn;
+      document.getElementById('mfUsdIn').textContent = '$' + fmt(usd.incoming.volume);
+      document.getElementById('mfUsdOut').textContent = '$' + fmt(usd.outgoing.volume);
+      const usdNet = usd.netInApp;
+      document.getElementById('mfUsdNet').textContent = (usdNet >= 0 ? '+$' : '-$') + fmt(Math.abs(usdNet));
+      document.getElementById('mfUsdNet').style.color = usdNet >= 0 ? 'var(--success)' : 'var(--danger)';
+      document.getElementById('mfUsdInCount').textContent = usd.incoming.count.toLocaleString();
+      document.getElementById('mfUsdOutCount').textContent = usd.outgoing.count.toLocaleString();
+
+      document.getElementById('mfNgnIn').textContent = '₦' + fmt(ngn.incoming.volume, 0);
+      document.getElementById('mfNgnOut').textContent = '₦' + fmt(ngn.outgoing.volume, 0);
+      const ngnNet = ngn.netInApp;
+      document.getElementById('mfNgnNet').textContent = (ngnNet >= 0 ? '+₦' : '-₦') + fmt(Math.abs(ngnNet), 0);
+      document.getElementById('mfNgnNet').style.color = ngnNet >= 0 ? 'var(--success)' : 'var(--danger)';
+      document.getElementById('mfNgnInCount').textContent = ngn.incoming.count.toLocaleString();
+      document.getElementById('mfNgnOutCount').textContent = ngn.outgoing.count.toLocaleString();
+    }
   } catch(e) { console.error(e); }
 }
 </script>
