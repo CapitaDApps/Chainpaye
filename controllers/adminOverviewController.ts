@@ -33,14 +33,17 @@ export async function getOverview(_req: Request, res: Response) {
       User.countDocuments({ createdAt: { $gte: startOf7Days } }),
       User.countDocuments({ createdAt: { $gte: startOf30Days } }),
 
-      // Transaction volume & fee aggregation (all statuses)
+      // Transaction volume & fee aggregation grouped by status + currency
       Transaction.aggregate([
-        { $group: {
-          _id: "$status",
-          count: { $sum: 1 },
-          volume: { $sum: "$amount" },
-          fees: { $sum: "$fees" },
-        }},
+        {
+          $group: {
+            _id: { status: "$status", currency: "$currency" },
+            count: { $sum: 1 },
+            volume: { $sum: "$amount" },
+            fees: { $sum: "$fees" },
+          },
+        },
+        { $sort: { "_id.currency": 1, "_id.status": 1 } },
       ]),
 
       // Offramp aggregation
@@ -105,18 +108,19 @@ export async function getOverview(_req: Request, res: Response) {
         .lean(),
     ]);
 
-    // Flatten tx stats
-    const txByStatus: Record<string, { count: number; volume: number; fees: number }> = {};
+    // Flatten tx stats by currency → status
+    // txByCurrency: { USD: { completed: { count, volume, fees }, ... }, NGN: { ... }, ... }
+    const txByCurrency: Record<string, Record<string, { count: number; volume: number; fees: number }>> = {};
     for (const row of txStats) {
-      txByStatus[row._id] = { count: row.count, volume: row.volume, fees: row.fees };
+      const { status, currency } = row._id;
+      if (!txByCurrency[currency]) txByCurrency[currency] = {};
+      txByCurrency[currency][status] = { count: row.count, volume: row.volume, fees: row.fees };
     }
     const totalTxCount = txStats.reduce((s, r) => s + r.count, 0);
     const totalTxVolume = txStats.reduce((s, r) => s + r.volume, 0);
     const totalTxFees = txStats.reduce((s, r) => s + r.fees, 0);
 
-    // Completed USD volume only
-    const completedUsdRow = txStats.find((r) => r._id === TransactionStatus.COMPLETED);
-    // We'll use usdFlowStats for the accurate completed USD figure
+    // Completed USD volume only — use usdFlowStats for the accurate completed USD figure
     const usdFlowByEntry: Record<string, { count: number; volume: number; fees: number }> = {};
     for (const row of usdFlowStats) {
       usdFlowByEntry[row._id ?? "UNKNOWN"] = { count: row.count, volume: row.volume, fees: row.fees };
@@ -164,7 +168,7 @@ export async function getOverview(_req: Request, res: Response) {
           totalVolume: totalTxVolume,
           completedUsdVolume,
           totalFees: totalTxFees,
-          byStatus: txByStatus,
+          byCurrency: txByCurrency,
         },
         offramp: {
           total: totalOfframpCount,

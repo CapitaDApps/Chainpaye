@@ -698,11 +698,24 @@ async function loadOverview() {
     document.getElementById('ovOutstandingBal').textContent = '$' + fmt(referralEarnings.totalOutstandingBalance);
     document.getElementById('ovTotalEarned').textContent = '$' + fmt(referralEarnings.totalEverEarned);
 
-    const txRows = Object.entries(transactions.byStatus).map(([s,v]) =>
-      `<tr><td><span class="badge badge-${s}">${s.toUpperCase()}</span></td><td>${v.count.toLocaleString()}</td><td>$${fmt(v.volume)}</td><td>$${fmt(v.fees)}</td></tr>`).join('');
-    document.getElementById('ovTxBreakdown').innerHTML = txRows
-      ? `<div class="table-wrap"><table><thead><tr><th>Status</th><th>Count</th><th>Volume</th><th>Fees</th></tr></thead><tbody>${txRows}</tbody></table></div>`
-      : '<div class="empty">No transactions yet.</div>';
+    const byCurrency = transactions.byCurrency || {};
+    const currencies = Object.keys(byCurrency).sort();
+    let txBreakdownHtml = '';
+    if (currencies.length === 0) {
+      txBreakdownHtml = '<div class="empty">No transactions yet.</div>';
+    } else {
+      txBreakdownHtml = currencies.map(cur => {
+        const statuses = byCurrency[cur];
+        const rows = Object.entries(statuses).map(([s, v]) =>
+          `<tr><td><span class="badge badge-${s}">${s.toUpperCase()}</span></td><td>${v.count.toLocaleString()}</td><td>${cur === 'NGN' ? '₦' : '$'}${fmt(v.volume, cur === 'NGN' ? 0 : 2)}</td><td>${cur === 'NGN' ? '₦' : '$'}${fmt(v.fees, cur === 'NGN' ? 0 : 2)}</td></tr>`
+        ).join('');
+        return `<div style="margin-bottom:.75rem">
+          <div style="padding:.5rem 1rem;background:var(--gray-50);font-size:.78rem;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--gray-200)">${cur}</div>
+          <div class="table-wrap"><table><thead><tr><th>Status</th><th>Count</th><th>Volume</th><th>Fees</th></tr></thead><tbody>${rows}</tbody></table></div>
+        </div>`;
+      }).join('');
+    }
+    document.getElementById('ovTxBreakdown').innerHTML = txBreakdownHtml;
 
     const orRows = Object.entries(offramp.byStatus).map(([s,v]) =>
       `<tr><td><span class="badge badge-${s}">${s.toUpperCase()}</span></td><td>${v.count}</td><td>$${fmt(v.cryptoVolume)}</td><td>₦${fmt(v.ngnVolume,0)}</td><td>$${fmt(v.fees)}</td></tr>`).join('');
