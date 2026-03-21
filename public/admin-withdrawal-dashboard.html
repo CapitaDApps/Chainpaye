@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -289,7 +289,8 @@ a.tx-link:hover { text-decoration: underline; }
     </div>
     <div class="topbar-right">
       <div class="live-dot" title="Live data"></div>
-      <button class="refresh-btn" onclick="refreshCurrent()">↻ Refresh</button>
+      <button class="refresh-btn" onclick="refreshCurrent()">&#8635; Refresh</button>
+      <button class="refresh-btn" onclick="logout()" style="background:#fee2e2;color:#dc2626">&#x2192; Logout</button>
     </div>
   </header>
 
@@ -327,6 +328,9 @@ a.tx-link:hover { text-decoration: underline; }
         </div>
         <div class="stat-card">
           <div class="stat-card-top"><div><div class="stat-label">Off-Ramp Fees</div><div class="stat-value" id="ovOfframpFees">—</div></div><div class="stat-icon green">💵</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top"><div><div class="stat-label">Offramp Fees Spread (USD)</div><div class="stat-value" id="ovOfframpSpread">—</div></div><div class="stat-icon orange">📈</div></div>
         </div>
         <div class="stat-card">
           <div class="stat-card-top"><div><div class="stat-label">Pending Withdrawals</div><div class="stat-value" id="ovPendingW">—</div></div><div class="stat-icon orange">⏳</div></div>
@@ -524,7 +528,8 @@ a.tx-link:hover { text-decoration: underline; }
         <div class="stat-card"><div class="stat-card-top"><div><div class="stat-label">Failed</div><div class="stat-value" id="orFailed">—</div></div><div class="stat-icon red">❌</div></div></div>
         <div class="stat-card"><div class="stat-card-top"><div><div class="stat-label">Crypto Volume</div><div class="stat-value" id="orCryptoVol">—</div></div><div class="stat-icon blue">💱</div></div></div>
         <div class="stat-card"><div class="stat-card-top"><div><div class="stat-label">NGN Disbursed</div><div class="stat-value" id="orNgnVol">—</div></div><div class="stat-icon purple">🇳🇬</div></div></div>
-        <div class="stat-card"><div class="stat-card-top"><div><div class="stat-label">Fees Collected</div><div class="stat-value" id="orFees">—</div></div><div class="stat-icon green">💰</div></div></div>
+        <div class="stat-card"><div class="stat-card-top"><div><div class="stat-label">Fees Collected (USD)</div><div class="stat-value" id="orFees">—</div></div><div class="stat-icon green">💰</div></div></div>
+        <div class="stat-card"><div class="stat-card-top"><div><div class="stat-label">Offramp Fees (USD)</div><div class="stat-value" id="orSpreadFees">—</div></div><div class="stat-icon orange">📊</div></div></div>
       </div>
       <div class="card">
         <div class="card-header">
@@ -599,16 +604,36 @@ a.tx-link:hover { text-decoration: underline; }
 </div>
 
 <script>
+// ── Auth guard ────────────────────────────────────────────────
+(function() {
+  const token = localStorage.getItem('adminToken');
+  if (!token) { window.location.href = '/admin-login.html'; }
+})();
+
+function getToken() { return localStorage.getItem('adminToken') || ''; }
+
+function logout() {
+  fetch('/api/admin/logout', { method: 'POST', headers: { Authorization: 'Bearer ' + getToken() } })
+    .finally(() => { localStorage.removeItem('adminToken'); window.location.href = '/admin-login.html'; });
+}
+
 // ── State ──────────────────────────────────────────────────────
 let currentWithdrawalId = null, wFilter = 'all';
 let txPage = 1, txTotalPages = 1;
 let orPage = 1, orTotalPages = 1;
 let lbSort = 'totalEarned';
 const tabLoaded = {};
+let _lastOverviewOfframp = null;
 const tabTitles = { overview:'Overview', withdrawals:'Withdrawals', users:'Users', transactions:'Transactions', offramp:'Off-Ramp', leaderboard:'Leaderboard' };
 
 // ── Helpers ────────────────────────────────────────────────────
-async function apiFetch(url, opts) { const r = await fetch(url, opts); return r.json(); }
+async function apiFetch(url, opts) {
+  opts = opts || {};
+  opts.headers = Object.assign({ Authorization: 'Bearer ' + getToken() }, opts.headers || {});
+  const r = await fetch(url, opts);
+  if (r.status === 401) { localStorage.removeItem('adminToken'); window.location.href = '/admin-login.html'; return {}; }
+  return r.json();
+}
 function fmt(n, d=2) { return Number(n||0).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}); }
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—'; }
 function truncate(s, n=8) { return s ? s.slice(0,n)+'…'+s.slice(-4) : '—'; }
@@ -682,6 +707,7 @@ async function loadOverview() {
     const d = await apiFetch('/api/admin/overview');
     if (!d.success) return;
     const { users, transactions, offramp, withdrawals, referralEarnings, moneyFlow, recentSignups } = d.data;
+    _lastOverviewOfframp = offramp;
 
     document.getElementById('ovTotalUsers').textContent = users.total.toLocaleString();
     document.getElementById('ovNew7d').textContent = `+${users.new7d} this week`;
@@ -693,6 +719,7 @@ async function loadOverview() {
     document.getElementById('ovTxFees').textContent = '$' + fmt(transactions.totalFees);
     document.getElementById('ovOfframpVol').textContent = '$' + fmt(offramp.totalCryptoVolume);
     document.getElementById('ovOfframpFees').textContent = '$' + fmt(offramp.totalFees);
+    document.getElementById('ovOfframpSpread').textContent = '$' + fmt(offramp.totalSpreadFeesUsd||0);
     document.getElementById('ovPendingW').textContent = '$' + fmt(withdrawals.pendingAmount);
     document.getElementById('ovCompletedW').textContent = '$' + fmt(withdrawals.completedAmount);
     document.getElementById('ovOutstandingBal').textContent = '$' + fmt(referralEarnings.totalOutstandingBalance);
@@ -803,8 +830,7 @@ async function loadAllUsers(page) {
   document.getElementById('userDetailPanel').style.display = 'none';
   try {
     const limit = 50, offset = (page-1)*limit;
-    const res = await fetch(`/api/admin/users?limit=${limit}&offset=${offset}`);
-    const d = await res.json();
+    const d = await apiFetch(`/api/admin/users?limit=${limit}&offset=${offset}`);
     if (!d.success) {
       el.innerHTML = `<div class="empty">Error: ${d.error || 'Unknown error'}</div>`;
       console.error('loadAllUsers error:', d);
@@ -989,6 +1015,8 @@ function clearTxFilters() {
 }
 
 // ── Off-Ramp ───────────────────────────────────────────────────
+const OFFRAMP_SPREAD_PER_USD = 30; // NGN spread per USD
+
 async function loadOfframp(page) {
   page = page||1; orPage = page;
   const el = document.getElementById('offrampContent');
@@ -1005,9 +1033,9 @@ async function loadOfframp(page) {
     if (!d.success) { el.innerHTML = '<div class="empty">Error loading.</div>'; return; }
     const { data, pagination } = d;
     orTotalPages = pagination.pages || 1;
-    if (page===1 && !status && !asset && !chain) updateOrStats(d);
+    if (page===1 && !status && !asset && !chain) updateOrStats();
     if (!data.length) { el.innerHTML = '<div class="empty">No off-ramp transactions found.</div>'; document.getElementById('orPagination').style.display='none'; return; }
-    el.innerHTML = `<table><thead><tr><th>Reference</th><th>User</th><th>Asset</th><th>Chain</th><th>Crypto (USD)</th><th>NGN Sent</th><th>Fee</th><th>Rate</th><th>Bank</th><th>Status</th><th>Date</th></tr></thead>
+    el.innerHTML = `<table><thead><tr><th>Reference</th><th>User</th><th>Asset</th><th>Chain</th><th>Crypto (USD)</th><th>NGN Sent</th><th>Fee (USD)</th><th>Offramp Fees (USD)</th><th>Rate</th><th>Bank</th><th>Status</th><th>Date</th></tr></thead>
     <tbody>${data.map(t=>{
       const user = t.userId?(t.userId.fullName||t.userId.whatsappNumber||'—'):'—';
       return `<tr>
@@ -1018,6 +1046,7 @@ async function loadOfframp(page) {
         <td><strong>$${fmt(t.cryptoAmount)}</strong></td>
         <td>₦${fmt(t.ngnAmount,0)}</td>
         <td style="color:var(--success)">$${fmt(t.fees)}</td>
+        <td style="color:var(--warning)">$${fmt(((t.cryptoAmount||0)*30)/(t.exchangeRate||1))}</td>
         <td style="color:var(--gray-500)">₦${fmt(t.exchangeRate,0)}</td>
         <td title="${t.accountNumber} · ${t.accountName}">${t.bankName}</td>
         <td><span class="badge badge-${t.status}">${t.status.toUpperCase()}</span></td>
@@ -1032,20 +1061,25 @@ async function loadOfframp(page) {
   } catch(e) { el.innerHTML = '<div class="empty">Error loading off-ramp data.</div>'; }
 }
 
-function updateOrStats(d) {
-  const all = d.data;
-  const by = {};
-  all.forEach(t => { by[t.status]=by[t.status]||{count:0,crypto:0,ngn:0,fees:0}; by[t.status].count++; by[t.status].crypto+=t.cryptoAmount; by[t.status].ngn+=t.ngnAmount; by[t.status].fees+=t.fees; });
-  document.getElementById('orTotal').textContent = d.pagination.total.toLocaleString();
-  document.getElementById('orCompleted').textContent = (by['completed']?.count||0).toLocaleString();
-  document.getElementById('orProcessing').textContent = (by['processing']?.count||0).toLocaleString();
-  document.getElementById('orFailed').textContent = (by['failed']?.count||0).toLocaleString();
-  const pageCrypto = all.reduce((s,t)=>s+t.cryptoAmount,0);
-  const pageNgn = all.reduce((s,t)=>s+t.ngnAmount,0);
-  const pageFees = all.reduce((s,t)=>s+t.fees,0);
-  document.getElementById('orCryptoVol').textContent = '$'+fmt(pageCrypto);
-  document.getElementById('orNgnVol').textContent = '₦'+fmt(pageNgn,0);
-  document.getElementById('orFees').textContent = '$'+fmt(pageFees);
+async function updateOrStats() {
+  try {
+    let or = _lastOverviewOfframp;
+    if (!or) {
+      const ov = await apiFetch('/api/admin/overview');
+      if (!ov.success) return;
+      or = ov.data.offramp;
+      _lastOverviewOfframp = or;
+    }
+    const byStatus = or.byStatus || {};
+    document.getElementById('orTotal').textContent = or.total.toLocaleString();
+    document.getElementById('orCompleted').textContent = (byStatus['completed']?.count||0).toLocaleString();
+    document.getElementById('orProcessing').textContent = (byStatus['processing']?.count||0).toLocaleString();
+    document.getElementById('orFailed').textContent = (byStatus['failed']?.count||0).toLocaleString();
+    document.getElementById('orCryptoVol').textContent = '$'+fmt(or.totalCryptoVolume);
+    document.getElementById('orNgnVol').textContent = '₦'+fmt(or.totalNgnVolume,0);
+    document.getElementById('orFees').textContent = '$'+fmt(or.totalFees);
+    document.getElementById('orSpreadFees').textContent = '$'+fmt(or.totalSpreadFeesUsd||0);
+  } catch(e) { console.error('updateOrStats error', e); }
 }
 
 function clearOrFilters() {
