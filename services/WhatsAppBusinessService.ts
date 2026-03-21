@@ -1075,7 +1075,7 @@ Our team is ready to assist you!`;
         body: "Buy USDC or USDT with NGN instantly. Select your asset, chain, and enter the amount.",
         cta: "Buy Crypto",
       },
-      {},
+      { init: true },
     );
   }
 
