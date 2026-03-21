@@ -764,6 +764,32 @@ const COMMANDS: Record<string, CommandConfig> = {
   },
 
   // ============================================================
+  // BUY CRYPTO / ONRAMP
+  // User wants to buy USDC or USDT with NGN
+  // ============================================================
+  buyCrypto: {
+    triggers: [
+      "/buycrypto",
+      "buy crypto",
+      "buy usdc",
+      "buy usdt",
+      "buy stablecoin",
+      "buy stablecoins",
+      "purchase crypto",
+      "purchase usdc",
+      "purchase usdt",
+      "onramp",
+      "on ramp",
+      "crypto onramp",
+      "i want to buy crypto",
+      "i want to buy usdc",
+      "i want to buy usdt",
+    ],
+    description: "Buy USDC or USDT with NGN via DexPay",
+    priority: 5,
+  },
+
+  // ============================================================
   // REFERRAL SYSTEM
   // View referral dashboard, earnings, and leaderboard
   // ============================================================

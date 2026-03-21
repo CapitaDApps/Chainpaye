@@ -1,0 +1,147 @@
+{
+  "version": "7.2",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "COMPLETE_TRANSACTION_FORM": ["TRANSACTION_RECEIVED"],
+    "TRANSACTION_RECEIVED": []
+  },
+  "screens": [
+    {
+      "id": "COMPLETE_TRANSACTION_FORM",
+      "title": "Complete Transaction",
+      "data": {
+        "fiatAmount": {
+          "type": "string",
+          "__example__": "5300"
+        },
+        "tokenAmount": {
+          "type": "string",
+          "__example__": "3.69"
+        },
+        "price": {
+          "type": "string",
+          "__example__": "1395.80"
+        },
+        "bankName": {
+          "type": "string",
+          "__example__": "Safe Haven MFB"
+        },
+        "accountName": {
+          "type": "string",
+          "__example__": "Opensky Checkout"
+        },
+        "accountNumber": {
+          "type": "string",
+          "__example__": "6026531329"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Transaction Details"
+          },
+          {
+            "type": "TextBody",
+            "text": "Please confirm the details below before proceeding."
+          },
+          {
+            "type": "TextSubheading",
+            "text": "Amount"
+          },
+          {
+            "type": "TextBody",
+            "text": "NGN ${data.fiatAmount}"
+          },
+          {
+            "type": "TextSubheading",
+            "text": "You Will Receive"
+          },
+          {
+            "type": "TextBody",
+            "text": "${data.tokenAmount} tokens"
+          },
+          {
+            "type": "TextSubheading",
+            "text": "Rate"
+          },
+          {
+            "type": "TextBody",
+            "text": "NGN ${data.price} per token"
+          },
+          {
+            "type": "TextSubheading",
+            "text": "Bank"
+          },
+          {
+            "type": "TextBody",
+            "text": "${data.bankName}"
+          },
+          {
+            "type": "TextSubheading",
+            "text": "Account Name"
+          },
+          {
+            "type": "TextBody",
+            "text": "${data.accountName}"
+          },
+          {
+            "type": "TextSubheading",
+            "text": "Account Number"
+          },
+          {
+            "type": "TextBody",
+            "text": "${data.accountNumber}"
+          },
+          {
+            "type": "Form",
+            "name": "complete_transaction_form",
+            "children": [
+              {
+                "type": "Footer",
+                "label": "Proceed",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {}
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "TRANSACTION_RECEIVED",
+      "title": "Transaction Received",
+      "terminal": true,
+      "success": true,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Transaction Received"
+          },
+          {
+            "type": "TextBody",
+            "text": "Your transaction has been received and is being processed. You will be notified once your crypto arrives."
+          },
+          {
+            "type": "Footer",
+            "label": "Done",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {}
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

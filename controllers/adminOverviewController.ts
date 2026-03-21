@@ -20,6 +20,7 @@ export async function getOverview(_req: Request, res: Response) {
       newUsers7d,
       newUsers30d,
       txStats,
+      completedUsdFeeStats,
       offrampStats,
       withdrawalStats,
       referralBalanceStats,
@@ -46,15 +47,39 @@ export async function getOverview(_req: Request, res: Response) {
         { $sort: { "_id.currency": 1, "_id.status": 1 } },
       ]),
 
-      // Offramp aggregation
+      // Completed USD fees only
+      Transaction.aggregate([
+        { $match: { status: TransactionStatus.COMPLETED, currency: "USD" } },
+        { $group: { _id: null, totalFees: { $sum: "$fees" } } },
+      ]),
+
+      // Offramp aggregation — fees and spread only from completed transactions
       OfframpTransaction.aggregate([
-        { $group: {
-          _id: "$status",
-          count: { $sum: 1 },
-          cryptoVolume: { $sum: "$cryptoAmount" },
-          ngnVolume: { $sum: "$ngnAmount" },
-          fees: { $sum: "$fees" },
-        }},
+        {
+          $facet: {
+            byStatus: [
+              { $group: { _id: "$status", count: { $sum: 1 }, cryptoVolume: { $sum: "$cryptoAmount" }, ngnVolume: { $sum: "$ngnAmount" } } },
+            ],
+            completedOnly: [
+              { $match: { status: OfframpStatus.COMPLETED } },
+              {
+                $group: {
+                  _id: null,
+                  fees: { $sum: "$fees" },
+                  spreadFeesUsd: {
+                    $sum: {
+                      $cond: [
+                        { $gt: ["$exchangeRate", 0] },
+                        { $divide: [{ $multiply: ["$cryptoAmount", 30] }, "$exchangeRate"] },
+                        0,
+                      ],
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        },
       ]),
 
       // Withdrawal aggregation
@@ -118,7 +143,7 @@ export async function getOverview(_req: Request, res: Response) {
     }
     const totalTxCount = txStats.reduce((s, r) => s + r.count, 0);
     const totalTxVolume = txStats.reduce((s, r) => s + r.volume, 0);
-    const totalTxFees = txStats.reduce((s, r) => s + r.fees, 0);
+    const completedUsdFees = completedUsdFeeStats[0]?.totalFees ?? 0;
 
     // Completed USD volume only — use usdFlowStats for the accurate completed USD figure
     const usdFlowByEntry: Record<string, { count: number; volume: number; fees: number }> = {};
@@ -136,13 +161,18 @@ export async function getOverview(_req: Request, res: Response) {
 
     // Flatten offramp stats
     const offrampByStatus: Record<string, any> = {};
-    for (const row of offrampStats) {
+    const [offrampFacet] = offrampStats as any[];
+    const statusRows: any[] = offrampFacet?.byStatus ?? [];
+    const completedRow = offrampFacet?.completedOnly?.[0] ?? { fees: 0, spreadFeesUsd: 0 };
+
+    for (const row of statusRows) {
       offrampByStatus[row._id] = row;
     }
-    const totalOfframpCount = offrampStats.reduce((s, r) => s + r.count, 0);
-    const totalOfframpCrypto = offrampStats.reduce((s, r) => s + r.cryptoVolume, 0);
-    const totalOfframpNgn = offrampStats.reduce((s, r) => s + r.ngnVolume, 0);
-    const totalOfframpFees = offrampStats.reduce((s, r) => s + r.fees, 0);
+    const totalOfframpCount  = statusRows.reduce((s: number, r: any) => s + r.count, 0);
+    const totalOfframpCrypto = statusRows.reduce((s: number, r: any) => s + r.cryptoVolume, 0);
+    const totalOfframpNgn    = statusRows.reduce((s: number, r: any) => s + r.ngnVolume, 0);
+    const totalOfframpFees         = completedRow.fees ?? 0;
+    const totalOfframpSpreadFeesUsd = completedRow.spreadFeesUsd ?? 0;
 
     // Flatten withdrawal stats
     const wByStatus: Record<string, { count: number; amount: number }> = {};
@@ -167,7 +197,7 @@ export async function getOverview(_req: Request, res: Response) {
           total: totalTxCount,
           totalVolume: totalTxVolume,
           completedUsdVolume,
-          totalFees: totalTxFees,
+          totalFees: completedUsdFees,
           byCurrency: txByCurrency,
         },
         offramp: {
@@ -175,6 +205,7 @@ export async function getOverview(_req: Request, res: Response) {
           totalCryptoVolume: totalOfframpCrypto,
           totalNgnVolume: totalOfframpNgn,
           totalFees: totalOfframpFees,
+          totalSpreadFeesUsd: totalOfframpSpreadFeesUsd,
           byStatus: offrampByStatus,
         },
         withdrawals: {

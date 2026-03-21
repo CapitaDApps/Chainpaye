@@ -335,27 +335,26 @@ app.use("/api/transactions", transactionRoutes);
 
 // Admin API routes
 import adminWithdrawalRoutes from "../routes/adminWithdrawal";
-app.use("/api/admin/referral-withdrawals", adminWithdrawalRoutes);
-
 import adminUserRoutes from "../routes/adminUser";
-app.use("/api/admin/users", adminUserRoutes);
-
-// Admin overview
 import { getOverview } from "../controllers/adminOverviewController";
-app.get("/api/admin/overview", getOverview);
-
-// Admin leaderboard
 import { getLeaderboard } from "../controllers/adminLeaderboardController";
-app.get("/api/admin/leaderboard", getLeaderboard);
-
-// Admin offramp
 import { getOfframpTransactions } from "../controllers/adminOfframpController";
-app.get("/api/admin/offramp", getOfframpTransactions);
-
-// Admin transactions — reuse existing controller, mount at /api/admin/transactions
 import { getAdminTransactionHistory, getTransactionDetails } from "../controllers/transactionController";
+import { adminLogin, adminLogout, requireAdminAuth } from "../controllers/adminAuthController";
 import { Router as TxRouter } from "express";
+
+// Public auth endpoints
+app.post("/api/admin/login", adminLogin);
+app.post("/api/admin/logout", requireAdminAuth, adminLogout);
+
+// All admin routes below require auth
+app.use("/api/admin/referral-withdrawals", requireAdminAuth, adminWithdrawalRoutes);
+app.use("/api/admin/users", requireAdminAuth, adminUserRoutes);
+app.get("/api/admin/overview", requireAdminAuth, getOverview);
+app.get("/api/admin/leaderboard", requireAdminAuth, getLeaderboard);
+app.get("/api/admin/offramp", requireAdminAuth, getOfframpTransactions);
+
 const adminTxRouter = TxRouter();
 adminTxRouter.get("/", getAdminTransactionHistory);
 adminTxRouter.get("/:referenceId", getTransactionDetails);
-app.use("/api/admin/transactions", adminTxRouter);
+app.use("/api/admin/transactions", requireAdminAuth, adminTxRouter);

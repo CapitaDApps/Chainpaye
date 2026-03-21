@@ -1059,6 +1059,72 @@ Our team is ready to assist you!`;
     }
   }
 
+  async sendBuyCryptoFlow(to: string): Promise<void> {
+    const flowId = WHATSAPP_CONFIG.FLOW_IDS.ONRAMP;
+    if (!flowId) {
+      throw new Error(
+        "Missing WhatsApp onramp flow ID. Set WHATSAPP_ONRAMP_FLOW_ID.",
+      );
+    }
+    await this.sendTextOnlyFlowWithDataById(
+      to,
+      flowId,
+      "BUY_CRYPTO_FORM",
+      {
+        header: "Buy Crypto",
+        body: "Buy USDC or USDT with NGN instantly. Select your asset, chain, and enter the amount.",
+        cta: "Buy Crypto",
+      },
+      { init: true },
+    );
+  }
+
+  async sendCompleteTransactionFlow(
+    to: string,
+    quoteData: {
+      id: string;
+      fiatAmount: number;
+      tokenAmount: number;
+      price: number;
+      paymentAccount: {
+        accountName: string;
+        accountNumber: string;
+        bankName: string;
+      };
+      receivingAddress: string;
+      asset: string;
+      chain: string;
+    },
+  ): Promise<void> {
+    const flowId = WHATSAPP_CONFIG.FLOW_IDS.COMPLETE_TRANSACTION;
+    if (!flowId) {
+      throw new Error(
+        "Missing WhatsApp complete transaction flow ID. Set WHATSAPP_COMPLETE_TRANSACTION_FLOW_ID.",
+      );
+    }
+    await this.sendTextOnlyFlowWithDataById(
+      to,
+      flowId,
+      "COMPLETE_TRANSACTION_FORM",
+      {
+        header: "Complete Transaction",
+        body: "Send the NGN amount to the account below, then tap Complete Transaction to confirm.",
+        cta: "Complete Transaction",
+      },
+      {
+        quoteId: quoteData.id,
+        fiatAmount: String(quoteData.fiatAmount),
+        tokenAmount: String(quoteData.tokenAmount),
+        price: String(quoteData.price),
+        bankName: quoteData.paymentAccount.bankName,
+        accountName: quoteData.paymentAccount.accountName,
+        accountNumber: quoteData.paymentAccount.accountNumber,
+        asset: quoteData.asset,
+        chain: quoteData.chain,
+      },
+    );
+  }
+
   async handleButtonPayload(payload: ButtonPayloadType, to: string) {
     switch (payload) {
       case "My Account": {
