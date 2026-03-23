@@ -19,6 +19,7 @@ import { dexPayService } from "../../services/DexPayService";
 import { redisClient } from "../../services/redis";
 import { logger } from "../../utils/logger";
 import { NormalizedNetworkType } from "../types";
+import { OfframpTransaction, OfframpStatus } from "../../models/OfframpTransaction";
 
 // Import new architecture services
 import { AuthenticationService } from "../../services/crypto-off-ramp/AuthenticationService";
@@ -87,14 +88,13 @@ export async function handleOfframp(
       return;
     }
 
-    // Check if user is verified (required for off-ramp)
-    if (!user.isVerified) {
-      await whatsappBusinessService.sendNormalMessage(
-        "🔒 *Verification Required*\n\nYou need to complete KYC verification to use the off-ramp feature.\n\nType *kyc* to start verification.",
-        phoneNumber,
-      );
-      return;
-    }
+    // Store KYC status in Redis for use during transaction validation
+    await redisClient.set(
+      `offramp_kyc:${phoneNumber}`,
+      user.isVerified ? "verified" : "unverified",
+      "EX",
+      30 * 60,
+    );
 
     // Initialize workflow using WorkflowController
     const workflowState = await workflowController.initiateOffRamp(user.userId);
@@ -1091,6 +1091,42 @@ export async function handleAccountConfirmation(
         phoneNumber,
       );
       return true;
+    }
+
+    // ============================================================
+    // NON-KYC LIMITS CHECK
+    // ============================================================
+    const kycStatus = await redisClient.get(`offramp_kyc:${phoneNumber}`);
+    if (kycStatus === "unverified") {
+      const NON_KYC_MAX_USD = 1000;
+      const NON_KYC_MAX_DAILY_TXN = 5;
+
+      // Check single transaction limit
+      if (financialCalc.totalInUsd > NON_KYC_MAX_USD) {
+        await whatsappBusinessService.sendNormalMessage(
+          `❌ *Transaction Limit Exceeded*\n\nUnverified accounts can only offramp up to $${NON_KYC_MAX_USD} USD per transaction.\n\nYour transaction requires ${financialCalc.totalInUsd.toFixed(2)} USD.\n\nType *kyc* to complete verification and unlock higher limits.`,
+          phoneNumber,
+        );
+        return true;
+      }
+
+      // Check daily transaction count (successful transactions only)
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const dailyCount = await OfframpTransaction.countDocuments({
+        userId: workflowState.userId,
+        status: OfframpStatus.COMPLETED,
+        createdAt: { $gte: startOfDay },
+      });
+
+      if (dailyCount >= NON_KYC_MAX_DAILY_TXN) {
+        await whatsappBusinessService.sendNormalMessage(
+          `❌ *Daily Limit Reached*\n\nUnverified accounts can only perform ${NON_KYC_MAX_DAILY_TXN} successful transactions per day. You have reached your limit for today.\n\nType *kyc* to complete verification and unlock unlimited transactions.`,
+          phoneNumber,
+        );
+        return true;
+      }
     }
 
     // Show transaction summary and ask for PIN
