@@ -811,7 +811,7 @@ For support, please DM our team:
 
 *📞 Brain:* +2348106535142
 *📞 Ben:* +2348130348865
-*📞 Eddy:* +2348130348865
+*📞 Eddy:* +2348135246063
 
 Our team is ready to assist you!`;
 
