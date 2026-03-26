@@ -185,9 +185,11 @@ async function processOfframpInBackground(
     // Send offramp receipt
     try {
       const { sendOfframpReceiptAsync } = await import("../../utils/sendOfframpReceipt");
+      const { getCountryFromPhoneNumber } = await import("../../utils/countryCodeMapping");
       
       // Calculate fees (flat fee from env)
       const flatFeeUsd = parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75");
+      const userCountry = getCountryFromPhoneNumber(phone);
       
       sendOfframpReceiptAsync(phone, {
         ngnAmount: ngnAmount,
@@ -199,6 +201,7 @@ async function processOfframpInBackground(
         transactionDate: new Date(),
         transactionReference: quoteId,
         status: "Successful",
+        ...(userCountry?.code && { countryCode: userCountry.code }),
       });
       
       logger.info(`[OFFRAMP-BG] Receipt generation initiated for ${phone}`);
