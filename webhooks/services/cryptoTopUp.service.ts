@@ -1178,7 +1178,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             const offrampTransaction = await TransactionService.createOfframpTransaction({
               refId: `OFFRAMP-${user.userId}-${Date.now()}`,
               crossmintTxId: transferResult.transactionId || transferIdempotencyKey,
-              userId: new Types.ObjectId(user.userId),
+              userId: user._id,
               asset: normalizedAsset,
               chain: crossmintChain,
               cryptoAmount: financials.totalInUsd - (parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75")),
