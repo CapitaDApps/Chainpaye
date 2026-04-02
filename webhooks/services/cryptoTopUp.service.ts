@@ -8,7 +8,7 @@ import { financialService } from "../../services/crypto-off-ramp/FinancialServic
 import { dexPayService } from "../../services/DexPayService";
 import { redisClient } from "../../services/redis";
 import { logger } from "../../utils/logger";
-import { Types } from "mongoose";
+// import { Types } from "mongoose";
 import { TransactionStatus } from "../../models/Transaction";
 
 type Network = "bsc" | "sol" | "eth" | "poly" | "trx" | "base";

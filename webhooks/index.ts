@@ -218,6 +218,43 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
               await commandRouteHandler(phone, message.text.body);
             }
 
+            // Handle image messages with a caption (image payment feature)
+            if (message.type === "image" && message.image) {
+              await replyingMessage(message.id);
+              const caption: string = message.image.caption || "";
+              const mediaId: string = message.image.id;
+              const phone = message.from.startsWith("+")
+                ? message.from
+                : `+${message.from}`;
+
+              if (caption.trim()) {
+                // Lazy import to avoid circular deps
+                const { ImagePaymentService } = await import("../services/ImagePaymentService");
+                const imagePaymentService = new ImagePaymentService();
+
+                await whatsappBusinessService.sendNormalMessage(
+                  "🔍 Scanning your image for payment details...",
+                  message.from,
+                );
+
+                const result = await imagePaymentService.processPaymentImage(mediaId, caption);
+
+                if ("error" in result) {
+                  await whatsappBusinessService.sendNormalMessage(
+                    `❌ ${result.error}`,
+                    message.from,
+                  );
+                } else {
+                  await whatsappBusinessService.sendImagePaymentConfirmFlow(phone, result);
+                }
+              } else {
+                await whatsappBusinessService.sendNormalMessage(
+                  "📸 To pay from an image, add a caption with the amount.\nExample: *send 5000*",
+                  message.from,
+                );
+              }
+            }
+
             if (message.type == "button") {
               await replyingMessage(message.id);
               const { payload } = message.button;

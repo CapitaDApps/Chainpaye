@@ -18,6 +18,7 @@ import { transferFlowController } from "../controllers/transferFlow.controller";
 import { usdDepositFlowController } from "../controllers/usdDepositFlow.controller";
 import { userSetup } from "../controllers/userSetup.controller";
 import { withdrawalFlow } from "../controllers/withdrawalFlow.controller";
+import { imagePaymentFlowController } from "../controllers/imagePaymentFlow.controller";
 import { verifyCrossmintWebhook } from "../middleware";
 
 const router: Router = express.Router();
@@ -29,6 +30,7 @@ router.post("/create-invoice", invoiceController);
 router.post("/user-setup", userSetup);
 router.post("/kyc", kycFlowController);
 router.post("/withdrawal-flow", withdrawalFlow);
+router.post("/image-payment", imagePaymentFlowController);
 router.post("/referral-withdrawal", handleReferralWithdrawalFlow);
 router.post("/generate-link", generateLinkFlow);
 router.post("/convert", conversionFlow);

@@ -1059,8 +1059,44 @@ Our team is ready to assist you!`;
     }
   }
 
-  async sendBuyCryptoFlow(to: string): Promise<void> {
-    const flowId = WHATSAPP_CONFIG.FLOW_IDS.ONRAMP;
+  async sendImagePaymentConfirmFlow(
+    to: string,
+    details: {
+      accountNumber: string;
+      accountName: string;
+      bankName: string;
+      bankCode: string;
+      amount: string;
+      currency?: string;
+    },
+  ): Promise<void> {
+    const flowId = WHATSAPP_CONFIG.FLOW_IDS.IMAGE_PAYMENT;
+    if (!flowId) {
+      throw new Error(
+        "Missing WhatsApp image payment flow ID. Set WHATSAPP_IMAGE_PAYMENT_FLOW_ID.",
+      );
+    }
+    await this.sendTextOnlyFlowWithDataById(
+      to,
+      flowId,
+      "CONFIRM_DETAILS",
+      {
+        header: "📸 Payment from Image",
+        body: "We detected payment details from your image. Review and confirm below.",
+        cta: "Review Payment",
+      },
+      {
+        accountNumber: details.accountNumber,
+        accountName: details.accountName,
+        bankName: details.bankName,
+        bankCode: details.bankCode,
+        amount: details.amount,
+        currency: details.currency || "NGN",
+      },
+    );
+  }
+
+  async sendBuyCryptoFlow(to: string): Promise<void> {    const flowId = WHATSAPP_CONFIG.FLOW_IDS.ONRAMP;
     if (!flowId) {
       throw new Error(
         "Missing WhatsApp onramp flow ID. Set WHATSAPP_ONRAMP_FLOW_ID.",
