@@ -42,7 +42,7 @@ export async function getResetPinScreen(decryptedBody: {
   const userPhone = await redisClient.get(flow_token);
 
   if (action === "INIT") {
-    return { screen: "COLLECT_EMAIL", data: {} };
+    return { screen: "COLLECT_EMAIL", data: { has_error: false, error_message: "" } };
   }
 
   if (action === "data_exchange") {
@@ -60,7 +60,7 @@ export async function getResetPinScreen(decryptedBody: {
         if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
           return {
             screen: "COLLECT_EMAIL",
-            data: { error_message: "Please enter a valid email address." },
+            data: { error_message: "Please enter a valid email address.", has_error: true },
           };
         }
 
@@ -83,7 +83,7 @@ export async function getResetPinScreen(decryptedBody: {
           logger.error("Error in reset PIN flow (COLLECT_EMAIL)", { error });
           return {
             screen: "COLLECT_EMAIL",
-            data: { error_message: "Something went wrong. Please try again." },
+            data: { error_message: "Something went wrong. Please try again.", has_error: true },
           };
         }
       }

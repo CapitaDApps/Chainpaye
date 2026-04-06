@@ -29,7 +29,11 @@ export async function handleResetPin(phoneNumber: string): Promise<void> {
       await whatsappBusinessService.sendResetPinEmailCollectionFlow(phoneNumber);
     }
   } catch (error) {
-    logger.error("Error in handleResetPin", { error, phone });
+    logger.error("Error in handleResetPin", {
+      error,
+      phone,
+      metaError: (error as any)?.response?.data,
+    });
     await whatsappBusinessService.sendNormalMessage(
       "❌ Something went wrong. Please try again later.",
       phoneNumber,

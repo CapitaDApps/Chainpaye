@@ -813,11 +813,20 @@ USD: USD ${usdBalance.balance.toFixed(2)}`;
       );
     }
 
-    await this.sendTextOnlyFlowById(to, flowId, "COLLECT_EMAIL", {
-      header: "Reset Your PIN",
-      body: "We need your email address to send you a secure PIN reset link.",
-      cta: "Continue",
-    });
+    await this.sendTextOnlyFlowWithDataById(
+      to,
+      flowId,
+      "COLLECT_EMAIL",
+      {
+        header: "Reset Your PIN",
+        body: "We need your email address to send you a secure PIN reset link.",
+        cta: "Continue",
+      },
+      {
+        has_error: false,
+        error_message: "",
+      },
+    );
   }
 
   async sendSupportMessage(to: string) {

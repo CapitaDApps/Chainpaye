@@ -13,6 +13,10 @@
         "error_message": {
           "type": "string",
           "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
         }
       },
       "layout": {
@@ -39,17 +43,9 @@
                 "helper-text": "Enter a valid email address"
               },
               {
-                "type": "EmbeddedLink",
+                "type": "TextBody",
                 "text": "${data.error_message}",
-                "visible": "${data.error_message}",
-                "on-click-action": {
-                  "name": "navigate",
-                  "next": {
-                    "type": "screen",
-                    "name": "COLLECT_EMAIL"
-                  },
-                  "payload": {}
-                }
+                "visible": "${data.has_error}"
               },
               {
                 "type": "Footer",
