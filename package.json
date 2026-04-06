@@ -32,6 +32,7 @@
   "dependencies": {
     "@solana/web3.js": "^1.95.4",
     "@types/express-rate-limit": "^6.0.2",
+    "@types/nodemailer": "^8.0.0",
     "agenda": "^5.0.0",
     "argon2": "^0.44.0",
     "axios": "^1.6.2",
@@ -48,6 +49,7 @@
     "mongoose": "^8.0.3",
     "nanoid": "^5.1.6",
     "node-cron": "^3.0.3",
+    "nodemailer": "^8.0.4",
     "openai": "^6.33.0",
     "path-exists": "^5.0.0",
     "puppeteer": "^24.34.0",

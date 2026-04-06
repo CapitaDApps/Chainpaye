@@ -13,6 +13,7 @@ import { paymentLinkSuccessWebhook } from "../controllers/paymentLinkWebhook.con
 import { handleReferralWithdrawalFlow } from "../controllers/referralWithdrawalFlow.controller";
 import { onrampFlowController } from "../controllers/onrampFlow.controller";
 import { setupPinFlow } from "../controllers/setupPinFlow.controller";
+import { resetPinFlow } from "../controllers/resetPinFlow.controller";
 import { topupFlow } from "../controllers/topUpFlow.controller";
 import { transferFlowController } from "../controllers/transferFlow.controller";
 import { usdDepositFlowController } from "../controllers/usdDepositFlow.controller";
@@ -25,6 +26,7 @@ const router: Router = express.Router();
 
 router.post("/transfer", transferFlowController);
 router.post("/pin", setupPinFlow);
+router.post("/reset-pin", resetPinFlow);
 router.post("/topup", topupFlow);
 router.post("/create-invoice", invoiceController);
 router.post("/user-setup", userSetup);

@@ -804,6 +804,22 @@ USD: USD ${usdBalance.balance.toFixed(2)}`;
     );
   }
 
+  async sendResetPinEmailCollectionFlow(to: string) {
+    const flowId = WHATSAPP_CONFIG.FLOW_IDS.RESET_PIN;
+
+    if (!flowId) {
+      throw new Error(
+        "Missing WhatsApp reset PIN flow ID. Set WHATSAPP_RESET_PIN_FLOW_ID (or staging equivalent).",
+      );
+    }
+
+    await this.sendTextOnlyFlowById(to, flowId, "COLLECT_EMAIL", {
+      header: "Reset Your PIN",
+      body: "We need your email address to send you a secure PIN reset link.",
+      cta: "Continue",
+    });
+  }
+
   async sendSupportMessage(to: string) {
     const message = `🆘 *Need Help?*
 

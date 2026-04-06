@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reset PIN – ChainPaye</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6fb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 40px 32px;
+      max-width: 420px;
+      width: 100%;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    }
+    .logo { text-align: center; margin-bottom: 24px; }
+    .logo img { height: 48px; }
+    h1 { font-size: 22px; color: #1a1a2e; margin-bottom: 8px; text-align: center; }
+    p.sub { color: #666; font-size: 14px; text-align: center; margin-bottom: 28px; }
+    label { display: block; font-size: 13px; color: #444; margin-bottom: 6px; }
+    input[type="password"] {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 15px;
+      margin-bottom: 16px;
+      outline: none;
+      transition: border 0.2s;
+    }
+    input[type="password"]:focus { border-color: #4f46e5; }
+    button {
+      width: 100%;
+      padding: 13px;
+      background: #4f46e5;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: #4338ca; }
+    button:disabled { background: #a5b4fc; cursor: not-allowed; }
+    .msg {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      text-align: center;
+      display: none;
+    }
+    .msg.success { background: #d1fae5; color: #065f46; display: block; }
+    .msg.error   { background: #fee2e2; color: #991b1b; display: block; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <img src="/logo.png" alt="ChainPaye" />
+    </div>
+    <h1>Reset Your PIN</h1>
+    <p class="sub">Enter and confirm your new PIN below.</p>
+
+    <form id="resetForm">
+      <label for="pin">New PIN (4–6 digits)</label>
+      <input type="password" id="pin" name="pin" inputmode="numeric" maxlength="6" placeholder="••••" required />
+
+      <label for="confirmPin">Confirm New PIN</label>
+      <input type="password" id="confirmPin" name="confirmPin" inputmode="numeric" maxlength="6" placeholder="••••" required />
+
+      <button type="submit" id="submitBtn">Reset PIN</button>
+    </form>
+
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+
+    if (!token) {
+      showMsg("Invalid or missing reset link.", "error");
+      document.getElementById("submitBtn").disabled = true;
+    }
+
+    document.getElementById("resetForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const pin = document.getElementById("pin").value.trim();
+      const confirmPin = document.getElementById("confirmPin").value.trim();
+      const btn = document.getElementById("submitBtn");
+
+      if (!/^\d{4,6}$/.test(pin)) {
+        return showMsg("PIN must be 4–6 digits.", "error");
+      }
+      if (pin !== confirmPin) {
+        return showMsg("PINs do not match.", "error");
+      }
+
+      btn.disabled = true;
+      btn.textContent = "Saving...";
+
+      try {
+        const res = await fetch("/api/reset-pin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token, pin }),
+        });
+        const json = await res.json();
+
+        if (res.ok) {
+          showMsg("Your PIN has been reset successfully! You can now log in on WhatsApp.", "success");
+          document.getElementById("resetForm").style.display = "none";
+        } else {
+          showMsg(json.message || "Something went wrong. Please try again.", "error");
+          btn.disabled = false;
+          btn.textContent = "Reset PIN";
+        }
+      } catch {
+        showMsg("Network error. Please try again.", "error");
+        btn.disabled = false;
+        btn.textContent = "Reset PIN";
+      }
+    });
+
+    function showMsg(text, type) {
+      const el = document.getElementById("msg");
+      el.textContent = text;
+      el.className = "msg " + type;
+    }
+  </script>
+</body>
+</html>

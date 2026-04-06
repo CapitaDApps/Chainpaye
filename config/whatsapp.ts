@@ -19,6 +19,7 @@ const PRODUCTION_FLOW_IDS = {
   ONRAMP: process.env.WHATSAPP_ONRAMP_FLOW_ID || "",
   COMPLETE_TRANSACTION: process.env.WHATSAPP_COMPLETE_TRANSACTION_FLOW_ID || "",
   IMAGE_PAYMENT: process.env.WHATSAPP_IMAGE_PAYMENT_FLOW_ID || "",
+  RESET_PIN: process.env.WHATSAPP_RESET_PIN_FLOW_ID || "",
 };
 
 // Staging flow IDs (update these with your staging-specific flow IDs)
@@ -41,6 +42,7 @@ const STAGING_FLOW_IDS = {
   ONRAMP: process.env.WHATSAPP_STAGING_ONRAMP_FLOW_ID || "",
   COMPLETE_TRANSACTION: process.env.WHATSAPP_STAGING_COMPLETE_TRANSACTION_FLOW_ID || "",
   IMAGE_PAYMENT: process.env.WHATSAPP_STAGING_IMAGE_PAYMENT_FLOW_ID || "",
+  RESET_PIN: process.env.WHATSAPP_STAGING_RESET_PIN_FLOW_ID || "",
 };
 
 export const WHATSAPP_CONFIG = {

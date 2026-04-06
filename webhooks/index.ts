@@ -370,6 +370,10 @@ app.use("/flow", userRateLimiter, flowRouter);
 import transactionRoutes from "../routes/transactionRoutes";
 app.use("/api/transactions", transactionRoutes);
 
+// Reset PIN route
+import resetPinRoute from "../routes/resetPin";
+app.use("/api/reset-pin", resetPinRoute);
+
 // Admin API routes
 import adminWithdrawalRoutes from "../routes/adminWithdrawal";
 import adminUserRoutes from "../routes/adminUser";
