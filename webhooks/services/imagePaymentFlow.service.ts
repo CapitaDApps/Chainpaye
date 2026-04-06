@@ -86,7 +86,6 @@ export async function getImagePaymentFlowScreen(decryptedBody: {
         };
       }
 
-      const chainpayeCharge = Number(amount) * 0.015; // 1.5% fee
       const withdrawalNanoId = nanoid();
 
       // Process withdrawal asynchronously — return success screen immediately
@@ -105,16 +104,6 @@ export async function getImagePaymentFlowScreen(decryptedBody: {
         })
         .then(async (withdrawalResp) => {
           if (withdrawalResp.success) {
-            // Collect platform fee
-            toronetService
-              .transferNGN(
-                wallet.publicKey,
-                "0xbdb182ac6b38fd8f4581ab21d29a50287d47a93c",
-                chainpayeCharge.toString(),
-                wallet.password,
-              )
-              .catch((err) => console.error("Error sending fees:", err));
-
             const tx = await TransactionService.recordWithdrawal({
               fromUser: user._id as Types.ObjectId,
               amount,

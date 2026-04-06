@@ -128,9 +128,8 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
             const accountName = data.accountName;
 
             const toronetCharge = Number(amount) * 0.005; // 0.5%
-            const chainpayeCharge = Number(amount) * 0.015; // 1.5%
             const totalAmount =
-              Number(amount) + toronetCharge + chainpayeCharge;
+              Number(amount) + toronetCharge;
 
             return {
               screen: "SUMMARY",
@@ -174,9 +173,8 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
 
             const cbnCharge = Number(amount) >= 10000 ? 50 + 10 : 10;
             const toronetCharge = Number(amount) * 0.005; // 0.5%
-            const chainpayeCharge = Number(amount) * 0.015; // 1.5%
             const totalAmount =
-              Number(amount) + cbnCharge + toronetCharge + chainpayeCharge;
+              Number(amount) + cbnCharge + toronetCharge;
 
             return {
               screen: "SUMMARY",
@@ -273,7 +271,6 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
                 },
               };
             }
-            const chainpayeCharge = Number(amount) * 0.015; // 1.5%
             const withdrawalNanoId = nanoid();
 
             toronetService
@@ -291,14 +288,6 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
               })
               .then(async (withdrawalResp) => {
                 if (withdrawalResp.success) {
-                  toronetService
-                    .transferUSD(
-                      wallet.publicKey,
-                      "0xbdb182ac6b38fd8f4581ab21d29a50287d47a93c",
-                      chainpayeCharge.toString(),
-                      wallet.password,
-                    )
-                    .catch((err) => console.log("Error sending fees", err));
                   const tx = await TransactionService.recordWithdrawal({
                     fromUser: user._id as Types.ObjectId,
                     amount,
@@ -392,7 +381,6 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
                 },
               };
             }
-            const chainpayeCharge = Number(amount) * 0.015; // 1.5%
             const withdrawalNanoId = nanoid();
 
             toronetService
@@ -410,14 +398,6 @@ export async function getWithdrawalFlowScreen(decryptedBody: {
               })
               .then(async (withdrawalResp) => {
                 if (withdrawalResp.success) {
-                  toronetService
-                    .transferNGN(
-                      wallet.publicKey,
-                      "0xbdb182ac6b38fd8f4581ab21d29a50287d47a93c",
-                      chainpayeCharge.toString(),
-                      wallet.password,
-                    )
-                    .catch((err) => console.log("Error sending fees", err));
                   const tx = await TransactionService.recordWithdrawal({
                     fromUser: user._id as Types.ObjectId,
                     amount,

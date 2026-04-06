@@ -395,7 +395,7 @@ What can I do for you?
           {
             id:"other_menu_withdraw",
             title:"Withdraw To Bank",
-            description:"Withdraw your funds to your bankk account"
+            description:"Withdraw your funds to your bank account"
           },
           {
             id:"other_menu_spend_crypto",
