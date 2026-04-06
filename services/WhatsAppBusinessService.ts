@@ -380,67 +380,24 @@ What can I do for you?
       "View Menu",
       [
         {
-          title: "Other menu",
+          title: "Payments",
           rows: [
-          {
-            id:"other_menu_ngn_deposit",
-            title:"Deposit NGN",
-            description:"Fund your NGN wallet"
-          },
-          {
-            id:"other_menu_USD_deposit",
-            title:"Deposit USD",
-            description:"Fund your USD wallet"
-          },
-          {
-            id:"other_menu_withdraw",
-            title:"Withdraw To Bank",
-            description:"Withdraw your funds to your bank account"
-          },
-          {
-            id:"other_menu_spend_crypto",
-            title:"Spend Crypto",
-            description:"Spend crypto like cash"
-          },
-          {
-            id:"other_menu_wallets",
-            title:"Wallets",
-            description:"View list of crypto wallets and balances"
-          },
-          {
-            id:"other_menu_transfer",
-            title:"Transfer",
-            description:"Transfer Money To Other Chainpaye Users"
-          },
-          
-            {
-              id: "other_menu_payment_link",
-              title: "Payment link",
-              description: "Create and share a payment link",
-            },
-            {
-              id: "other_menu_transaction_history",
-              title: "Transaction history",
-              description: "View your recent transactions",
-            },
-          {
-            id:"other_menu_referral",
-            title:"Referral",
-            description:"View referral stats and details"
-          },
-          
-          
-            {
-              id: "other_menu_support",
-              title: "Support",
-              description: "Contact Chainpaye support",
-            },
-            {
-              id: "other_menu_reset_pin",
-              title: "Reset PIN",
-              description: "Reset your transaction PIN",
-            },
-            
+            { id: "other_menu_ngn_deposit", title: "Deposit NGN", description: "Fund your NGN wallet" },
+            { id: "other_menu_USD_deposit", title: "Deposit USD", description: "Fund your USD wallet" },
+            { id: "other_menu_withdraw", title: "Withdraw To Bank", description: "Withdraw your funds to your bank account" },
+            { id: "other_menu_spend_crypto", title: "Spend Crypto", description: "Spend crypto like cash" },
+            { id: "other_menu_transfer", title: "Transfer", description: "Transfer Money To Other Chainpaye Users" },
+            { id: "other_menu_payment_link", title: "Payment link", description: "Create and share a payment link" },
+          ],
+        },
+        {
+          title: "Account",
+          rows: [
+            { id: "other_menu_wallets", title: "Wallets", description: "View crypto wallets and balances" },
+            { id: "other_menu_transaction_history", title: "Transaction history", description: "View your recent transactions" },
+            { id: "other_menu_referral", title: "Referral", description: "View referral stats and details" },
+            { id: "other_menu_reset_pin", title: "Reset PIN", description: "Reset your transaction PIN" },
+            { id: "other_menu_support", title: "Support", description: "Contact Chainpaye support" },
           ],
         },
       ],
