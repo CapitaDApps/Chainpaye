@@ -370,6 +370,11 @@ app.use("/flow", userRateLimiter, flowRouter);
 import transactionRoutes from "../routes/transactionRoutes";
 app.use("/api/transactions", transactionRoutes);
 
+// Reset PIN page
+app.get("/reset-pin", (req, res) => {
+  res.sendFile("reset-pin.html", { root: "public" });
+});
+
 // Reset PIN route
 import resetPinRoute from "../routes/resetPin";
 app.use("/api/reset-pin", resetPinRoute);

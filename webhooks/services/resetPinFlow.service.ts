@@ -76,7 +76,12 @@ export async function getResetPinScreen(decryptedBody: {
           return {
             screen: "SUCCESS",
             data: {
-              message: `A reset link has been sent to ${email}. It expires in 15 minutes.`,
+              extension_message_response: {
+                params: {
+                  flow_token,
+                  message: `A reset link has been sent to ${email}. It expires in 15 minutes.`,
+                },
+              },
             },
           };
         } catch (error) {
