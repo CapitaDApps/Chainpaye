@@ -1,0 +1,361 @@
+{
+  "version": "7.2",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "CREATE_LINK_DETAILS": ["SELECT_METHODS"],
+    "SELECT_METHODS": ["REVIEW_AND_PIN"],
+    "REVIEW_AND_PIN": ["LINK_CREATED"],
+    "LINK_CREATED": []
+  },
+  "screens": [
+    {
+      "id": "CREATE_LINK_DETAILS",
+      "title": "Create Payment Link",
+      "data": {
+        "currencies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            }
+          },
+          "__example__": [
+            {
+              "id": "NGN",
+              "title": "NGN"
+            },
+            {
+              "id": "USD",
+              "title": "USD"
+            }
+          ]
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "create_link_form",
+            "children": [
+              {
+                "type": "TextInput",
+                "label": "Link Title",
+                "name": "title",
+                "required": true,
+                "input-type": "text",
+                "helper-text": "Example: Website Design Payment"
+              },
+              {
+                "type": "TextInput",
+                "label": "Amount",
+                "name": "amount",
+                "required": true,
+                "input-type": "number",
+                "helper-text": "Enter amount to charge"
+              },
+              {
+                "type": "Dropdown",
+                "label": "Currency",
+                "name": "currency",
+                "required": true,
+                "data-source": "${data.currencies}"
+              },
+              {
+                "type": "TextInput",
+                "label": "Description",
+                "name": "description",
+                "required": false,
+                "input-type": "text"
+              },
+              {
+                "type": "TextInput",
+                "label": "Success URL",
+                "name": "successUrl",
+                "required": false,
+                "input-type": "text",
+                "helper-text": "https://your-site.com/success"
+              },
+              {
+                "type": "Footer",
+                "label": "Next",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "title": "${form.title}",
+                    "amount": "${form.amount}",
+                    "currency": "${form.currency}",
+                    "description": "${form.description}",
+                    "successUrl": "${form.successUrl}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "SELECT_METHODS",
+      "title": "Select Payment Method",
+      "data": {
+        "title": {
+          "type": "string",
+          "__example__": "Website Design Payment"
+        },
+        "description": {
+          "type": "string",
+          "__example__": "Milestone 1 payment"
+        },
+        "currency": {
+          "type": "string",
+          "__example__": "USD"
+        },
+        "amount": {
+          "type": "string",
+          "__example__": "250.00"
+        },
+        "successUrl": {
+          "type": "string",
+          "__example__": "https://site.com/success"
+        },
+        "allowed_methods": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            }
+          },
+          "__example__": [
+            {
+              "id": "bank",
+              "title": "Bank Transfer"
+            }
+          ]
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": "Select only one payment method to continue."
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Payment Method"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Amount: '${data.amount}' '${data.currency}''`"
+          },
+          {
+            "type": "Form",
+            "name": "select_methods_form",
+            "children": [
+              {
+                "type": "CheckboxGroup",
+                "label": "Choose payment method",
+                "name": "methods",
+                "required": true,
+                "data-source": "${data.allowed_methods}"
+              },
+              {
+                "type": "Footer",
+                "label": "Continue",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "title": "${data.title}",
+                    "description": "${data.description}",
+                    "currency": "${data.currency}",
+                    "amount": "${data.amount}",
+                    "successUrl": "${data.successUrl}",
+                    "methods": "${form.methods}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "REVIEW_AND_PIN",
+      "title": "Review and Authorize",
+      "data": {
+        "title": {
+          "type": "string",
+          "__example__": "Website Design Payment"
+        },
+        "description": {
+          "type": "string",
+          "__example__": "Milestone 1 payment"
+        },
+        "currency": {
+          "type": "string",
+          "__example__": "USD"
+        },
+        "amount": {
+          "type": "string",
+          "__example__": "250.00"
+        },
+        "paymentType": {
+          "type": "string",
+          "__example__": "card"
+        },
+        "paymentTypeLabel": {
+          "type": "string",
+          "__example__": "Card Payment"
+        },
+        "successUrl": {
+          "type": "string",
+          "__example__": "https://site.com/success"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": "Incorrect pin"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "review_pin_form",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Review Payment Link"
+              },
+              {
+                "type": "TextBody",
+                "text": "`'Title: '${data.title}''`"
+              },
+              {
+                "type": "TextBody",
+                "text": "`'Amount: '${data.amount}' '${data.currency}''`"
+              },
+              {
+                "type": "TextBody",
+                "text": "`'Method: '${data.paymentTypeLabel}''`"
+              },
+              {
+                "type": "TextBody",
+                "text": "${data.description}"
+              },
+              {
+                "type": "TextInput",
+                "label": "PIN",
+                "name": "pin",
+                "required": true,
+                "input-type": "password",
+                "helper-text": "Enter your 4-6 digit PIN"
+              },
+              {
+                "type": "Footer",
+                "label": "Create Link",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "pin": "${form.pin}",
+                    "title": "${data.title}",
+                    "description": "${data.description}",
+                    "currency": "${data.currency}",
+                    "amount": "${data.amount}",
+                    "paymentType": "${data.paymentType}",
+                    "successUrl": "${data.successUrl}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "LINK_CREATED",
+      "title": "Link Ready",
+      "terminal": true,
+      "success": true,
+      "data": {
+        "title": {
+          "type": "string",
+          "__example__": "Website Design Payment"
+        },
+        "amount": {
+          "type": "string",
+          "__example__": "250.00"
+        },
+        "currency": {
+          "type": "string",
+          "__example__": "USD"
+        },
+        "paymentTypeLabel": {
+          "type": "string",
+          "__example__": "Card Payment"
+        },
+        "description": {
+          "type": "string",
+          "__example__": "Milestone 1 payment"
+        },
+        "link_url": {
+          "type": "string",
+          "__example__": "https://chainpaye.com/payment/507f1f77bcf86cd799439011"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Payment Link Created"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Title: '${data.title}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Amount: '${data.amount}' '${data.currency}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Method: '${data.paymentTypeLabel}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "${data.description}"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Link: '${data.link_url}''`"
+          },
+          {
+            "type": "Footer",
+            "label": "Done",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {
+                "status": "payment_link_created",
+                "link_url": "${data.link_url}"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

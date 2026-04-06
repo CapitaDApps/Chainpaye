@@ -11,6 +11,8 @@ import mongoose, { Schema, Document } from "mongoose";
 export enum StablecoinType {
   TORO_USD = "ToroUSD",
   TORO_NGN = "ToroNGN",
+  TORO_EUR = "ToroEUR",
+  TORO_GBP = "ToroGBP",
 }
 
 /**
@@ -70,6 +72,16 @@ const WalletSchema: Schema = new Schema(
         default: 0,
         min: 0,
       },
+      [StablecoinType.TORO_EUR]: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      [StablecoinType.TORO_GBP]: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
     },
     isActive: {
       type: Boolean,
@@ -99,7 +111,6 @@ const WalletSchema: Schema = new Schema(
  * Indexes for efficient queries
  */
 WalletSchema.index({ user: 1 });
-WalletSchema.index({ toronetWalletId: 1 });
 WalletSchema.index({ publicKey: 1 });
 
 /**
@@ -216,6 +227,14 @@ WalletSchema.virtual("formattedBalances").get(function () {
       style: "currency",
       currency: "NGN",
     }).format(Number((this.balances as any)[StablecoinType.TORO_NGN])),
+    [StablecoinType.TORO_EUR]: new Intl.NumberFormat("en-IE", {
+      style: "currency",
+      currency: "EUR",
+    }).format(Number((this.balances as any)[StablecoinType.TORO_EUR])),
+    [StablecoinType.TORO_GBP]: new Intl.NumberFormat("en-GB", {
+      style: "currency",
+      currency: "GBP",
+    }).format(Number((this.balances as any)[StablecoinType.TORO_GBP])),
   };
 });
 

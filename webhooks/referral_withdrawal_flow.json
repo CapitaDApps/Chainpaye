@@ -1,0 +1,160 @@
+{
+  "version": "7.2",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "WITHDRAWAL_DETAILS": ["WITHDRAWAL_CONFIRMATION"],
+    "WITHDRAWAL_CONFIRMATION": []
+  },
+  "screens": [
+    {
+      "id": "WITHDRAWAL_DETAILS",
+      "title": "Withdraw Earnings",
+      "data": {
+        "currentBalance": {
+          "type": "string",
+          "__example__": "125.50"
+        },
+        "minAmount": {
+          "type": "string",
+          "__example__": "20"
+        },
+        "chain": {
+          "type": "string",
+          "__example__": "Base"
+        },
+        "token": {
+          "type": "string",
+          "__example__": "USDT"
+        },
+        "evmAddress": {
+          "type": "string",
+          "__example__": "0x742d35Cc6634C0532925a3b8D4C9db96590b5"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": "Amount must be between $20 and your current balance."
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Withdraw Referral Earnings"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Current Balance: $'${data.currentBalance}''`"
+          },
+          {
+            "type": "Form",
+            "name": "withdrawal_form",
+            "children": [
+              {
+                "type": "TextInput",
+                "label": "Amount (USD)",
+                "name": "amount",
+                "required": true,
+                "input-type": "number",
+                "helper-text": "`'Min: $'${data.minAmount}' | Max: $'${data.currentBalance}''`"
+              },
+              {
+                "type": "TextBody",
+                "text": "`'Address: '${data.evmAddress}''`"
+              },
+              {
+                "type": "TextBody",
+                "text": "`'Chain: '${data.chain}''`"
+              },
+              {
+                "type": "TextBody",
+                "text": "`'Token: '${data.token}''`"
+              },
+              {
+                "type": "Footer",
+                "label": "Proceed",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "amount": "${form.amount}",
+                    "evmAddress": "${data.evmAddress}",
+                    "chain": "${data.chain}",
+                    "token": "${data.token}",
+                    "currentBalance": "${data.currentBalance}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "WITHDRAWAL_CONFIRMATION",
+      "title": "Confirm Withdrawal",
+      "terminal": true,
+      "success": true,
+      "data": {
+        "amount": {
+          "type": "string",
+          "__example__": "50.00"
+        },
+        "evmAddress": {
+          "type": "string",
+          "__example__": "0x742d35Cc6634C0532925a3b8D4C9db96590b5"
+        },
+        "chain": {
+          "type": "string",
+          "__example__": "Base"
+        },
+        "token": {
+          "type": "string",
+          "__example__": "USDT"
+        },
+        "currentBalance": {
+          "type": "string",
+          "__example__": "125.50"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Withdrawal Request Submitted"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Amount: $'${data.amount}' '${data.token}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Chain: '${data.chain}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Address: '${data.evmAddress}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "Your withdrawal request is being processed. You'll receive a notification once the USDT has been sent to your wallet."
+          },
+          {
+            "type": "Footer",
+            "label": "Done",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {
+                "status": "withdrawal_submitted",
+                "amount": "${data.amount}",
+                "evmAddress": "${data.evmAddress}",
+                "chain": "${data.chain}",
+                "token": "${data.token}"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

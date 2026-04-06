@@ -4,7 +4,20 @@
  */
 
 import mongoose, { Schema, Document } from "mongoose";
+import { IUser } from "./User";
+import { CoinType, CurrencyType } from "../types/toronetService.types";
 
+//   usdcbase,
+//   usdtbsc,
+//   usdcbsc,
+//   usdtpoly,
+//   usdcpoly,
+//   usdttrx,
+//   usdctrx,
+//   usdtsol,
+//   usdcsol,
+//   usdteth,
+//   usdceth;
 /**
  * Transaction types
  */
@@ -13,6 +26,10 @@ export enum TransactionType {
   TRANSFER = "transfer",
   DEPOSIT = "deposit",
   WITHDRAWAL = "withdrawal",
+  DIRECT_TRANSFER = "direct_transfer",
+  CONVERSION = "conversion",
+  OFF_RAMP = "off_ramp",
+  ON_RAMP = "on_ramp",
 }
 
 /**
@@ -26,6 +43,13 @@ export enum TransactionStatus {
   CANCELLED = "cancelled",
 }
 
+export type BankDetails = {
+  accountNumber: string;
+  accountName: string;
+  bankName: string;
+  routingNumber?: string;
+};
+
 /**
  * Interface for Transaction document
  */
@@ -33,25 +57,30 @@ export interface ITransaction extends Document {
   referenceId: string;
   type: TransactionType;
   status: TransactionStatus;
-  fromUser?: mongoose.Types.ObjectId;
+  fromUser?: mongoose.Types.ObjectId | IUser;
   toUser?: mongoose.Types.ObjectId;
   amount: number;
-  currency: "USD" | "NGN";
+  currency: any;
   description?: string;
   toronetTransactionId?: string;
-  bankDetails?: {
-    accountNumber: string;
-    accountName: string;
-    bankName: string;
-    routingNumber?: string;
-  };
+  bankDetails?: BankDetails;
   exchangeRate?: number;
-  fees: number;
+  fees?: number;
   totalAmount: number;
   createdAt: Date;
   updatedAt: Date;
   completedAt?: Date;
   failureReason?: string;
+  hash?: string;
+  // Fields for conversion transactions
+  fromCurrency?: "USD" | "NGN" | "EUR" | "GBP";
+  toCurrency?: "USD" | "NGN" | "EUR" | "GBP";
+  asset?: CoinType;
+  fromAmount?: number;
+  toAmount?: number;
+  // DEBIT/CREDIT fields for transaction history formatting
+  entryType?: "DEBIT" | "CREDIT";
+  receiptImageId?: string; // WhatsApp media ID for the receipt image
   markAsCompleted: (toronetTransactionId?: string) => void;
 }
 
@@ -90,7 +119,7 @@ const TransactionSchema: Schema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: function () {
-        return this.type === TransactionType.TRANSFER;
+        return this.type !== TransactionType.DIRECT_TRANSFER;
       },
     },
     toUser: {
@@ -98,6 +127,16 @@ const TransactionSchema: Schema = new Schema(
       ref: "User",
       required: function () {
         return this.type === TransactionType.TRANSFER;
+      },
+    },
+    hash: {
+      type: String,
+      trim: true,
+      required: function () {
+        return (
+          (this.type as unknown as TransactionType) ===
+          TransactionType.DIRECT_TRANSFER
+        );
       },
     },
     amount: {
@@ -108,7 +147,23 @@ const TransactionSchema: Schema = new Schema(
     currency: {
       type: String,
       required: true,
-      enum: ["USD", "NGN"],
+      enum: [
+        "USD",
+        "NGN",
+        "EUR",
+        "GBP",
+        "USDCBASE",
+        "USDTBSC",
+        "USDCBSC",
+        "USDTPOLY",
+        "USDCPOLY",
+        "USDTTRX",
+        "USDCTRX",
+        "USDTSOL",
+        "USDCSOL",
+        "USDTETH",
+        "USDCETH",
+      ],
       trim: true,
     },
     description: {
@@ -124,14 +179,52 @@ const TransactionSchema: Schema = new Schema(
     bankDetails: {
       type: Object,
       default: {},
+      required: function () {
+        return (
+          (this.type as unknown as TransactionType) ===
+          TransactionType.WITHDRAWAL
+        );
+      },
     },
     exchangeRate: {
       type: Number,
       min: 0,
     },
+    // Fields for conversion transactions
+    fromCurrency: {
+      type: String,
+      enum: ["USD", "NGN", "EUR", "GBP"],
+      required: false,
+    },
+    toCurrency: {
+      type: String,
+      enum: ["USD", "NGN", "EUR", "GBP"],
+      required: false,
+    },
+
+    fromAmount: {
+      type: Number,
+      min: 0,
+      required: false,
+    },
+    toAmount: {
+      type: Number,
+      min: 0,
+      required: false,
+    },
+    // DEBIT/CREDIT fields for transaction history formatting
+    entryType: {
+      type: String,
+      enum: ["DEBIT", "CREDIT"],
+      required: false,
+    },
+    receiptImageId: {
+      type: String,
+      required: false,
+    },
     fees: {
       type: Number,
-      required: true,
+      required: false,
       default: 0,
       min: 0,
     },
@@ -169,7 +262,7 @@ TransactionSchema.index({ toronetTransactionId: 1 });
  */
 TransactionSchema.pre<ITransaction>("save", function (next) {
   if (this.isModified("amount") || this.isModified("fees")) {
-    this.totalAmount = this.amount + this.fees;
+    this.totalAmount = this.amount + (this.fees || 0);
   }
   next();
 });

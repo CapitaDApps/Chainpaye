@@ -1,0 +1,273 @@
+{
+  "version": "7.2",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "COUNTRY_SELECT": ["BVN_INPUT"],
+    "BVN_INPUT": ["VERIFICATION_COMPLETE"],
+    "VERIFICATION_COMPLETE": []
+  },
+  "screens": [
+    {
+      "id": "COUNTRY_SELECT",
+      "title": "KYC Verification",
+      "data": {
+        "countries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" }
+            }
+          },
+          "__example__": [{ "id": "NG", "title": "Nigeria" }]
+        },
+        "first_name": {
+          "type": "string",
+          "__example__": "John"
+        },
+        "last_name": {
+          "type": "string",
+          "__example__": "Doe"
+        },
+        "dob": {
+          "type": "string",
+          "__example__": "1990-01-01"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "country_form",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Verify Your Identity"
+              },
+              {
+                "type": "TextBody",
+                "text": "Complete your Bank Verification Number (BVN) verification to unlock all features."
+              },
+              {
+                "type": "Dropdown",
+                "label": "Country",
+                "name": "country",
+                "required": true,
+                "data-source": "${data.countries}",
+                "init-value": "NG"
+              },
+              {
+                "type": "EmbeddedLink",
+                "text": "${data.error_message}",
+                "visible": "${data.error_message}",
+                "on-click-action": {
+                  "name": "navigate",
+                  "next": {
+                    "type": "screen",
+                    "name": "COUNTRY_SELECT"
+                  },
+                  "payload": {}
+                }
+              },
+              {
+                "type": "Footer",
+                "label": "Continue",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "country": "${form.country}",
+                    "first_name": "${data.first_name}",
+                    "last_name": "${data.last_name}",
+                    "dob": "${data.dob}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "BVN_INPUT",
+      "title": "Enter BVN",
+      "data": {
+        "country": {
+          "type": "string",
+          "__example__": "NG"
+        },
+        "first_name": {
+          "type": "string",
+          "__example__": "John"
+        },
+        "last_name": {
+          "type": "string",
+          "__example__": "Doe"
+        },
+        "dob": {
+          "type": "string",
+          "__example__": "1990-01-01"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "bvn_form",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Bank Verification Number"
+              },
+              {
+                "type": "TextBody",
+                "text": "Enter your details exactly as they appear on your BVN."
+              },
+              {
+                "type": "TextInput",
+                "label": "First Name",
+                "name": "first_name",
+                "required": true,
+                "input-type": "text"
+              },
+              {
+                "type": "TextInput",
+                "label": "Last Name",
+                "name": "last_name",
+                "required": true,
+                "input-type": "text"
+              },
+              {
+                "type": "DatePicker",
+                "label": "Date of Birth",
+                "name": "dob",
+                "required": true,
+                "min-date": "1900-01-01",
+                "max-date": "2010-01-01",
+                "helper-text": "You must be 18 or older"
+              },
+              {
+                "type": "TextInput",
+                "label": "BVN",
+                "name": "bvn",
+                "required": true,
+                "input-type": "number",
+                "helper-text": "11 digits"
+              },
+              {
+                "type": "EmbeddedLink",
+                "text": "${data.error_message}",
+                "visible": "${data.error_message}",
+                "on-click-action": {
+                  "name": "navigate",
+                  "next": {
+                    "type": "screen",
+                    "name": "BVN_INPUT"
+                  },
+                  "payload": {}
+                }
+              },
+              {
+                "type": "Footer",
+                "label": "Verify",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "country": "${data.country}",
+                    "first_name": "${form.first_name}",
+                    "last_name": "${form.last_name}",
+                    "dob": "${form.dob}",
+                    "bvn": "${form.bvn}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "VERIFICATION_COMPLETE",
+      "title": "Verification Complete",
+      "terminal": true,
+      "success": true,
+      "data": {
+        "first_name": {
+          "type": "string",
+          "__example__": "John"
+        },
+        "verified": {
+          "type": "boolean",
+          "__example__": true
+        },
+        "already_verified": {
+          "type": "boolean",
+          "__example__": false
+        },
+        "not_required": {
+          "type": "boolean",
+          "__example__": false
+        },
+        "message": {
+          "type": "string",
+          "__example__": ""
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Verification Successful! ✅",
+            "visible": "${data.verified}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Congratulations ${data.first_name}! Your identity has been verified. You now have full access to all Chainpaye features.",
+            "visible": "${data.verified}"
+          },
+          {
+            "type": "TextHeading",
+            "text": "Already Verified ✓",
+            "visible": "${data.already_verified}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Your account is already verified. You have full access to all features.",
+            "visible": "${data.already_verified}"
+          },
+          {
+            "type": "TextHeading",
+            "text": "Verification Not Required",
+            "visible": "${data.not_required}"
+          },
+          {
+            "type": "TextBody",
+            "text": "${data.message}",
+            "visible": "${data.not_required}"
+          },
+          {
+            "type": "Footer",
+            "label": "Done",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {
+                "type": "kyc-complete"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

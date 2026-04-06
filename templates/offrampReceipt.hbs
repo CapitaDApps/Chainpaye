@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offramp Receipt - Chainpaye</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-blue: #003DFF;
+            --dark-blue: #00174F;
+            --success-green: #23A26D;
+            --gray-text: #5A5F73;
+            --light-gray: #9CA3AF;
+            --border-color: #F3F4F6;
+            --bg-white: #ffffff;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: transparent;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .screenshot-wrapper {
+            padding: 60px 20px 20px 20px;
+            display: inline-block;
+            background: transparent;
+        }
+
+        .receipt-container {
+            width: 400px;
+            background: var(--bg-white);
+            border-radius: 40px 40px 0 0;
+            box-shadow: 0 20px 60px -15px rgba(0, 0, 0, 0.1);
+            position: relative;
+            padding-bottom: 20px;
+        }
+
+        .watermark {
+            position: absolute;
+            inset: 0;
+            border-top-left-radius: 40px;
+            border-top-right-radius: 40px;
+            background-repeat: repeat;
+            background-size: 150px 75px;
+            transform: rotate(-15deg);
+            opacity: 0.03;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .receipt-container::after {
+            content: "";
+            position: absolute;
+            bottom: -10px;
+            left: 0;
+            right: 0;
+            height: 10px;
+            background-image: radial-gradient(circle, transparent 50%, #ffffff 50%);
+            background-size: 20px 20px;
+            background-position: center bottom;
+            transform: rotate(180deg);
+        }
+
+        .header {
+            position: relative;
+            z-index: 10;
+            padding: 40px 24px 24px 24px;
+        }
+
+        .brand-logo {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+
+        .brand-logo img {
+            width: 100px;
+            height: auto;
+            object-fit: contain;
+        }
+
+        .brand-logo::after {
+            content: "Offramp Receipt";
+            color: #111528;
+            font-size: 10px;
+            font-weight: 400;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .transaction-summary {
+            text-align: center;
+            position: relative;
+            z-index: 10;
+        }
+
+        .type-tag {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 16px;
+            background: rgba(230, 81, 0, 0.1);
+            color: #e65100;
+        }
+
+        .amount-large {
+            color: var(--dark-blue);
+            font-size: 32px;
+            font-weight: 600;
+            display: flex;
+            justify-content: center;
+            align-items: baseline;
+            margin: 0;
+        }
+
+        .success-icon-container {
+            position: absolute;
+            top: -48px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+        }
+
+        .success-icon-outer {
+            width: 96px;
+            height: 96px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            border: 4px solid #f9fafb;
+        }
+
+        .success-icon-inner {
+            width: 64px;
+            height: 64px;
+            background: var(--success-green);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .checkmark {
+            width: 32px;
+            height: 32px;
+            fill: none;
+            stroke: white;
+            stroke-width: 4;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .details-body {
+            position: relative;
+            z-index: 10;
+            padding: 24px;
+            border-top: 1px solid var(--border-color);
+            margin: 0;
+            background: transparent;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+
+        .detail-label {
+            color: var(--light-gray);
+            font-size: 11px;
+            font-weight: 400;
+            width: 40%;
+            text-align: left;
+        }
+
+        .detail-value {
+            text-align: right;
+            color: #111528;
+            font-size: 12px;
+            font-weight: 500;
+            width: 60%;
+            word-break: break-all;
+            line-height: 1.4;
+        }
+
+        .detail-value.highlight {
+            color: var(--primary-blue);
+            font-weight: 600;
+        }
+
+        .status-tag {
+            display: inline-block !important;
+            padding: 2px 8px !important;
+            border-radius: 12px !important;
+            font-size: 10px !important;
+            font-weight: 600 !important;
+            text-transform: uppercase !important;
+        }
+
+        .status-success {
+            background: rgba(35, 162, 109, 0.1) !important;
+            color: var(--success-green) !important;
+        }
+
+        .status-pending {
+            background: rgba(254, 249, 195, 0.5) !important;
+            color: #854d0e !important;
+        }
+
+        .status-failed {
+            background: rgba(254, 226, 226, 0.5) !important;
+            color: #991b1b !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="screenshot-wrapper">
+        <div class="receipt-container">
+            <!-- Watermark -->
+            <div class="watermark" style="background-image: url('{{logoBase64}}');"></div>
+            
+            <!-- Success Icon -->
+            <div class="success-icon-container">
+                <div class="success-icon-outer">
+                    <div class="success-icon-inner">
+                        <svg class="checkmark" viewBox="0 0 24 24">
+                            <path d="M5 13l4 4L19 7"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="header">
+                <div class="brand-logo">
+                    <img src="{{logoBase64}}" alt="Chainpaye Logo" />
+                </div>
+
+                <div class="transaction-summary">
+                    <span class="type-tag">CRYPTO OFFRAMP</span>
+                    <div class="amount-large">{{ngnAmount}}</div>
+                </div>
+            </div>
+
+            <div class="details-body">
+                <div class="detail-row">
+                    <span class="detail-label">Status</span>
+                    <span class="status-tag {{statusClass}}">{{status}}</span>
+                </div>
+
+                <div class="detail-row">
+                    <span class="detail-label">Crypto Spent (USD)</span>
+                    <span class="detail-value highlight">{{cryptoSpentUsd}}</span>
+                </div>
+
+                <div class="detail-row">
+                    <span class="detail-label">Fees</span>
+                    <span class="detail-value">{{fees}}</span>
+                </div>
+
+                <div class="detail-row">
+                    <span class="detail-label">Bank Name</span>
+                    <span class="detail-value">{{bankName}}</span>
+                </div>
+
+                <div class="detail-row">
+                    <span class="detail-label">Account Name</span>
+                    <span class="detail-value">{{accountName}}</span>
+                </div>
+
+                <div class="detail-row">
+                    <span class="detail-label">Account Number</span>
+                    <span class="detail-value">{{accountNumber}}</span>
+                </div>
+
+                <div class="detail-row">
+                    <span class="detail-label">Date & Time</span>
+                    <span class="detail-value">{{dateTime}}</span>
+                </div>
+
+                <div class="detail-row">
+                    <span class="detail-label">Transaction Reference</span>
+                    <span class="detail-value">{{transactionReference}}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

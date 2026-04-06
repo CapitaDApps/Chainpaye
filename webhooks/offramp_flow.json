@@ -1,0 +1,396 @@
+{
+  "version": "6.0",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "OFFRAMP_DETAILS": ["OFFRAMP_FIAT_REVIEW"],
+    "OFFRAMP_FIAT_REVIEW": ["OFFRAMP_CRYPTO_REVIEW"],
+    "OFFRAMP_CRYPTO_REVIEW": ["OFFRAMP_SUCCESS"],
+    "OFFRAMP_SUCCESS": []
+  },
+  "screens": [
+    {
+      "id": "OFFRAMP_DETAILS",
+      "title": "Off-Ramp (Sell Crypto)",
+      "data": {
+        "banks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" }
+            }
+          },
+          "__example__": [
+            { "id": "000014", "title": "Access Bank" },
+            { "id": "000013", "title": "GTBank" }
+          ]
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Withdraw to Bank"
+          },
+          {
+            "type": "Form",
+            "name": "offramp_form",
+            "children": [
+              {
+                "type": "Dropdown",
+                "name": "currency",
+                "label": "Asset to Sell",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "USDT",
+                    "title": "Tether (USDT)"
+                  },
+                  {
+                    "id": "USDC",
+                    "title": "USD Coin (USDC)"
+                  }
+                ]
+              },
+              {
+                "type": "Dropdown",
+                "name": "network",
+                "label": "Select Network",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "BEP20",
+                    "title": "BNB Smart Chain (BEP20)"
+                  },
+                  {
+                    "id": "SOL",
+                    "title": "Solana (SOL)"
+                  },
+                  {
+                    "id": "BASE",
+                    "title": "Base Network"
+                  },
+                  {
+                    "id": "ARBITRUM",
+                    "title": "Arbitrum"
+                  }
+                ]
+              },
+              {
+                "type": "Dropdown",
+                "name": "bank_code",
+                "label": "Select Bank",
+                "required": true,
+                "data-source": "${data.banks}"
+              },
+              {
+                "type": "TextInput",
+                "name": "account_number",
+                "label": "Account Number",
+                "required": true,
+                "input-type": "text",
+                "helper-text": "Enter 10-digit account number"
+              },
+              {
+                "type": "TextInput",
+                "name": "sell_amount",
+                "label": "Amount",
+                "required": true,
+                "input-type": "text",
+                "helper-text": "Min: ₦5,000 | Fee: $0.75 USD"
+              },
+              {
+                "type": "Footer",
+                "label": "Preview Withdrawal",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "currency": "${form.currency}",
+                    "network": "${form.network}",
+                    "sell_amount": "${form.sell_amount}",
+                    "bank_code": "${form.bank_code}",
+                    "account_number": "${form.account_number}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "OFFRAMP_FIAT_REVIEW",
+      "title": "Recipient Overview",
+      "data": {
+        "currency": {
+          "type": "string",
+          "__example__": "USDC"
+        },
+        "network": {
+          "type": "string",
+          "__example__": "BASE"
+        },
+        "sell_amount": {
+          "type": "string",
+          "__example__": "5000"
+        },
+        "sell_amount_usd": {
+          "type": "string",
+          "__example__": "3.73"
+        },
+        "amount_to_receive": {
+          "type": "string",
+          "__example__": "5,000"
+        },
+        "bank_name": {
+          "type": "string",
+          "__example__": "GTBank"
+        },
+        "bank_code": {
+          "type": "string",
+          "__example__": "000013"
+        },
+        "account_number": {
+          "type": "string",
+          "__example__": "0123456789"
+        },
+        "recipient_name": {
+          "type": "string",
+          "__example__": "Alice Smith"
+        },
+        "rate": {
+          "type": "string",
+          "__example__": "₦1,460"
+        },
+        "fee_info": {
+          "type": "string",
+          "__example__": "Flat fee: $0.75 USD"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Review Details"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Recipient: '${data.recipient_name}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Bank: '${data.bank_name}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Account: '${data.account_number}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'To Receive: ₦'${data.amount_to_receive}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Selling: '${data.sell_amount_usd}' '${data.currency}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Network: '${data.network}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Rate: 1 '${data.currency}' = '${data.rate}' (with spread)'`"
+          },
+          {
+            "type": "Footer",
+            "label": "Proceed to Payment",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "sell_amount": "${data.sell_amount}",
+                "sell_amount_usd": "${data.sell_amount_usd}",
+                "amount_to_receive": "${data.amount_to_receive}",
+                "currency": "${data.currency}",
+                "network": "${data.network}",
+                "bank_name": "${data.bank_name}",
+                "bank_code": "${data.bank_code}",
+                "account_number": "${data.account_number}",
+                "recipientName": "${data.recipient_name}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "OFFRAMP_CRYPTO_REVIEW",
+      "title": "Payment Authorization",
+      "data": {
+        "currency": {
+          "type": "string",
+          "__example__": "USDC"
+        },
+        "network": {
+          "type": "string",
+          "__example__": "BASE"
+        },
+        "sell_amount": {
+          "type": "string",
+          "__example__": "5000"
+        },
+        "sell_amount_usd": {
+          "type": "string",
+          "__example__": "3.73"
+        },
+        "amount_to_receive": {
+          "type": "string",
+          "__example__": "5,000"
+        },
+        "total_amount_usd": {
+          "type": "string",
+          "__example__": "4.48"
+        },
+        "bank_name": {
+          "type": "string",
+          "__example__": "GTBank"
+        },
+        "bank_code": {
+          "type": "string",
+          "__example__": "000013"
+        },
+        "account_number": {
+          "type": "string",
+          "__example__": "0123456789"
+        },
+        "recipientName": {
+          "type": "string",
+          "__example__": "Kelechi"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": "Invalid PIN"
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Authorize"
+          },
+          {
+            "type": "If",
+            "condition": "${data.has_error}",
+            "then": [
+              {
+                "type": "TextCaption",
+                "text": "${data.error_message}"
+              }
+            ]
+          },
+          {
+            "type": "TextBody",
+            "text": "`'To Receive: ₦'${data.amount_to_receive}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Selling: '${data.sell_amount_usd}' '${data.currency}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Fee: $0.75 USD'`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Total: '${data.total_amount_usd}' '${data.currency}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Network: '${data.network}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "Enter PIN to Confirm"
+          },
+          {
+            "type": "Form",
+            "name": "pin_form",
+            "children": [
+              {
+                "type": "TextInput",
+                "name": "pin",
+                "label": "4-6 Digit PIN",
+                "required": true,
+                "input-type": "password",
+                "min-chars": 4,
+                "max-chars": 6
+              },
+              {
+                "type": "Footer",
+                "label": "Sell & Withdraw",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "pin": "${form.pin}",
+                    "sell_amount": "${data.sell_amount}",
+                    "sell_amount_usd": "${data.sell_amount_usd}",
+                    "amount_to_receive": "${data.amount_to_receive}",
+                    "total_amount_usd": "${data.total_amount_usd}",
+                    "currency": "${data.currency}",
+                    "network": "${data.network}",
+                    "bank_name": "${data.bank_name}",
+                    "bank_code": "${data.bank_code}",
+                    "account_number": "${data.account_number}",
+                    "recipientName": "${data.recipientName}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "OFFRAMP_SUCCESS",
+      "title": "Processing",
+      "terminal": true,
+      "success": true,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Funds are underway! 🚀"
+          },
+          {
+            "type": "TextBody",
+            "text": "Your withdrawal has been initiated. The funds usually hit the bank account in under 50 seconds."
+          },
+          {
+            "type": "Footer",
+            "label": "Done",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {
+                "status": "offramp_initiated",
+                "result": "success"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

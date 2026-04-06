@@ -4,8 +4,7 @@
  */
 
 import argon2 from "argon2";
-import mongoose, { Document, Schema, Types } from "mongoose";
-import { IWallet } from "./Wallet";
+import mongoose, { Document, Schema } from "mongoose";
 
 /**
  * Interface for User document
@@ -13,17 +12,24 @@ import { IWallet } from "./Wallet";
 export interface IUser extends Document {
   whatsappNumber: string;
   userId: string;
-  fullName: string;
+  firstName?: string; // Set during KYC verification
+  lastName?: string; // Set during KYC verification
+  fullName: string; // Set during onboarding, used for wallet creation
   email?: string;
   country: string;
-  currency: "USD" | "NGN";
+  currency: "USD" | "NGN" | "EUR" | "GBP";
   isVerified: boolean;
   verificationCode?: string;
   verificationCodeExpires?: Date;
-  pin: string;
+  pin?: string;
+  dob?: string;
+  referralCode?: string; // Unique referral code for this user
+  referredBy?: string; // User ID of the referrer
+  referredAt?: Date; // Timestamp when user was referred
   createdAt: Date;
   updatedAt: Date;
   comparePin(candidatePin: string): Promise<boolean>;
+  markVerified(): Promise<void>;
 }
 
 /**
@@ -43,11 +49,24 @@ const UserSchema: Schema = new Schema(
       required: true,
       unique: true,
     },
+
+    firstName: {
+      type: String,
+      trim: true,
+      maxlength: 150,
+    },
+
+    lastName: {
+      type: String,
+      trim: true,
+      maxlength: 150,
+    },
+
     fullName: {
       type: String,
       required: true,
       trim: true,
-      maxlength: 150,
+      maxlength: 300,
     },
 
     email: {
@@ -67,10 +86,12 @@ const UserSchema: Schema = new Schema(
     currency: {
       type: String,
       required: true,
-      enum: ["USD", "NGN"],
+      enum: ["USD", "NGN", "EUR", "GBP"],
       default: function () {
         // Default currency based on country
-        return this.country === "US" ? "USD" : "NGN";
+        if (this.country === "US") return "USD";
+        if (this.country === "GB") return "GBP";
+        return "NGN";
       },
     },
     isVerified: {
@@ -91,10 +112,28 @@ const UserSchema: Schema = new Schema(
       required: true,
       select: false, // Don't include in queries by default
     },
+    dob: {
+      type: String,
+    },
+    referralCode: {
+      type: String,
+      unique: true,
+      sparse: true, // Allows multiple null values, unique only when set
+      trim: true,
+      minlength: 6,
+      maxlength: 12,
+    },
+    referredBy: {
+      type: String,
+      trim: true,
+    },
+    referredAt: {
+      type: Date,
+    },
   },
   {
     timestamps: true, // Automatically add createdAt and updatedAt
-  }
+  },
 );
 
 /**
@@ -102,33 +141,40 @@ const UserSchema: Schema = new Schema(
  */
 UserSchema.index({ whatsappNumber: 1 });
 UserSchema.index({ email: 1 });
-
+UserSchema.index({ referralCode: 1 });
+UserSchema.index({ referredBy: 1 });
 /**
  * Pre-save middleware to hash PIN
  */
-UserSchema.pre<IUser>("save", async function (next) {
-  // Only hash the PIN if it has been modified (or is new)
-  if (!this.isModified("pin")) return next();
+// UserSchema.pre<IUser>("save", async function (next) {
+//   // Only hash the PIN if it has been modified (or is new)
+//   if (!this.isModified("pin")) return next();
 
-  try {
-    this.pin = await argon2.hash(this.pin);
-    next();
-  } catch (error) {
-    next(error as Error);
-  }
-});
+//   try {
+//   if(this.pin){
+//       this.pin = await argon2.hash(this.pin);
+//   }
+//     next();
+//   } catch (error) {
+//     next(error as Error);
+//   }
+// });
 
 /**
  * Method to compare PIN for authentication
  */
 UserSchema.methods.comparePin = async function (
-  candidatePin: string
+  candidatePin: string,
 ): Promise<boolean> {
   try {
     return await argon2.verify(this.pin, candidatePin);
   } catch (error) {
     return false;
   }
+};
+
+UserSchema.methods.markVerified = async function () {
+  this.isVerified = true;
 };
 
 /**

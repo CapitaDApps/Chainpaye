@@ -1,0 +1,88 @@
+name: deploy-cicd
+
+on:
+  push:
+    branches:
+      - "stage"
+      # - "staging"
+
+jobs:
+  typecheck:
+    name: Run Type Check
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 10
+          run_install: false
+      - run: pnpm install
+      - run: pnpm typecheck
+
+  deploy:
+    needs: typecheck
+    name: Deploy to EC2
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # --- DYNAMIC VARIABLE SETUP ---
+      # This step sets the target folder and PM2 name based on the branch
+      - name: Set Environment Variables
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/stage" ]]; then
+            echo "TARGET_DIR=~/app" >> $GITHUB_ENV
+            echo "PM2_NAME=chainpaye-stage" >> $GITHUB_ENV
+            echo "Environment is PRODUCTION"
+          elif [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
+            echo "TARGET_DIR=~/staging" >> $GITHUB_ENV
+            echo "PM2_NAME=chainpaye-staging" >> $GITHUB_ENV
+            echo "Environment is STAGING"
+          fi
+
+      - name: Remove .git and .github (Cleanup before upload)
+        run: rm -rf .git .github .gitignore
+
+      - name: Preflight on server
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.STAGEHOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.STAGEKEY }}
+          # dynamic TARGET_DIR used here
+          script: |
+            mkdir -p ${{ env.TARGET_DIR }}
+            test -w ${{ env.TARGET_DIR }} && echo "Target dir is writable" || exit 1
+
+      - name: Copy files via scp
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.STAGEHOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.STAGEKEY }}
+          source: "."
+          target: ${{ env.TARGET_DIR }}
+          # rm: true # uncomment if you want to delete old files in folder (careful!)
+
+      - name: Start/Restart application
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.STAGEHOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.STAGEKEY }}
+          script: |
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+            # Navigate to the dynamic folder
+            cd ${{ env.TARGET_DIR }}
+
+            pnpm install
+
+            # Restart ONLY the specific app for this branch
+            pm2 restart ecosystem.config.js --only ${{ env.PM2_NAME }} --update-env
+            pm2 save

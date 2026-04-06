@@ -1,0 +1,368 @@
+{
+  "version": "7.2",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "WITHDRAWAL_CURRENCY": ["WITHDRAWAL_DETAILS"],
+    "WITHDRAWAL_DETAILS": ["SUMMARY"],
+    "SUMMARY": ["PIN"],
+    "PIN": ["PROCESSING"],
+    "PROCESSING": []
+  },
+  "screens": [
+    {
+      "id": "WITHDRAWAL_CURRENCY",
+      "title": "Select Currency",
+      "data": {
+        "error_message": {
+          "type": "string",
+          "__example__": "Error"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "currency_form",
+            "children": [
+              {
+                "type": "TextBody",
+                "text": "${data.error_message}",
+                "visible": "${data.error_message != null}",
+                "style": {
+                  "color": "#EF4444"
+                }
+              },
+              {
+                "type": "TextHeading",
+                "text": "Withdrawal Currency"
+              },
+              {
+                "type": "RadioButtonsGroup",
+                "label": "Select Currency",
+                "name": "currency",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "USD",
+                    "title": "USD"
+                  },
+                  {
+                    "id": "NGN",
+                    "title": "NGN"
+                  }
+                ]
+              },
+              {
+                "type": "Footer",
+                "label": "Next",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "currency": "${form.currency}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "WITHDRAWAL_DETAILS",
+      "title": "Withdrawal Details",
+      "data": {
+        "currency": {
+          "type": "string",
+          "__example__": "USD"
+        },
+        "banks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            }
+          },
+          "__example__": []
+        },
+        "acct_name_visible": {
+          "type": "boolean",
+          "__example__": true
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": "Error"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "details_form",
+            "children": [
+              {
+                "type": "TextBody",
+                "text": "${data.error_message}",
+                "visible": "${data.error_message != null}",
+                "style": {
+                  "color": "#EF4444"
+                }
+              },
+              {
+                "type": "Dropdown",
+                "label": "Select Bank",
+                "name": "bankCode",
+                "required": true,
+                "data-source": "${data.banks}"
+              },
+              {
+                "type": "TextInput",
+                "label": "Account Number",
+                "name": "accountNumber",
+                "required": true,
+                "input-type": "number"
+              },
+              {
+                "type": "TextInput",
+                "label": "Amount (${data.currency})",
+                "name": "amount",
+                "required": true,
+                "input-type": "number"
+              },
+              {
+                "type": "TextInput",
+                "label": "Account Name",
+                "name": "accountName",
+                "required": "${data.acct_name_visible}",
+                "visible": "${data.acct_name_visible}",
+                "input-type": "text"
+              },
+              {
+                "type": "Footer",
+                "label": "Next",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "currency": "${data.currency}",
+                    "bankCode": "${form.bankCode}",
+                    "accountNumber": "${form.accountNumber}",
+                    "amount": "${form.amount}",
+                    "accountName": "${form.accountName}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUMMARY",
+      "title": "Confirm Withdrawal",
+      "data": {
+        "currency": {
+          "type": "string",
+          "__example__": "USD"
+        },
+        "amount": {
+          "type": "string",
+          "__example__": "100"
+        },
+        "accountNumber": {
+          "type": "string",
+          "__example__": "1234567890"
+        },
+        "resolvedAccountName": {
+          "type": "string",
+          "__example__": "John Doe"
+        },
+        "resolvedBankName": {
+          "type": "string",
+          "__example__": "Bank of America"
+        },
+        "bankCode": {
+          "type": "string",
+          "__example__": "011"
+        },
+        "totalAmount": {
+          "type": "string",
+          "__example__": "102.00"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Review Withdrawal"
+          },
+          {
+            "type": "TextSubheading",
+            "text": "Recipient Details"
+          },
+          {
+            "type": "TextBody",
+            "text": "Bank: ${data.resolvedBankName}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Account Name: ${data.resolvedAccountName}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Account Number: ${data.accountNumber}"
+          },
+          {
+            "type": "TextSubheading",
+            "text": "Transaction"
+          },
+          {
+            "type": "TextBody",
+            "text": "Amount: ${data.amount} ${data.currency}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Total (Inc. Fees): ${data.totalAmount} ${data.currency}",
+            "style": {
+              "fontWeight": "bold"
+            }
+          },
+          {
+            "type": "Footer",
+            "label": "Confirm",
+            "on-click-action": {
+              "name": "navigate",
+              "next": {
+                "type": "screen",
+                "name": "PIN"
+              },
+              "payload": {
+                "currency": "${data.currency}",
+                "amount": "${data.amount}",
+                "accountNumber": "${data.accountNumber}",
+                "accountName": "${data.resolvedAccountName}",
+                "bankCode": "${data.bankCode}",
+                "totalAmount": "${data.totalAmount}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "PIN",
+      "title": "Enter PIN",
+      "data": {
+        "currency": {
+          "type": "string",
+          "__example__": "USD"
+        },
+        "amount": {
+          "type": "string",
+          "__example__": "100"
+        },
+        "accountNumber": {
+          "type": "string",
+          "__example__": "1234567890"
+        },
+        "accountName": {
+          "type": "string",
+          "__example__": "John Doe"
+        },
+        "bankCode": {
+          "type": "string",
+          "__example__": "011"
+        },
+        "totalAmount": {
+          "type": "string",
+          "__example__": "102.00"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": "Invalid PIN"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "pin_form",
+            "children": [
+              {
+                "type": "TextBody",
+                "text": "${data.error_message}",
+                "visible": "${data.error_message != null}",
+                "style": {
+                  "color": "#EF4444"
+                }
+              },
+              {
+                "type": "TextBody",
+                "text": "Enter your 4-6 digit PIN to authorize this withdrawal."
+              },
+              {
+                "type": "TextInput",
+                "label": "PIN",
+                "name": "pin",
+                "required": true,
+                "input-type": "password"
+              },
+              {
+                "type": "Footer",
+                "label": "Withdraw",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "pin": "${form.pin}",
+                    "currency": "${data.currency}",
+                    "amount": "${data.amount}",
+                    "accountNumber": "${data.accountNumber}",
+                    "accountName": "${data.accountName}",
+                    "bankCode": "${data.bankCode}",
+                    "totalAmount": "${data.totalAmount}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "PROCESSING",
+      "title": "Processing",
+      "terminal": true,
+      "success": true,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Withdrawal Initiated"
+          },
+          {
+            "type": "TextBody",
+            "text": "Your withdrawal request is being processed. You will be notified once it's completed."
+          },
+          {
+            "type": "Footer",
+            "label": "Done",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {}
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
