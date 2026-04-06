@@ -20,7 +20,8 @@ async function generateTestReceipt() {
       "0123456789", // Account number
       new Date(), // Transaction date
       "quote_test_abc123", // Transaction reference
-      "Successful" // Status
+      "Successful", // Status
+      "NG" // Country code (Nigeria → Africa/Lagos)
     );
 
     console.log("📋 Receipt Data:");

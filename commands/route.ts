@@ -17,6 +17,7 @@ import {
 import { handleStartCommand } from "./handlers/startCommandHandler";
 import { handleReferralCommand } from "./handlers/referralHandler";
 import { handleBuyCrypto } from "./handlers/onrampHandler";
+import { handleResetPin } from "./handlers/resetPinHandler";
 
 /**
  * Handle wallet command - show all crypto wallet addresses and balances
@@ -389,6 +390,10 @@ export async function commandRouteHandler(from: string, message: string) {
 
     case "buyCrypto":
       await handleBuyCrypto(from);
+      break;
+
+    case "resetPin":
+      await handleResetPin(from);
       break;
 
     case "paymentLink":

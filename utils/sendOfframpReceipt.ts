@@ -26,6 +26,7 @@ export interface OfframpTransactionDetails {
   transactionDate: Date;
   transactionReference: string;
   status?: "Successful" | "Pending" | "Failed";
+  countryCode?: string; // IANA country code for local time formatting (e.g. "NG", "GB")
 }
 
 /**
@@ -54,7 +55,8 @@ export async function sendOfframpReceipt(
       transactionDetails.accountNumber,
       transactionDetails.transactionDate,
       transactionDetails.transactionReference,
-      transactionDetails.status || "Successful"
+      transactionDetails.status || "Successful",
+      transactionDetails.countryCode
     );
 
     // Generate receipt image (returns base64)

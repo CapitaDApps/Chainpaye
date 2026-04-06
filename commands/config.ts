@@ -851,6 +851,25 @@ const COMMANDS: Record<string, CommandConfig> = {
     description: "View your referral dashboard and earnings",
     priority: 4,
   },
+  // ============================================================
+  // RESET PIN
+  // User wants to reset their PIN via email
+  // ============================================================
+  resetPin: {
+    triggers: [
+      "/resetpin",
+      "reset pin",
+      "reset my pin",
+      "forgot pin",
+      "forgot my pin",
+      "change pin",
+      "change my pin",
+      "i forgot my pin",
+      "i forgot pin",
+    ],
+    description: "Reset your PIN via email",
+    priority: 9,
+  },
 };
 
 export { COMMANDS };

@@ -395,7 +395,7 @@ What can I do for you?
           {
             id:"other_menu_withdraw",
             title:"Withdraw To Bank",
-            description:"Withdraw your funds to your bankk account"
+            description:"Withdraw your funds to your bank account"
           },
           {
             id:"other_menu_spend_crypto",
@@ -804,6 +804,31 @@ USD: USD ${usdBalance.balance.toFixed(2)}`;
     );
   }
 
+  async sendResetPinEmailCollectionFlow(to: string) {
+    const flowId = WHATSAPP_CONFIG.FLOW_IDS.RESET_PIN;
+
+    if (!flowId) {
+      throw new Error(
+        "Missing WhatsApp reset PIN flow ID. Set WHATSAPP_RESET_PIN_FLOW_ID (or staging equivalent).",
+      );
+    }
+
+    await this.sendTextOnlyFlowWithDataById(
+      to,
+      flowId,
+      "COLLECT_EMAIL",
+      {
+        header: "Reset Your PIN",
+        body: "We need your email address to send you a secure PIN reset link.",
+        cta: "Continue",
+      },
+      {
+        has_error: false,
+        error_message: "",
+      },
+    );
+  }
+
   async sendSupportMessage(to: string) {
     const message = `🆘 *Need Help?*
 
@@ -1032,6 +1057,7 @@ Our team is ready to assist you!`;
             flow_token: flowToken,
             flow_id: flowId,
             flow_cta: displayData.cta,
+            ...(process.env.PORT === "3001" && { mode: "published" }),
             flow_action_payload: {
               screen: screenId,
               data: screenData,
@@ -1059,8 +1085,44 @@ Our team is ready to assist you!`;
     }
   }
 
-  async sendBuyCryptoFlow(to: string): Promise<void> {
-    const flowId = WHATSAPP_CONFIG.FLOW_IDS.ONRAMP;
+  async sendImagePaymentConfirmFlow(
+    to: string,
+    details: {
+      accountNumber: string;
+      accountName: string;
+      bankName: string;
+      bankCode: string;
+      amount: string;
+      currency?: string;
+    },
+  ): Promise<void> {
+    const flowId = WHATSAPP_CONFIG.FLOW_IDS.IMAGE_PAYMENT;
+    if (!flowId) {
+      throw new Error(
+        "Missing WhatsApp image payment flow ID. Set WHATSAPP_IMAGE_PAYMENT_FLOW_ID.",
+      );
+    }
+    await this.sendTextOnlyFlowWithDataById(
+      to,
+      flowId,
+      "CONFIRM_DETAILS",
+      {
+        header: "📸 Payment from Image",
+        body: "We detected payment details from your image. Review and confirm below.",
+        cta: "Review Payment",
+      },
+      {
+        accountNumber: details.accountNumber,
+        accountName: details.accountName,
+        bankName: details.bankName,
+        bankCode: details.bankCode,
+        amount: details.amount,
+        currency: details.currency || "NGN",
+      },
+    );
+  }
+
+  async sendBuyCryptoFlow(to: string): Promise<void> {    const flowId = WHATSAPP_CONFIG.FLOW_IDS.ONRAMP;
     if (!flowId) {
       throw new Error(
         "Missing WhatsApp onramp flow ID. Set WHATSAPP_ONRAMP_FLOW_ID.",

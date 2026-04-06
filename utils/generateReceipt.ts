@@ -98,19 +98,27 @@ function mapTransactionStatus(
 }
 
 /**
- * Format date for receipt
+ * Format date for receipt in the user's local timezone
+ * Output: "Thursday, Mar 26, 2026 at 08:35 am"
  */
-function formatDate(date: Date): string {
-  const options: Intl.DateTimeFormatOptions = {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  };
-  return new Date(date).toLocaleDateString("en-US", options);
+function formatDate(date: Date, timeZone = "UTC"): string {
+  const d = new Date(date);
+  const weekday = d.toLocaleDateString("en-US", { weekday: "long", timeZone });
+  const datePart = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone });
+  const timePart = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone }).toLowerCase();
+  return `${weekday}, ${datePart} at ${timePart}`;
 }
+
+// Map country codes to IANA timezone identifiers
+const COUNTRY_TIMEZONE_MAP: Record<string, string> = {
+  NG: "Africa/Lagos",
+  GH: "Africa/Accra",
+  KE: "Africa/Nairobi",
+  ZA: "Africa/Johannesburg",
+  GB: "Europe/London",
+  US: "America/New_York",
+  CA: "America/Toronto",
+};
 
 /**
  * Format transaction data for receipt generation based on project Transaction model
@@ -121,7 +129,8 @@ export async function formatTransactionData(
   counterpartyUser?: IUser
 ): Promise<ReceiptData> {
   const status = mapTransactionStatus(transaction.status);
-  const transactionDate = formatDate(transaction.createdAt);
+  const timeZone = COUNTRY_TIMEZONE_MAP[user.country] || "UTC";
+  const transactionDate = formatDate(transaction.createdAt, timeZone);
 
   // Prepare additional fields
   const fees = transaction.fees

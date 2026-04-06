@@ -29,19 +29,28 @@ export interface OfframpReceiptData {
   status: "Successful" | "Pending" | "Failed";
 }
 
+// Map country codes to IANA timezone identifiers
+const COUNTRY_TIMEZONE_MAP: Record<string, string> = {
+  NG: "Africa/Lagos",
+  GH: "Africa/Accra",
+  KE: "Africa/Nairobi",
+  ZA: "Africa/Johannesburg",
+  GB: "Europe/London",
+  US: "America/New_York",
+  CA: "America/Toronto",
+};
+
 /**
- * Format date for offramp receipt
+ * Format date for offramp receipt in the user's local timezone
+ * Output: "Thursday, Mar 26, 2026 at 08:35 am"
  */
-function formatOfframpDate(date: Date): string {
-  const options: Intl.DateTimeFormatOptions = {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  };
-  return new Date(date).toLocaleDateString("en-US", options);
+function formatOfframpDate(date: Date, countryCode?: string): string {
+  const timeZone = (countryCode && COUNTRY_TIMEZONE_MAP[countryCode]) || "UTC";
+  const d = new Date(date);
+  const weekday = d.toLocaleDateString("en-US", { weekday: "long", timeZone });
+  const datePart = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone });
+  const timePart = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone }).toLowerCase();
+  return `${weekday}, ${datePart} at ${timePart}`;
 }
 
 /**
@@ -82,7 +91,8 @@ export function prepareOfframpReceiptData(
   accountNumber: string,
   transactionDate: Date,
   transactionReference: string,
-  status: "Successful" | "Pending" | "Failed" = "Successful"
+  status: "Successful" | "Pending" | "Failed" = "Successful",
+  countryCode?: string
 ): OfframpReceiptData {
   return {
     ngnAmount: formatCurrency(ngnAmount, "NGN"),
@@ -91,7 +101,7 @@ export function prepareOfframpReceiptData(
     bankName,
     accountName,
     accountNumber,
-    dateTime: formatOfframpDate(transactionDate),
+    dateTime: formatOfframpDate(transactionDate, countryCode),
     transactionReference,
     status,
   };
