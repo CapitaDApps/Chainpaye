@@ -435,6 +435,11 @@ What can I do for you?
               title: "Support",
               description: "Contact Chainpaye support",
             },
+            {
+              id: "other_menu_reset_pin",
+              title: "Reset PIN",
+              description: "Reset your transaction PIN",
+            },
             
           ],
         },

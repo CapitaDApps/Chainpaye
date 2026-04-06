@@ -285,6 +285,7 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
                   other_menu_payment_link: "payment link",
                   other_menu_transaction_history: "transaction history",
                   other_menu_support: "support",
+                  other_menu_reset_pin: "reset pin",
                 };
 
                 const selectedCommand = selectedMenuId
