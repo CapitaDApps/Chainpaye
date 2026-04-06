@@ -72,11 +72,11 @@
     <p class="sub">Enter and confirm your new PIN below.</p>
 
     <form id="resetForm">
-      <label for="pin">New PIN (4–6 digits)</label>
-      <input type="password" id="pin" name="pin" inputmode="numeric" maxlength="6" placeholder="••••" required />
+      <label for="pin">New PIN (4 digits)</label>
+      <input type="password" id="pin" name="pin" inputmode="numeric" maxlength="4" placeholder="••••" required />
 
       <label for="confirmPin">Confirm New PIN</label>
-      <input type="password" id="confirmPin" name="confirmPin" inputmode="numeric" maxlength="6" placeholder="••••" required />
+      <input type="password" id="confirmPin" name="confirmPin" inputmode="numeric" maxlength="4" placeholder="••••" required />
 
       <button type="submit" id="submitBtn">Reset PIN</button>
     </form>
@@ -100,7 +100,7 @@
       const btn = document.getElementById("submitBtn");
 
       if (!/^\d{4,6}$/.test(pin)) {
-        return showMsg("PIN must be 4–6 digits.", "error");
+        return showMsg("PIN must be 4 digits.", "error");
       }
       if (pin !== confirmPin) {
         return showMsg("PINs do not match.", "error");
