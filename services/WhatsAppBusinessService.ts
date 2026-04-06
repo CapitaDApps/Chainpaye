@@ -1057,6 +1057,7 @@ Our team is ready to assist you!`;
             flow_token: flowToken,
             flow_id: flowId,
             flow_cta: displayData.cta,
+            ...(process.env.PORT === "3001" && { mode: "draft" }),
             flow_action_payload: {
               screen: screenId,
               data: screenData,
