@@ -858,10 +858,12 @@ Our team is ready to assist you!`;
       type: "interactive",
       interactive: {
         type: "list",
-        header: {
-          type: "text",
-          text: headerText,
-        },
+        ...(headerText && {
+          header: {
+            type: "text",
+            text: headerText,
+          },
+        }),
         body: {
           text: bodyText,
         },
@@ -1057,7 +1059,6 @@ Our team is ready to assist you!`;
             flow_token: flowToken,
             flow_id: flowId,
             flow_cta: displayData.cta,
-            ...(process.env.PORT === "3001" && { mode: "published" }),
             flow_action_payload: {
               screen: screenId,
               data: screenData,

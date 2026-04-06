@@ -15,7 +15,7 @@ export async function sendResetPinEmail(
   toEmail: string,
   resetToken: string,
 ): Promise<void> {
-  const resetUrl = `https://staging.chainpaye.com/reset-pin?token=${resetToken}`;
+  const resetUrl = `https://app.chainpaye.com/reset-pin?token=${resetToken}`;
 
   const mailOptions = {
     from: `"ChainPaye" <${process.env.SMTP_FROM}>`,
