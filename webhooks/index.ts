@@ -364,11 +364,7 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
                 // Handle email verification completion
                 if (responseJson.type === "email-verification-complete") {
                   await replyingMessage(message.id);
-                  await whatsappBusinessService.sendNormalMessage(
-                    "✅ Email verified! You now have full access to all Chainpaye features.",
-                    message.from,
-                  );
-                  await whatsappBusinessService.sendMenuMessageMyFlowId(phone);
+                  // Confirmation message and menu are sent by the flow service via setImmediate
                 }
               }
             }

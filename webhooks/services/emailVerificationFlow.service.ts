@@ -210,77 +210,73 @@ export const emailVerificationFlowScreen = async (decryptedBody: {
             : `+${userPhone}`
           : null;
 
-        // Run DB update, WhatsApp message, and Linkio call after returning SUCCESS
-        // so nothing can block or break the flow response
+        // Fetch user before updating (need firstName, lastName, country for Linkio)
+        const user = await User.findOne({ whatsappNumber: phone });
+
+        // CRITICAL: mark email as verified — must succeed before returning SUCCESS
+        await User.updateOne(
+          { whatsappNumber: phone },
+          { email, emailVerified: true },
+        );
+
+        // Non-critical: WhatsApp message + Linkio call — fire and forget
         setImmediate(async () => {
           try {
-            const user = await User.findOne({ whatsappNumber: phone });
-
-            await User.updateOne(
-              { whatsappNumber: phone },
-              { email, emailVerified: true },
+            const wbs = new WhatsAppBusinessService();
+            await wbs.sendNormalMessage(
+              "✅ *Email Verified Successfully!*\n\nYour email has been verified. You now have full access to all Chainpaye features.",
+              phone!,
             );
+            await wbs.sendMenuMessageMyFlowId(phone!);
+          } catch (msgErr) {
+            logger.error("Failed to send email verification confirmation message", { msgErr });
+          }
 
-            // Send confirmation WhatsApp message
+          if (user) {
             try {
-              const wbs = new WhatsAppBusinessService();
-              await wbs.sendNormalMessage(
-                "✅ *Email Verified Successfully!*\n\nYour email has been verified. You now have full access to all Chainpaye features.",
-                phone!,
-              );
-              await wbs.sendMenuMessageMyFlowId(phone!);
-            } catch (msgErr) {
-              logger.error("Failed to send email verification confirmation message", { msgErr });
-            }
+              const secKey = process.env.LINKIO_SEC_KEY || "ngnc_s_lk_0cd3b9819b72a06fb4d5f28ded9accc4b434262b8d30620e12e8f932249bf3a2";
+              const linkioUrl = "https://api.linkio.world/transactions/v2/direct_ramp/onboarding";
+              const countryName = user.country === "NG" ? "Nigeria" : (user.country || "");
 
-            if (user) {
-              try {
-                const secKey = process.env.LINKIO_SEC_KEY || "ngnc_s_lk_0cd3b9819b72a06fb4d5f28ded9accc4b434262b8d30620e12e8f932249bf3a2";
-                const linkioUrl = "https://api.linkio.world/transactions/v2/direct_ramp/onboarding";
-                const countryName = user.country === "NG" ? "Nigeria" : (user.country || "");
+              logger.info("Calling Linkio onboarding API", {
+                email,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                country: countryName,
+              });
 
-                logger.info("Calling Linkio onboarding API", {
+              const response = await axios.post(linkioUrl, null, {
+                headers: { "ngnc-sec-key": secKey },
+                params: {
                   email,
-                  firstName: user.firstName,
-                  lastName: user.lastName,
+                  last_name: user.lastName || "",
+                  first_name: user.firstName || "",
                   country: countryName,
-                });
+                },
+              });
 
-                const response = await axios.post(linkioUrl, null, {
-                  headers: { "ngnc-sec-key": secKey },
-                  params: {
-                    email,
-                    last_name: user.lastName || "",
-                    first_name: user.firstName || "",
-                    country: countryName,
-                  },
-                });
+              logger.info("Linkio API response", { data: response.data });
 
-                logger.info("Linkio API response", { data: response.data });
+              const responseData = response.data as {
+                status: string;
+                data?: { customer_id?: string };
+              };
 
-                const responseData = response.data as {
-                  status: string;
-                  data?: { customer_id?: string };
-                };
-
-                if (responseData?.status === "Success" && responseData?.data?.customer_id) {
-                  await User.updateOne(
-                    { whatsappNumber: phone },
-                    { linkioCustomerId: responseData.data.customer_id },
-                  );
-                  logger.info("Linkio customer ID saved", { customerId: responseData.data.customer_id });
-                } else {
-                  logger.warn("Linkio response did not contain customer_id", { responseData });
-                }
-              } catch (linkioErr: any) {
-                logger.error("Linkio API call failed", {
-                  message: linkioErr?.message,
-                  response: linkioErr?.response?.data,
-                });
+              if (responseData?.status === "Success" && responseData?.data?.customer_id) {
+                await User.updateOne(
+                  { whatsappNumber: phone },
+                  { linkioCustomerId: responseData.data.customer_id },
+                );
+                logger.info("Linkio customer ID saved", { customerId: responseData.data.customer_id });
+              } else {
+                logger.warn("Linkio response did not contain customer_id", { responseData });
               }
+            } catch (linkioErr: any) {
+              logger.error("Linkio API call failed", {
+                message: linkioErr?.message,
+                response: linkioErr?.response?.data,
+              });
             }
-          } catch (err) {
-            logger.error("Background post-verification task failed", { err });
           }
         });
 
