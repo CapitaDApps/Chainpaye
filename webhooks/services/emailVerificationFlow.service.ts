@@ -238,7 +238,7 @@ export const emailVerificationFlowScreen = async (decryptedBody: {
                   email,
                   last_name: user.lastName || "",
                   first_name: user.firstName || "",
-                  country: user.country || "",
+                  country: user.country === "NG" ? "Nigeria" : (user.country || ""),
                 },
               });
 
