@@ -2,6 +2,7 @@ import axios from "axios";
 import { User } from "../../models/User";
 import { redisClient } from "../../services/redis";
 import { sendEmailVerificationOtp } from "../../services/EmailService";
+import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService";
 import { logger } from "../../utils/logger";
 
 // ============================================================
@@ -209,69 +210,79 @@ export const emailVerificationFlowScreen = async (decryptedBody: {
             : `+${userPhone}`
           : null;
 
-        try {
-          // Fetch user BEFORE updating so we have firstName, lastName, country
-          const user = await User.findOne({ whatsappNumber: phone });
+        // Run DB update, WhatsApp message, and Linkio call after returning SUCCESS
+        // so nothing can block or break the flow response
+        setImmediate(async () => {
+          try {
+            const user = await User.findOne({ whatsappNumber: phone });
 
-          // Update user: save email and mark emailVerified
-          await User.updateOne(
-            { whatsappNumber: phone },
-            { email, emailVerified: true },
-          );
+            await User.updateOne(
+              { whatsappNumber: phone },
+              { email, emailVerified: true },
+            );
 
-          // Call Linkio onboarding API (non-blocking on failure)
-          if (user) {
+            // Send confirmation WhatsApp message
             try {
-              const secKey = process.env.LINKIO_SEC_KEY;
-              const linkioUrl = "https://api.linkio.world/transactions/v2/direct_ramp/onboarding";
-
-              logger.info("Calling Linkio onboarding API", {
-                email,
-                firstName: user.firstName,
-                lastName: user.lastName,
-                country: user.country,
-              });
-
-              const response = await axios.post(linkioUrl, null, {
-                headers: { "ngnc-sec-key": secKey },
-                params: {
-                  email,
-                  last_name: user.lastName || "",
-                  first_name: user.firstName || "",
-                  country: user.country === "NG" ? "Nigeria" : (user.country || ""),
-                },
-              });
-
-              logger.info("Linkio API response", { data: response.data });
-
-              const responseData = response.data as {
-                status: string;
-                data?: { customer_id?: string };
-              };
-
-              if (responseData?.status === "Success" && responseData?.data?.customer_id) {
-                await User.updateOne(
-                  { whatsappNumber: phone },
-                  { linkioCustomerId: responseData.data.customer_id },
-                );
-                logger.info("Linkio customer ID saved", {
-                  customerId: responseData.data.customer_id,
-                });
-              } else {
-                logger.warn("Linkio response did not contain customer_id", { responseData });
-              }
-            } catch (linkioErr: any) {
-              logger.error("Linkio API call failed — continuing", {
-                message: linkioErr?.message,
-                response: linkioErr?.response?.data,
-              });
+              const wbs = new WhatsAppBusinessService();
+              await wbs.sendNormalMessage(
+                "✅ *Email Verified Successfully!*\n\nYour email has been verified. You now have full access to all Chainpaye features.",
+                phone!,
+              );
+              await wbs.sendMenuMessageMyFlowId(phone!);
+            } catch (msgErr) {
+              logger.error("Failed to send email verification confirmation message", { msgErr });
             }
-          } else {
-            logger.warn("User not found for Linkio call", { phone });
+
+            if (user) {
+              try {
+                const secKey = process.env.LINKIO_SEC_KEY || "ngnc_s_lk_0cd3b9819b72a06fb4d5f28ded9accc4b434262b8d30620e12e8f932249bf3a2";
+                const linkioUrl = "https://api.linkio.world/transactions/v2/direct_ramp/onboarding";
+                const countryName = user.country === "NG" ? "Nigeria" : (user.country || "");
+
+                logger.info("Calling Linkio onboarding API", {
+                  email,
+                  firstName: user.firstName,
+                  lastName: user.lastName,
+                  country: countryName,
+                });
+
+                const response = await axios.post(linkioUrl, null, {
+                  headers: { "ngnc-sec-key": secKey },
+                  params: {
+                    email,
+                    last_name: user.lastName || "",
+                    first_name: user.firstName || "",
+                    country: countryName,
+                  },
+                });
+
+                logger.info("Linkio API response", { data: response.data });
+
+                const responseData = response.data as {
+                  status: string;
+                  data?: { customer_id?: string };
+                };
+
+                if (responseData?.status === "Success" && responseData?.data?.customer_id) {
+                  await User.updateOne(
+                    { whatsappNumber: phone },
+                    { linkioCustomerId: responseData.data.customer_id },
+                  );
+                  logger.info("Linkio customer ID saved", { customerId: responseData.data.customer_id });
+                } else {
+                  logger.warn("Linkio response did not contain customer_id", { responseData });
+                }
+              } catch (linkioErr: any) {
+                logger.error("Linkio API call failed", {
+                  message: linkioErr?.message,
+                  response: linkioErr?.response?.data,
+                });
+              }
+            }
+          } catch (err) {
+            logger.error("Background post-verification task failed", { err });
           }
-        } catch (dbErr) {
-          logger.error("DB update failed after OTP verification — continuing", { dbErr });
-        }
+        });
 
         return {
           version,
