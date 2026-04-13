@@ -6,8 +6,11 @@ import "../config/init";
 import { userService, whatsappBusinessService } from "../services";
 import { redisClient } from "../services/redis";
 import { userRateLimiter, verifyWebhookSignature } from "./middleware";
+import { shouldGateEmailVerification } from "./emailVerificationGuard";
 import flowRouter from "./route/route";
 import { CustomReq } from "./types/request.type";
+
+export { shouldGateEmailVerification };
 
 export const app: Express = express();
 app.use(express.static("public"));
@@ -205,6 +208,18 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
               message,
               contact,
             });
+
+            // Guard: email verification gate
+            // Must run before any command routing for KYC-verified users
+            const phone = message.from.startsWith("+")
+              ? message.from
+              : `+${message.from}`;
+
+            if (user && shouldGateEmailVerification(user)) {
+              await whatsappBusinessService.sendEmailVerificationFlowById(phone);
+              return res.sendStatus(200);
+            }
+
             // User has completed registration
             // Handle text messages
             if (message.type == "text" && message.text.body) {
@@ -212,9 +227,6 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
 
               // Nigerian user without KYC - prompt for verification but still allow basic access
               // They can still use the app, but some features may be limited
-              const phone = message.from.startsWith("+")
-                ? message.from
-                : `+${message.from}`;
               await commandRouteHandler(phone, message.text.body);
             }
 
@@ -223,9 +235,6 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
               await replyingMessage(message.id);
               const caption: string = message.image.caption || "";
               const mediaId: string = message.image.id;
-              const phone = message.from.startsWith("+")
-                ? message.from
-                : `+${message.from}`;
 
               if (caption.trim()) {
                 // Lazy import to avoid circular deps
@@ -350,6 +359,16 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
                   await whatsappBusinessService.sendMenuMessageMyFlowId(
                     message.from,
                   );
+                }
+
+                // Handle email verification completion
+                if (responseJson.type === "email-verification-complete") {
+                  await replyingMessage(message.id);
+                  await whatsappBusinessService.sendNormalMessage(
+                    "✅ Email verified! You now have full access to all Chainpaye features.",
+                    message.from,
+                  );
+                  await whatsappBusinessService.sendMenuMessageMyFlowId(phone);
                 }
               }
             }

@@ -20,6 +20,7 @@ import { usdDepositFlowController } from "../controllers/usdDepositFlow.controll
 import { userSetup } from "../controllers/userSetup.controller";
 import { withdrawalFlow } from "../controllers/withdrawalFlow.controller";
 import { imagePaymentFlowController } from "../controllers/imagePaymentFlow.controller";
+import { emailVerificationFlowController } from "../controllers/emailVerificationFlow.controller";
 import { verifyCrossmintWebhook } from "../middleware";
 
 const router: Router = express.Router();
@@ -41,6 +42,7 @@ router.post("/usd-deposit", usdDepositFlowController);
 router.post("/bank-details", bankDetailsFlowController);
 router.post("/buy-crypto", onrampFlowController);
 router.post("/complete-transaction", onrampFlowController);
+router.post("/email-verification", emailVerificationFlowController);
 
 // Enhanced deposit notification webhooks with WorkflowController integration
 // Protected with Crossmint signature verification

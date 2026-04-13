@@ -26,6 +26,8 @@ export interface IUser extends Document {
   referralCode?: string; // Unique referral code for this user
   referredBy?: string; // User ID of the referrer
   referredAt?: Date; // Timestamp when user was referred
+  emailVerified: boolean;
+  linkioCustomerId?: string;
   createdAt: Date;
   updatedAt: Date;
   comparePin(candidatePin: string): Promise<boolean>;
@@ -129,6 +131,15 @@ const UserSchema: Schema = new Schema(
     },
     referredAt: {
       type: Date,
+    },
+    emailVerified: {
+      type: Boolean,
+      default: false,
+    },
+    linkioCustomerId: {
+      type: String,
+      trim: true,
+      sparse: true,
     },
   },
   {

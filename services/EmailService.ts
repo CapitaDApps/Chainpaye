@@ -44,3 +44,33 @@ export async function sendResetPinEmail(
     throw error;
   }
 }
+
+export async function sendEmailVerificationOtp(
+  toEmail: string,
+  otp: string,
+): Promise<void> {
+  const mailOptions = {
+    from: `"ChainPaye" <${process.env.SMTP_FROM}>`,
+    to: toEmail,
+    subject: "Your ChainPaye Email Verification Code",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #1a1a2e;">Email Verification</h2>
+        <p>Use the code below to verify your email address on ChainPaye.</p>
+        <div style="text-align:center;margin:24px 0;">
+          <span style="font-size:36px;font-weight:bold;letter-spacing:8px;color:#4f46e5;">${otp}</span>
+        </div>
+        <p>This code expires in <strong>10 minutes</strong>.</p>
+        <p style="color:#666;font-size:13px;">If you didn't request this, you can safely ignore this email.</p>
+      </div>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    logger.info("Email verification OTP sent", { to: toEmail });
+  } catch (error) {
+    logger.error("Failed to send email verification OTP", { error, to: toEmail });
+    throw error;
+  }
+}

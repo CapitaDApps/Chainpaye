@@ -804,6 +804,15 @@ USD: USD ${usdBalance.balance.toFixed(2)}`;
     );
   }
 
+  async sendEmailVerificationFlowById(to: string): Promise<void> {
+    const flowId = WHATSAPP_CONFIG.FLOW_IDS.EMAIL_VERIFICATION;
+    await this.sendTextOnlyFlowById(to, flowId, "EMAIL_INPUT", {
+      header: "Verify Your Email",
+      body: "Please verify your email address to access all Chainpaye features.",
+      cta: "Verify Email",
+    });
+  }
+
   async sendResetPinEmailCollectionFlow(to: string) {
     const flowId = WHATSAPP_CONFIG.FLOW_IDS.RESET_PIN;
 
