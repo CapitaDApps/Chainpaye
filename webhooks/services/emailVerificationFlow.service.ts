@@ -23,7 +23,7 @@ export const emailVerificationFlowScreen = async (decryptedBody: {
   action: string;
   flow_token: string;
 }) => {
-  const { screen, data, action, flow_token } = decryptedBody;
+  const { screen, data, action, flow_token, version } = decryptedBody;
 
   // Handle health check
   if (action === "ping") {
@@ -209,59 +209,72 @@ export const emailVerificationFlowScreen = async (decryptedBody: {
             : `+${userPhone}`
           : null;
 
-        // Update user: save email and mark emailVerified
-        await User.updateOne(
-          { whatsappNumber: phone },
-          { email, emailVerified: true },
-        );
+        try {
+          // Fetch user BEFORE updating so we have firstName, lastName, country
+          const user = await User.findOne({ whatsappNumber: phone });
 
-        // Fetch updated user for Linkio API call
-        const user = await User.findOne({ whatsappNumber: phone });
+          // Update user: save email and mark emailVerified
+          await User.updateOne(
+            { whatsappNumber: phone },
+            { email, emailVerified: true },
+          );
 
-        // Call Linkio onboarding API (non-blocking on failure)
-        if (user) {
-          try {
-            const linkioUrl =
-              "https://api.linkio.world/transactions/v2/direct_ramp/onboarding";
-            const response = await axios.post(
-              linkioUrl,
-              {},
-              {
-                headers: {
-                  "ngnc-sec-key": process.env.LINKIO_SEC_KEY || "",
-                },
+          // Call Linkio onboarding API (non-blocking on failure)
+          if (user) {
+            try {
+              const secKey = process.env.LINKIO_SEC_KEY;
+              const linkioUrl = "https://api.linkio.world/transactions/v2/direct_ramp/onboarding";
+
+              logger.info("Calling Linkio onboarding API", {
+                email,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                country: user.country,
+              });
+
+              const response = await axios.post(linkioUrl, null, {
+                headers: { "ngnc-sec-key": secKey },
                 params: {
-                  email: user.email || email,
+                  email,
                   last_name: user.lastName || "",
                   first_name: user.firstName || "",
                   country: user.country || "",
                 },
-              },
-            );
+              });
 
-            const responseData = response.data as {
-              status: string;
-              data?: { customer_id?: string };
-            };
+              logger.info("Linkio API response", { data: response.data });
 
-            if (
-              responseData?.status === "Success" &&
-              responseData?.data?.customer_id
-            ) {
-              await User.updateOne(
-                { whatsappNumber: phone },
-                { linkioCustomerId: responseData.data.customer_id },
-              );
-              logger.info("Linkio customer created", {
-                customerId: responseData.data.customer_id,
+              const responseData = response.data as {
+                status: string;
+                data?: { customer_id?: string };
+              };
+
+              if (responseData?.status === "Success" && responseData?.data?.customer_id) {
+                await User.updateOne(
+                  { whatsappNumber: phone },
+                  { linkioCustomerId: responseData.data.customer_id },
+                );
+                logger.info("Linkio customer ID saved", {
+                  customerId: responseData.data.customer_id,
+                });
+              } else {
+                logger.warn("Linkio response did not contain customer_id", { responseData });
+              }
+            } catch (linkioErr: any) {
+              logger.error("Linkio API call failed — continuing", {
+                message: linkioErr?.message,
+                response: linkioErr?.response?.data,
               });
             }
-          } catch (linkioErr) {
-            logger.error("Linkio API call failed — continuing", { linkioErr });
+          } else {
+            logger.warn("User not found for Linkio call", { phone });
           }
+        } catch (dbErr) {
+          logger.error("DB update failed after OTP verification — continuing", { dbErr });
         }
 
         return {
+          version,
           screen: "SUCCESS",
           data: {},
         };
