@@ -1,7 +1,7 @@
 # Referral System Review
 
 ## Overview
-The ChainPaye referral system is a comprehensive implementation that allows users to earn rewards by referring new users. The system tracks referral relationships, calculates earnings, and manages withdrawals.
+The ChainPaye referral system is a comprehensive implementation that allows users to earn rewards by referring new users. The system  tracks referral relationships, calculates earnings, and manages withdrawals.
 
 ## System Architecture
 
