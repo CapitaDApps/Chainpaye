@@ -804,12 +804,25 @@ USD: USD ${usdBalance.balance.toFixed(2)}`;
     );
   }
 
-  async sendEmailVerificationFlowById(to: string): Promise<void> {
-    const flowId = WHATSAPP_CONFIG.FLOW_IDS.EMAIL_VERIFICATION;
+  async sendEmailVerificationFlowById(to: string): Promise<void> {    const flowId = WHATSAPP_CONFIG.FLOW_IDS.EMAIL_VERIFICATION;
     await this.sendTextOnlyFlowById(to, flowId, "EMAIL_INPUT", {
       header: "Verify Your Email",
       body: "Please verify your email address to access all Chainpaye features.",
       cta: "Verify Email",
+    });
+  }
+
+  async sendAddBeneficiaryFlowById(to: string): Promise<void> {
+    const flowId = WHATSAPP_CONFIG.FLOW_IDS.ADD_BENEFICIARY;
+    if (!flowId) {
+      throw new Error(
+        "Missing WhatsApp add beneficiary flow ID. Set WHATSAPP_ADD_BENEFICIARY_FLOW_ID.",
+      );
+    }
+    await this.sendTextOnlyFlowById(to, flowId, "SELECT_COUNTRY", {
+      header: "Add Beneficiary",
+      body: "Add a bank account beneficiary for Ghana or Kenya payouts.",
+      cta: "Add Beneficiary",
     });
   }
 

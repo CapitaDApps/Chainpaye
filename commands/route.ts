@@ -13,6 +13,7 @@ import {
   handleTransfer,
   handleWithdrawal,
   handleUsdDeposit,
+  handleAddBeneficiary,
 } from "./handlers";
 import { handleStartCommand } from "./handlers/startCommandHandler";
 import { handleReferralCommand } from "./handlers/referralHandler";
@@ -394,6 +395,10 @@ export async function commandRouteHandler(from: string, message: string) {
 
     case "resetPin":
       await handleResetPin(from);
+      break;
+
+    case "addBeneficiary":
+      await handleAddBeneficiary(from);
       break;
 
     case "paymentLink":

@@ -1,0 +1,308 @@
+{
+  "version": "7.2",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "SELECT_COUNTRY": ["BANK_DETAILS"],
+    "BANK_DETAILS": ["CONFIRM"],
+    "CONFIRM": ["PIN"],
+    "PIN": ["SUCCESS"],
+    "SUCCESS": []
+  },
+  "screens": [
+    {
+      "id": "SELECT_COUNTRY",
+      "title": "Add Beneficiary",
+      "data": {
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "country_form",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Add Beneficiary"
+              },
+              {
+                "type": "TextBody",
+                "text": "Select the country of the bank account you want to add."
+              },
+              {
+                "type": "TextBody",
+                "text": "${data.error_message}",
+                "visible": "${data.has_error}"
+              },
+              {
+                "type": "Dropdown",
+                "label": "Country",
+                "name": "country",
+                "required": true,
+                "data-source": [
+                  { "id": "ghana", "title": "Ghana" },
+                  { "id": "kenya", "title": "Kenya" }
+                ]
+              },
+              {
+                "type": "Footer",
+                "label": "Next",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "country": "${form.country}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "BANK_DETAILS",
+      "title": "Bank Details",
+      "data": {
+        "country": {
+          "type": "string",
+          "__example__": "ghana"
+        },
+        "banks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" }
+            }
+          },
+          "__example__": []
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "bank_details_form",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Bank Details"
+              },
+              {
+                "type": "TextBody",
+                "text": "${data.error_message}",
+                "visible": "${data.has_error}"
+              },
+              {
+                "type": "Dropdown",
+                "label": "Bank",
+                "name": "bank_id",
+                "required": true,
+                "data-source": "${data.banks}"
+              },
+              {
+                "type": "TextInput",
+                "label": "Account Number",
+                "name": "account_number",
+                "required": true,
+                "input-type": "number"
+              },
+              {
+                "type": "TextInput",
+                "label": "Account Name",
+                "name": "account_name",
+                "required": true,
+                "input-type": "text"
+              },
+              {
+                "type": "Dropdown",
+                "label": "Destination",
+                "name": "destination",
+                "required": true,
+                "data-source": [
+                  { "id": "first_party", "title": "First Party (My Account)" },
+                  { "id": "third_party", "title": "Third Party (Someone Else)" }
+                ]
+              },
+              {
+                "type": "Footer",
+                "label": "Next",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "country": "${data.country}",
+                    "bank_id": "${form.bank_id}",
+                    "account_number": "${form.account_number}",
+                    "account_name": "${form.account_name}",
+                    "destination": "${form.destination}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "CONFIRM",
+      "title": "Confirm Details",
+      "data": {
+        "country": { "type": "string", "__example__": "ghana" },
+        "bank_name": { "type": "string", "__example__": "Absa Bank" },
+        "bank_code": { "type": "string", "__example__": "03" },
+        "account_number": { "type": "string", "__example__": "9039221043" },
+        "account_name": { "type": "string", "__example__": "John Doe" },
+        "destination": { "type": "string", "__example__": "first_party" },
+        "resolved_account_name": { "type": "string", "__example__": "JOHN DOE" }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Confirm Beneficiary"
+          },
+          {
+            "type": "TextSubheading",
+            "text": "Account Details"
+          },
+          {
+            "type": "TextBody",
+            "text": "Bank: ${data.bank_name}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Account Number: ${data.account_number}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Account Name: ${data.resolved_account_name}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Destination: ${data.destination}"
+          },
+          {
+            "type": "Footer",
+            "label": "Add Beneficiary",
+            "on-click-action": {
+              "name": "navigate",
+              "next": { "type": "screen", "name": "PIN" },
+              "payload": {
+                "country": "${data.country}",
+                "bank_name": "${data.bank_name}",
+                "bank_code": "${data.bank_code}",
+                "account_number": "${data.account_number}",
+                "account_name": "${data.resolved_account_name}",
+                "destination": "${data.destination}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "PIN",
+      "title": "Enter PIN",
+      "data": {
+        "country": { "type": "string", "__example__": "ghana" },
+        "bank_name": { "type": "string", "__example__": "Absa Bank" },
+        "bank_code": { "type": "string", "__example__": "03" },
+        "account_number": { "type": "string", "__example__": "9039221043" },
+        "account_name": { "type": "string", "__example__": "John Doe" },
+        "destination": { "type": "string", "__example__": "first_party" },
+        "error_message": { "type": "string", "__example__": "" },
+        "has_error": { "type": "boolean", "__example__": false }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "pin_form",
+            "children": [
+              {
+                "type": "TextBody",
+                "text": "${data.error_message}",
+                "visible": "${data.has_error}"
+              },
+              {
+                "type": "TextBody",
+                "text": "Enter your 4-digit PIN to confirm adding this beneficiary."
+              },
+              {
+                "type": "TextInput",
+                "label": "PIN",
+                "name": "pin",
+                "required": true,
+                "input-type": "password"
+              },
+              {
+                "type": "Footer",
+                "label": "Confirm",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "pin": "${form.pin}",
+                    "country": "${data.country}",
+                    "bank_name": "${data.bank_name}",
+                    "bank_code": "${data.bank_code}",
+                    "account_number": "${data.account_number}",
+                    "account_name": "${data.account_name}",
+                    "destination": "${data.destination}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUCCESS",
+      "title": "Beneficiary Added",
+      "terminal": true,
+      "success": true,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Beneficiary Added"
+          },
+          {
+            "type": "TextBody",
+            "text": "Your beneficiary has been saved successfully."
+          },
+          {
+            "type": "Footer",
+            "label": "Done",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {}
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
