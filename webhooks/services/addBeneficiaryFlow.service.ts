@@ -32,7 +32,7 @@ function getCurrency(country: string): string {
 
 async function fetchBanksFromPaystack(
   country: string,
-): Promise<{ id: string; title: string; code: string }[]> {
+): Promise<{ id: string; title: string }[]> {
   const countryName = country === "ghana" ? "ghana" : "kenya";
   const currency = getCurrency(country);
 
@@ -46,9 +46,8 @@ async function fetchBanksFromPaystack(
   return response.data.data
     .filter((b: any) => b.active && !b.is_deleted)
     .map((b: any) => ({
-      id: b.code,       // used as the dropdown id (bank code)
-      title: b.name,    // displayed to user
-      code: b.code,
+      id: b.code,
+      title: b.name,
     }));
 }
 
