@@ -887,6 +887,20 @@ const COMMANDS: Record<string, CommandConfig> = {
     description: "Add a bank account beneficiary for Ghana or Kenya payouts",
     priority: 5,
   },
+  viewBeneficiaries: {
+    triggers: [
+      "/beneficiaries",
+      "beneficiaries",
+      "my beneficiaries",
+      "view beneficiaries",
+      "show beneficiaries",
+      "list beneficiaries",
+      "saved accounts",
+      "my saved accounts",
+    ],
+    description: "View your saved beneficiary accounts",
+    priority: 5,
+  },
 };
 
 export { COMMANDS };
