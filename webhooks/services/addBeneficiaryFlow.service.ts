@@ -56,13 +56,22 @@ async function resolveAccount(
   bankCode: string,
 ): Promise<string> {
   const url = `${PAYSTACK_BASE}/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`;
-  const response = await axios.get(url, { headers: getPaystackHeaders() });
 
-  if (!response.data?.status || !response.data?.data?.account_name) {
-    throw new Error("Could not resolve account. Check account number and bank.");
+  try {
+    const response = await axios.get(url, { headers: getPaystackHeaders() });
+
+    if (!response.data?.status || !response.data?.data?.account_name) {
+      throw new Error("Could not resolve account. Check account number and bank.");
+    }
+
+    return response.data.data.account_name as string;
+  } catch (err: any) {
+    // Extract Paystack's error message if available
+    const paystackMessage = err.response?.data?.message;
+    throw new Error(
+      paystackMessage || "Could not verify account. Check the account number and selected bank.",
+    );
   }
-
-  return response.data.data.account_name as string;
 }
 
 async function addPayoutAccountToLinkio(params: {
