@@ -45,9 +45,10 @@ async function handleWallets(phoneNumber: string): Promise<void> {
       console.log(`Creating wallets for user ${user.userId}`);
       
       try {
-        const [evmWallet, solanaWallet] = await Promise.all([
+        const [evmWallet, solanaWallet, stellarWallet] = await Promise.all([
           crossmintService.getOrCreateWallet(user.userId, "evm"),
           crossmintService.getOrCreateWallet(user.userId, "solana"),
+          crossmintService.getOrCreateWallet(user.userId, "stellar"),
         ]);
         
         // Fetch the wallets again after creation
@@ -111,7 +112,7 @@ async function handleWallets(phoneNumber: string): Promise<void> {
     // Process Solana wallet
     const solanaWallet = wallets.find(w => w.chainType === "solana");
     if (solanaWallet) {
-      message += `� *Solana Wallet*\n`;
+      message += `🟣 *Solana Wallet*\n`;
       message += `\`${solanaWallet.address}\`\n\n`;
       
       try {
@@ -140,6 +141,38 @@ async function handleWallets(phoneNumber: string): Promise<void> {
       }
     }
 
+    // Process Stellar wallet
+    const stellarWallet = wallets.find(w => w.chainType === "stellar");
+    if (stellarWallet) {
+      message += `⭐ *Stellar Wallet*\n`;
+      message += `\`${stellarWallet.address}\`\n\n`;
+
+      try {
+        const balances = await crossmintService.getBalancesByChain(
+          user.userId,
+          "stellar",
+          ["usdc"],
+        );
+
+        console.log(`Stellar balances for ${user.userId}:`, balances);
+
+        if (balances.length > 0) {
+          message += `*Balances:*\n`;
+          for (const balance of balances) {
+            const amount = parseFloat(balance.amount).toFixed(2);
+            const tokenName = (balance.symbol || balance.token || "UNKNOWN").toUpperCase();
+            message += `• ${tokenName}: ${amount}\n`;
+          }
+        } else {
+          message += `*Balance:* 0.00\n`;
+        }
+        message += `\n`;
+      } catch (error) {
+        console.error("Error fetching Stellar balances:", error);
+        message += `*Balance:* 0.00\n\n`;
+      }
+    }
+
     message += `💡 *Tip:* Your wallet addresses will be sent in separate messages for easy copying.`;
 
     // Send main message with balances
@@ -160,17 +193,18 @@ async function handleWallets(phoneNumber: string): Promise<void> {
       );
     }
     
-    // Send Solana wallet messages
+    // Send Solana wallet address
     if (solanaWallet) {
-      // Message 4: Solana instruction
-      // await whatsappBusinessService.sendNormalMessage(
-      //   "You can copy the address below to send crypto into your Solana wallet:",
-      //   phoneNumber
-      // );
-      
-      // Message 5: Solana address only
       await whatsappBusinessService.sendNormalMessage(
         solanaWallet.address,
+        phoneNumber
+      );
+    }
+
+    // Send Stellar wallet address
+    if (stellarWallet) {
+      await whatsappBusinessService.sendNormalMessage(
+        stellarWallet.address,
         phoneNumber
       );
     }
