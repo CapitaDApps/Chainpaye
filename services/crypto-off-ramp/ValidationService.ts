@@ -20,7 +20,7 @@ export class ValidationService implements IValidationService {
     SupportedAsset,
     SupportedChain[]
   > = {
-    USDC: ["bep20", "base", "arbitrum", "solana"],
+    USDC: ["bep20", "base", "arbitrum", "solana", "stellar"],
     USDT: ["bep20", "solana"],
   };
 
@@ -431,6 +431,13 @@ export class ValidationService implements IValidationService {
         // Hedera addresses are in format 0.0.xxxxx
         if (!/^0\.0\.\d+$/.test(cleanAddress)) {
           errors.push("Invalid Hedera wallet address format");
+        }
+        break;
+
+      case "stellar":
+        // Stellar addresses start with G and are 56 characters (base32)
+        if (!/^G[A-Z2-7]{55}$/.test(cleanAddress)) {
+          errors.push("Invalid Stellar wallet address format");
         }
         break;
 

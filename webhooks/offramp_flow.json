@@ -79,6 +79,10 @@
                   {
                     "id": "ARBITRUM",
                     "title": "Arbitrum"
+                  },
+                  {
+                    "id": "STELLAR",
+                    "title": "Stellar (XLM)"
                   }
                 ]
               },
