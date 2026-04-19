@@ -40,29 +40,31 @@ async function handleWallets(phoneNumber: string): Promise<void> {
     // Get or create wallets for the user
     let wallets = await crossmintService.listWallets(user.userId);
 
-    // If no wallets exist, create them
-    if (!wallets || wallets.length === 0) {
-      console.log(`Creating wallets for user ${user.userId}`);
-      
+    // Always ensure all three wallets exist (handles existing users missing Stellar)
+    const hasStellar = wallets.some(w => w.chainType === "stellar");
+    const hasEvm = wallets.some(w => w.chainType === "evm");
+    const hasSolana = wallets.some(w => w.chainType === "solana");
+
+    if (!hasEvm || !hasSolana || !hasStellar) {
+      console.log(`Ensuring all wallets exist for user ${user.userId} (evm:${hasEvm}, solana:${hasSolana}, stellar:${hasStellar})`);
       try {
-        const [evmWallet, solanaWallet, stellarWallet] = await Promise.all([
-          crossmintService.getOrCreateWallet(user.userId, "evm"),
-          crossmintService.getOrCreateWallet(user.userId, "solana"),
-          crossmintService.getOrCreateWallet(user.userId, "stellar"),
+        await Promise.all([
+          !hasEvm ? crossmintService.getOrCreateWallet(user.userId, "evm") : Promise.resolve(),
+          !hasSolana ? crossmintService.getOrCreateWallet(user.userId, "solana") : Promise.resolve(),
+          !hasStellar ? crossmintService.getOrCreateWallet(user.userId, "stellar") : Promise.resolve(),
         ]);
-        
-        // Fetch the wallets again after creation
         wallets = await crossmintService.listWallets(user.userId);
       } catch (createError) {
-        console.error("Error creating wallets:", createError);
-        await whatsappBusinessService.sendNormalMessage(
-          "❌ *Error Creating Wallets*\n\nCouldn't create your wallets. Please try again later.",
-          phoneNumber,
-        );
-        return;
+        console.error("Error creating missing wallets:", createError);
+        if (wallets.length === 0) {
+          await whatsappBusinessService.sendNormalMessage(
+            "❌ *Error Creating Wallets*\n\nCouldn't create your wallets. Please try again later.",
+            phoneNumber,
+          );
+          return;
+        }
       }
     }
-
     console.log(`Found ${wallets.length} wallets for user ${user.userId}:`, 
       wallets.map(w => `${w.chainType}: ${w.address}`));
 

@@ -142,63 +142,62 @@ async function displayUserWallets(
 ): Promise<void> {
   try {
     // Get all user wallets
-    const wallets = await crossmintService.listWallets(userId);
+    let wallets = await crossmintService.listWallets(userId);
 
-    // If user has NO wallets, create wallets and send the offramp flow
-    if (!wallets || wallets.length === 0) {
+    // Ensure all three wallets exist — handles existing users who don't have Stellar yet
+    const hasStellar = wallets.some(w => w.chainType === "stellar");
+    const hasEvm = wallets.some(w => w.chainType === "evm");
+    const hasSolana = wallets.some(w => w.chainType === "solana");
+
+    if (!hasEvm || !hasSolana || !hasStellar) {
       console.log(
-        `[OFFRAMP] User ${userId} has no wallets - creating EVM, Solana, and Stellar wallets`,
+        `[OFFRAMP] User ${userId} missing wallets (evm:${hasEvm}, solana:${hasSolana}, stellar:${hasStellar}) - creating missing ones`,
       );
-
       try {
-        // Create EVM, Solana, and Stellar wallets for the user
         const [evmWallet, solanaWallet, stellarWallet] = await Promise.all([
-          crossmintService.getOrCreateWallet(userId, "evm"),
-          crossmintService.getOrCreateWallet(userId, "solana"),
-          crossmintService.getOrCreateWallet(userId, "stellar"),
+          !hasEvm ? crossmintService.getOrCreateWallet(userId, "evm") : Promise.resolve(null),
+          !hasSolana ? crossmintService.getOrCreateWallet(userId, "solana") : Promise.resolve(null),
+          !hasStellar ? crossmintService.getOrCreateWallet(userId, "stellar") : Promise.resolve(null),
         ]);
 
-        console.log(
-          `[OFFRAMP] Created wallets - EVM: ${evmWallet.address}, Solana: ${solanaWallet.address}, Stellar: ${stellarWallet.address}`,
-        );
+        // If this was a brand new user (no wallets at all), show creation message
+        if (!hasEvm && !hasSolana && !hasStellar && evmWallet && solanaWallet && stellarWallet) {
+          console.log(
+            `[OFFRAMP] Created wallets - EVM: ${evmWallet.address}, Solana: ${solanaWallet.address}, Stellar: ${stellarWallet.address}`,
+          );
 
-        // Send wallet info message to user
-        let walletMessage = `🆕 *Wallets Created Successfully!*\n\n`;
-        walletMessage += `We've created crypto wallets for you:\n\n`;
-        walletMessage += `🔷 *EVM Wallet* (for USDC/USDT on BSC, Base, Arbitrum, etc.)\n`;
-        walletMessage += `\`${evmWallet.address}\`\n\n`;
-        walletMessage += `🟣 *Solana Wallet* (for USDC on Solana)\n`;
-        walletMessage += `\`${solanaWallet.address}\`\n\n`;
-        walletMessage += `⭐ *Stellar Wallet* (for USDC on Stellar)\n`;
-        walletMessage += `\`${stellarWallet.address}\`\n\n`;
-        walletMessage += `💡 Deposit crypto to these addresses, then use the button below to sell and withdraw to your bank account.\n`;
-        walletMessage += `Type wallet in the chat to copy your wallets for crypto deposit.`;
+          let walletMessage = `🆕 *Wallets Created Successfully!*\n\n`;
+          walletMessage += `We've created crypto wallets for you:\n\n`;
+          walletMessage += `🔷 *EVM Wallet* (for USDC/USDT on BSC, Base, Arbitrum, etc.)\n`;
+          walletMessage += `\`${evmWallet.address}\`\n\n`;
+          walletMessage += `🟣 *Solana Wallet* (for USDC on Solana)\n`;
+          walletMessage += `\`${solanaWallet.address}\`\n\n`;
+          walletMessage += `⭐ *Stellar Wallet* (for USDC on Stellar)\n`;
+          walletMessage += `\`${stellarWallet.address}\`\n\n`;
+          walletMessage += `💡 Deposit crypto to these addresses, then use the button below to sell and withdraw to your bank account.\n`;
+          walletMessage += `Type wallet in the chat to copy your wallets for crypto deposit.`;
 
-        await whatsappBusinessService.sendNormalMessage(
-          walletMessage,
-          phoneNumber,
-        );
+          await whatsappBusinessService.sendNormalMessage(walletMessage, phoneNumber);
+          await whatsappBusinessService.sendCryptoDepositAddress(
+            phoneNumber,
+            "USDC",
+            "base" as NormalizedNetworkType,
+            evmWallet.address,
+          );
+          return;
+        }
 
-        // Send the offramp flow to the user
-        // TODO! Verify the flow ID is correct for your Meta Business Suite setup
-        await whatsappBusinessService.sendCryptoDepositAddress(
-          phoneNumber,
-          "USDC", // Default token
-          "base" as NormalizedNetworkType, // Default network
-          evmWallet.address, // Show EVM address by default
-        );
-
-        return;
+        // Refresh wallet list after creating missing ones
+        wallets = await crossmintService.listWallets(userId);
       } catch (createError) {
-        console.error(
-          `[OFFRAMP] Error creating wallets for user ${userId}:`,
-          createError,
-        );
-        await whatsappBusinessService.sendNormalMessage(
-          "❌ *Error Creating Wallets*\n\nCouldn't create your wallets. Please try again later or contact support.",
-          phoneNumber,
-        );
-        return;
+        console.error(`[OFFRAMP] Error creating missing wallets for user ${userId}:`, createError);
+        if (wallets.length === 0) {
+          await whatsappBusinessService.sendNormalMessage(
+            "❌ *Error Creating Wallets*\n\nCouldn't create your wallets. Please try again later or contact support.",
+            phoneNumber,
+          );
+          return;
+        }
       }
     }
 
