@@ -132,7 +132,7 @@ export async function handleOfframp(
 
 /**
  * Display user's existing wallets with balances using WorkflowController
- * If user has no wallets, create EVM and Solana wallets and send offramp flow
+ * If user has no wallets, create EVM, Solana, and Stellar wallets and send offramp flow
  * Requirements: 2.1, 2.2, 2.3, 2.4
  */
 async function displayUserWallets(
@@ -147,18 +147,19 @@ async function displayUserWallets(
     // If user has NO wallets, create wallets and send the offramp flow
     if (!wallets || wallets.length === 0) {
       console.log(
-        `[OFFRAMP] User ${userId} has no wallets - creating EVM and Solana wallets`,
+        `[OFFRAMP] User ${userId} has no wallets - creating EVM, Solana, and Stellar wallets`,
       );
 
       try {
-        // Create both EVM and Solana wallets for the user
-        const [evmWallet, solanaWallet] = await Promise.all([
+        // Create EVM, Solana, and Stellar wallets for the user
+        const [evmWallet, solanaWallet, stellarWallet] = await Promise.all([
           crossmintService.getOrCreateWallet(userId, "evm"),
           crossmintService.getOrCreateWallet(userId, "solana"),
+          crossmintService.getOrCreateWallet(userId, "stellar"),
         ]);
 
         console.log(
-          `[OFFRAMP] Created wallets - EVM: ${evmWallet.address}, Solana: ${solanaWallet.address}`,
+          `[OFFRAMP] Created wallets - EVM: ${evmWallet.address}, Solana: ${solanaWallet.address}, Stellar: ${stellarWallet.address}`,
         );
 
         // Send wallet info message to user
@@ -168,7 +169,9 @@ async function displayUserWallets(
         walletMessage += `\`${evmWallet.address}\`\n\n`;
         walletMessage += `🟣 *Solana Wallet* (for USDC on Solana)\n`;
         walletMessage += `\`${solanaWallet.address}\`\n\n`;
-        walletMessage += `� Deposit crypto to these addresses, then use the button below to sell and withdraw to your bank account.\n`;
+        walletMessage += `⭐ *Stellar Wallet* (for USDC on Stellar)\n`;
+        walletMessage += `\`${stellarWallet.address}\`\n\n`;
+        walletMessage += `💡 Deposit crypto to these addresses, then use the button below to sell and withdraw to your bank account.\n`;
         walletMessage += `Type wallet in the chat to copy your wallets for crypto deposit.`;
 
         await whatsappBusinessService.sendNormalMessage(
@@ -312,9 +315,10 @@ async function displayUserWallets(
         phoneNumber,
       );
 
-      // Send both EVM and Solana wallet addresses as separate messages (like in wallets command)
+      // Send EVM, Solana, and Stellar wallet addresses as separate messages
       const evmWallet = wallets.find(w => w.chainType === "evm");
       const solanaWallet = wallets.find(w => w.chainType === "solana");
+      const stellarWallet = wallets.find(w => w.chainType === "stellar");
       
       if (evmWallet) {
         await whatsappBusinessService.sendNormalMessage(
@@ -326,6 +330,13 @@ async function displayUserWallets(
       if (solanaWallet) {
         await whatsappBusinessService.sendNormalMessage(
           solanaWallet.address,
+          phoneNumber
+        );
+      }
+
+      if (stellarWallet) {
+        await whatsappBusinessService.sendNormalMessage(
+          stellarWallet.address,
           phoneNumber
         );
       }
@@ -396,9 +407,10 @@ async function displayUserWallets(
       phoneNumber,
     );
 
-    // Send both EVM and Solana wallet addresses as separate messages (like in wallets command)
+    // Send EVM, Solana, and Stellar wallet addresses as separate messages
     const evmWallet = wallets.find(w => w.chainType === "evm");
     const solanaWallet = wallets.find(w => w.chainType === "solana");
+    const stellarWallet = wallets.find(w => w.chainType === "stellar");
     
     if (evmWallet) {
       await whatsappBusinessService.sendNormalMessage(
@@ -410,6 +422,13 @@ async function displayUserWallets(
     if (solanaWallet) {
       await whatsappBusinessService.sendNormalMessage(
         solanaWallet.address,
+        phoneNumber
+      );
+    }
+
+    if (stellarWallet) {
+      await whatsappBusinessService.sendNormalMessage(
+        stellarWallet.address,
         phoneNumber
       );
     }
@@ -460,7 +479,7 @@ export async function handleAssetSelection(
 
     // Parse asset and chain from message
     const assetChainMatch = message.match(
-      /\b(usdc|usdt)\b.*?\b(bep20|base|arbitrum|solana|hedera|apechain|lisk)\b/i,
+      /\b(usdc|usdt)\b.*?\b(bep20|base|arbitrum|solana|stellar|hedera|apechain|lisk)\b/i,
     );
 
     if (!assetChainMatch) {
@@ -1956,6 +1975,7 @@ async function sendFallbackDepositNotification(
 function mapChainToWebhookFormat(chain: string): string {
   const chainMapping: Record<string, string> = {
     solana: "solana",
+    stellar: "stellar",
     bep20: "bsc",
     arbitrum: "arbitrum",
     base: "base",
@@ -2245,10 +2265,11 @@ function getSupportedAssetsMessage(): string {
   return (
     `💡 *Tell me what asset you want to deposit and its chain.*\n\n` +
     `*Supported Assets & Chains:*\n` +
-    `🔸 *USDC:* BSC (BEP20), Base, Arbitrum, Solana\n` +
+    `🔸 *USDC:* BSC (BEP20), Base, Arbitrum, Solana, Stellar\n` +
     `🔸 *USDT:* BSC (BEP20), Solana\n\n` +
     `*Examples:*\n` +
     `• "USDC on Solana"\n` +
+    `• "USDC on Stellar"\n` +
     `• "USDT BEP20"\n` +
     `• "USDC Base"`
   );
@@ -2262,6 +2283,8 @@ function parseNormalizedNetwork(chain: string): NormalizedNetworkType {
   switch (chainLower) {
     case "solana":
       return "Solana";
+    case "stellar":
+      return "Stellar";
     case "bep20":
     case "bsc":
       return "BNB Smart Chain";
