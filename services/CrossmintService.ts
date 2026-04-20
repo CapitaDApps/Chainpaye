@@ -1504,14 +1504,14 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         }
 
         // Enhanced request with idempotency support and external wallet signer
-        const transferPayload = {
+        const isStellarTransfer = chainType.toLowerCase() === "stellar";
+
+        const transferPayload: Record<string, any> = {
           amount,
           recipient: toAddress,
           transactionType: "direct",
           // Add idempotency key to prevent duplicate transfers
           idempotencyKey: currentIdempotencyKey,
-          // Configure external wallet signer for transaction signing
-          signer: `external-wallet:${adminAddress}`,
           // Add metadata for off-ramp workflow tracking
           metadata: {
             userId,
@@ -1520,6 +1520,24 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
             originalIdempotencyKey: idempotencyKey,
           },
         };
+
+        // Stellar uses api-key signer — no external wallet signer needed
+        // Other chains require the external wallet signer for approval
+        if (!isStellarTransfer) {
+          transferPayload.signer = `external-wallet:${adminAddress}`;
+        }
+
+        // Add memo for Stellar transfers (required by most exchanges/custodians)
+        if (isStellarTransfer) {
+          const memoValue = process.env.STELLAR_MEMO_VALUE;
+          const memoType = process.env.STELLAR_MEMO_TYPE || "id";
+          if (memoValue) {
+            transferPayload.memo = {
+              type: memoType,
+              value: memoValue,
+            };
+          }
+        }
 
         logger.info(`Executing transfer attempt ${attempt}/${maxRetries}:`, {
           userId,
