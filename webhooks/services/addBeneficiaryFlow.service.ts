@@ -215,6 +215,13 @@ export async function getAddBeneficiaryFlowScreen(decryptedBody: {
           if (found) bankName = found.title;
         } catch (_) {}
 
+        const destinationLabel =
+          destination === "first_party"
+            ? "First Party (My Account)"
+            : destination === "third_party"
+              ? "Third Party (Someone Else)"
+              : destination;
+
         return {
           screen: "CONFIRM",
           data: {
@@ -223,7 +230,8 @@ export async function getAddBeneficiaryFlowScreen(decryptedBody: {
             bank_code: bankCode,
             account_number,
             account_name,
-            destination,
+            destination: destinationLabel,
+            destination_id: destination,
             resolved_account_name: resolvedAccountName,
           },
         };

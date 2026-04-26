@@ -170,51 +170,58 @@
         "bank_code": { "type": "string", "__example__": "03" },
         "account_number": { "type": "string", "__example__": "9039221043" },
         "account_name": { "type": "string", "__example__": "John Doe" },
-        "destination": { "type": "string", "__example__": "first_party" },
+        "destination": { "type": "string", "__example__": "First Party (My Account)" },
+        "destination_id": { "type": "string", "__example__": "first_party" },
         "resolved_account_name": { "type": "string", "__example__": "JOHN DOE" }
       },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
           {
-            "type": "TextHeading",
-            "text": "Confirm Beneficiary"
-          },
-          {
-            "type": "TextSubheading",
-            "text": "Account Details"
-          },
-          {
-            "type": "TextBody",
-            "text": "Bank: ${data.bank_name}"
-          },
-          {
-            "type": "TextBody",
-            "text": "Account Number: ${data.account_number}"
-          },
-          {
-            "type": "TextBody",
-            "text": "Account Name: ${data.resolved_account_name}"
-          },
-          {
-            "type": "TextBody",
-            "text": "Destination: ${data.destination}"
-          },
-          {
-            "type": "Footer",
-            "label": "Add Beneficiary",
-            "on-click-action": {
-              "name": "navigate",
-              "next": { "type": "screen", "name": "PIN" },
-              "payload": {
-                "country": "${data.country}",
-                "bank_name": "${data.bank_name}",
-                "bank_code": "${data.bank_code}",
-                "account_number": "${data.account_number}",
-                "account_name": "${data.resolved_account_name}",
-                "destination": "${data.destination}"
+            "type": "Form",
+            "name": "confirm_form",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Confirm Beneficiary"
+              },
+              {
+                "type": "TextSubheading",
+                "text": "Account Details"
+              },
+              {
+                "type": "TextBody",
+                "text": "Bank: ${data.bank_name}"
+              },
+              {
+                "type": "TextBody",
+                "text": "Account Number: ${data.account_number}"
+              },
+              {
+                "type": "TextBody",
+                "text": "Account Name: ${data.resolved_account_name}"
+              },
+              {
+                "type": "TextBody",
+                "text": "Destination: ${data.destination}"
+              },
+              {
+                "type": "Footer",
+                "label": "Add Beneficiary",
+                "on-click-action": {
+                  "name": "navigate",
+                  "next": { "type": "screen", "name": "PIN" },
+                  "payload": {
+                    "country": "${data.country}",
+                    "bank_name": "${data.bank_name}",
+                    "bank_code": "${data.bank_code}",
+                    "account_number": "${data.account_number}",
+                    "account_name": "${data.resolved_account_name}",
+                    "destination": "${data.destination_id}"
+                  }
+                }
               }
-            }
+            ]
           }
         ]
       }
