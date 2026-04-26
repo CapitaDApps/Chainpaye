@@ -339,11 +339,51 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
       );
     }
 
+    // Check if there's prefilled data from image payment flow
+    const imagePaymentKey = `offramp:image_payment:${phone}`;
+    const imagePaymentData = await redisClient.get(imagePaymentKey);
+    
+    let responseData: any = { banks, hasPrefillData: false };
+
+    if (imagePaymentData) {
+      try {
+        const prefillData = JSON.parse(imagePaymentData);
+        
+        // Find matching bank from the list
+        let matchedBankCode = prefillData.bankCode;
+        const matchedBank = banks.find(
+          (b) =>
+            b.id === prefillData.bankCode ||
+            b.title.toLowerCase().includes(prefillData.bankName.toLowerCase()) ||
+            prefillData.bankName.toLowerCase().includes(b.title.toLowerCase())
+        );
+
+        if (matchedBank) {
+          matchedBankCode = matchedBank.id;
+        }
+
+        // Add prefilled data to response
+        responseData = {
+          banks,
+          prefilledAmount: prefillData.amount.toString(),
+          prefilledBankCode: matchedBankCode,
+          prefilledAccountNumber: prefillData.accountNumber,
+          hasPrefillData: true,
+        };
+
+        logger.info(`[OFFRAMP-INIT] Prefilled data from image payment: amount=${prefillData.amount}, bank=${matchedBankCode}, account=${prefillData.accountNumber}`);
+        
+        // Clean up the Redis key after reading to prevent reuse
+        await redisClient.del(imagePaymentKey);
+        logger.info(`[OFFRAMP-INIT] Cleaned up prefill data from Redis`);
+      } catch (error) {
+        logger.error("Error parsing image payment prefill data: " + (error as Error).message);
+      }
+    }
+
     return {
       screen: "OFFRAMP_DETAILS",
-      data: {
-        banks: banks,
-      },
+      data: responseData,
     };
   }
 
