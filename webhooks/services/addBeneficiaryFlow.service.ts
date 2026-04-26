@@ -54,7 +54,7 @@ async function fetchBanksFromPaystack(
 async function resolveAccount(
   accountNumber: string,
   bankCode: string,
-): Promise<string> {
+): Promise<{ accountName: string; bankName: string }> {
   const url = `${PAYSTACK_BASE}/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`;
 
   try {
@@ -64,9 +64,11 @@ async function resolveAccount(
       throw new Error("Could not resolve account. Check account number and bank.");
     }
 
-    return response.data.data.account_name as string;
+    return {
+      accountName: response.data.data.account_name as string,
+      bankName: "",
+    };
   } catch (err: any) {
-    // Extract Paystack's error message if available
     const paystackMessage = err.response?.data?.message;
     throw new Error(
       paystackMessage || "Could not verify account. Check the account number and selected bank.",
@@ -185,15 +187,18 @@ export async function getAddBeneficiaryFlowScreen(decryptedBody: {
           };
         }
 
-        // bank_id is the bank code (set as id in dropdown)
         const bankCode = bank_id;
+
+        // Fetch banks once — used for both name lookup and error fallback
+        const banks = await fetchBanksFromPaystack(country).catch(() => []);
+        const bankName = banks.find((b) => b.id === bankCode)?.title ?? bankCode;
 
         // Resolve account name via Paystack
         let resolvedAccountName: string;
         try {
-          resolvedAccountName = await resolveAccount(account_number, bankCode);
+          const resolved = await resolveAccount(account_number, bankCode);
+          resolvedAccountName = resolved.accountName;
         } catch (err: any) {
-          const banks = await fetchBanksFromPaystack(country).catch(() => []);
           return {
             screen: "BANK_DETAILS",
             data: {
@@ -206,14 +211,6 @@ export async function getAddBeneficiaryFlowScreen(decryptedBody: {
             },
           };
         }
-
-        // We need the bank name — re-fetch to find it by code
-        let bankName = bank_id;
-        try {
-          const banks = await fetchBanksFromPaystack(country);
-          const found = banks.find((b) => b.id === bankCode);
-          if (found) bankName = found.title;
-        } catch (_) {}
 
         const destinationLabel =
           destination === "first_party"
