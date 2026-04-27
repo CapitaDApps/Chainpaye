@@ -60,7 +60,7 @@
           },
           {
             "type": "TextBody",
-            "text": "₦${data.amount}"
+            "text": "`'₦'${data.amount}''`"
           },
           {
             "type": "Footer",
@@ -174,7 +174,7 @@
               },
               {
                 "type": "TextBody",
-                "text": "Enter your PIN to send ${data.amount} NGN to ${data.accountName} at ${data.bankName} via ${data.paymentMethod}."
+                "text": "`'Enter your PIN to send '${data.amount}' NGN to '${data.accountName}' at '${data.bankName}' via '${data.paymentMethod}'.'`"
               },
               {
                 "type": "TextInput",
@@ -182,7 +182,7 @@
                 "name": "pin",
                 "required": true,
                 "input-type": "password",
-                "helper-text": "4-6 digit security PIN"
+                "helper-text": "4 digit security PIN"
               },
               {
                 "type": "Footer",

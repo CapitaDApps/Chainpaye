@@ -367,11 +367,12 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           banks,
           prefilledAmount: prefillData.amount.toString(),
           prefilledBankCode: matchedBankCode,
+          prefilledBankName: matchedBank ? matchedBank.title : prefillData.bankName,
           prefilledAccountNumber: prefillData.accountNumber,
           hasPrefillData: true,
         };
 
-        logger.info(`[OFFRAMP-INIT] Prefilled data from image payment: amount=${prefillData.amount}, bank=${matchedBankCode}, account=${prefillData.accountNumber}`);
+        logger.info(`[OFFRAMP-INIT] Prefilled data from image payment: amount=${prefillData.amount}, bank=${matchedBank ? matchedBank.title : prefillData.bankName}, account=${prefillData.accountNumber}`);
         
         // Clean up the Redis key after reading to prevent reuse
         await redisClient.del(imagePaymentKey);

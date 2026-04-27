@@ -34,6 +34,10 @@
           "type": "string",
           "__example__": ""
         },
+        "prefilledBankName": {
+          "type": "string",
+          "__example__": ""
+        },
         "prefilledAccountNumber": {
           "type": "string",
           "__example__": ""
@@ -51,20 +55,50 @@
         "type": "SingleColumnLayout",
         "children": [
           {
-            "type": "TextHeading",
-            "text": "Withdraw to Bank"
-          },
-          {
             "type": "If",
             "condition": "${data.hasPrefillData}",
             "then": [
               {
+                "type": "TextHeading",
+                "text": "Payment from Image 📸"
+              },
+              {
                 "type": "TextBody",
-                "text": "💡 From image: ₦${data.prefilledAmount} to ${data.prefilledAccountNumber}"
+                "text": "Please enter these details from your image:"
+              },
+              {
+                "type": "TextSubheading",
+                "text": "Amount"
+              },
+              {
+                "type": "TextBody",
+                "text": "₦${data.prefilledAmount}"
+              },
+              {
+                "type": "TextSubheading",
+                "text": "Account Number"
+              },
+              {
+                "type": "TextBody",
+                "text": "${data.prefilledAccountNumber}"
+              },
+              {
+                "type": "TextSubheading",
+                "text": "Bank"
+              },
+              {
+                "type": "TextBody",
+                "text": "${data.prefilledBankName}"
               },
               {
                 "type": "TextCaption",
-                "text": "Please enter these values in the form below"
+                "text": "⚠️ Copy these values into the form below"
+              }
+            ],
+            "else": [
+              {
+                "type": "TextHeading",
+                "text": "Withdraw to Bank"
               }
             ]
           },
