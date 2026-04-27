@@ -137,23 +137,38 @@ export async function getPanAfricanOfframpFlowScreen(decryptedBody: {
           };
         }
 
-        // If NGN selected, close flow and user will be redirected to normal offramp
+        // If NGN selected, launch the regular DexPay offramp flow
         if (currency === "NGN") {
-          // Send a message to the user explaining they'll use the normal flow
           const user = await User.findOne({ whatsappNumber: phone });
           if (user) {
             const { whatsappBusinessService } = await import("../../services");
-            await whatsappBusinessService.sendNormalMessage(
-              "🇳🇬 *Nigerian Naira Selected*\n\nFor NGN transactions, please use our standard offramp flow.\n\nYou can access it by:\n• Typing your wallet details (e.g., 'USDC Base')\n• Or check your wallets by typing 'wallet'",
-              phone
+            
+            // Send a message before launching the flow
+            const message = `🇳🇬 *Nigerian Naira Selected*\n\n` +
+              `Launching NGN offramp flow...\n\n` +
+              `You can now spend your crypto and withdraw to your Nigerian bank account.`;
+
+            await whatsappBusinessService.sendNormalMessage(message, phone);
+
+            // Wait a moment for the message to be delivered
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Automatically trigger the offramp flow
+            await whatsappBusinessService.sendCryptoDepositAddress(
+              phone,
+              "USDC", // Default token
+              "base" as any, // Default network
+              "" // Empty address since we're just triggering the flow
             );
+
+            return { screen: "PROCESSING", data: {} };
           }
           
-          // Return terminal screen to close the flow
+          // User not found - return error
           return {
             screen: "SELECT_CURRENCY",
             data: {
-              error_message: "NGN transactions use a different flow. Please check your messages for instructions.",
+              error_message: "User not found. Please try again.",
               has_error: true,
             },
           };
