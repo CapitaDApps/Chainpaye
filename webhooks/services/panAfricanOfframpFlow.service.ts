@@ -137,15 +137,24 @@ export async function getPanAfricanOfframpFlowScreen(decryptedBody: {
           };
         }
 
-        // If NGN selected, redirect to normal offramp flow
+        // If NGN selected, close flow and user will be redirected to normal offramp
         if (currency === "NGN") {
-          // Return a special response to trigger normal offramp flow
+          // Send a message to the user explaining they'll use the normal flow
+          const user = await User.findOne({ whatsappNumber: phone });
+          if (user) {
+            const { whatsappBusinessService } = await import("../../services");
+            await whatsappBusinessService.sendNormalMessage(
+              "🇳🇬 *Nigerian Naira Selected*\n\nFor NGN transactions, please use our standard offramp flow.\n\nYou can access it by:\n• Typing your wallet details (e.g., 'USDC Base')\n• Or check your wallets by typing 'wallet'",
+              phone
+            );
+          }
+          
+          // Return terminal screen to close the flow
           return {
             screen: "SELECT_CURRENCY",
             data: {
-              error_message: "Please use the regular offramp flow for NGN transactions.",
+              error_message: "NGN transactions use a different flow. Please check your messages for instructions.",
               has_error: true,
-              redirect_to_normal_offramp: true,
             },
           };
         }
