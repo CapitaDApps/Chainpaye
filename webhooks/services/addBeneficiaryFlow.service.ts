@@ -21,7 +21,9 @@ function getLinkioHeaders() {
 async function fetchPaymentMethods(
   country: string,
 ): Promise<{ id: string; title: string }[]> {
-  const url = `https://api.linkio.world/transactions/v2/direct_ramp/payment_methods?country=${country}`;
+  // Convert country to currency code
+  const currency = getCurrency(country).toUpperCase();
+  const url = `https://api.linkio.world/transactions/v2/direct_ramp/payment_methods?currency=${currency}`;
 
   try {
     const response = await axios.get(url, { headers: getLinkioHeaders() });
