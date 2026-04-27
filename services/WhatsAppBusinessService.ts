@@ -686,7 +686,8 @@ What would you like to sell?`;
     const panAfricanOfframpFlowId = WHATSAPP_CONFIG.FLOW_IDS.PAN_AFRICAN_OFFRAMP;
     const panAfricanOfframpScreenId = "SELECT_CURRENCY";
 
-    await this.sendTextOnlyFlowWithDataById(
+    // Send flow starting at currency selection screen
+    await this.sendTextOnlyFlowById(
       to,
       panAfricanOfframpFlowId,
       panAfricanOfframpScreenId,
@@ -694,7 +695,6 @@ What would you like to sell?`;
         body: `Spend your crypto across Africa 🌍\nSelect your preferred currency`,
         cta: "Spend Crypto",
       },
-      {},
     );
   }
 
