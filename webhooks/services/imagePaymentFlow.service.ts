@@ -196,6 +196,20 @@ export async function getImagePaymentFlowScreen(decryptedBody: {
           3600 // 1 hour expiry
         );
 
+        // Send a message with the details BEFORE launching the flow
+        const detailsMessage = `📸 *Payment Details from Image*\n\n` +
+          `💰 *Amount:* ₦${amount}\n` +
+          `🏦 *Bank:* ${bankName}\n` +
+          `🔢 *Account:* ${accountNumber}\n` +
+          `👤 *Name:* ${accountName}\n\n` +
+          `⚠️ *Please enter these details in the form that will open next.*\n\n` +
+          `_Tip: Keep this message visible while filling the form_`;
+
+        await whatsappBusinessService.sendNormalMessage(detailsMessage, phone);
+
+        // Wait a moment for the message to be delivered
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
         // Automatically trigger the offramp flow
         // The sendCryptoDepositAddress method will handle fetching banks and launching the flow
         await whatsappBusinessService.sendCryptoDepositAddress(

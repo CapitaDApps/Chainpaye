@@ -63,36 +63,8 @@
                 "text": "Payment from Image 📸"
               },
               {
-                "type": "TextBody",
-                "text": "Please enter these details from your image:"
-              },
-              {
-                "type": "TextSubheading",
-                "text": "Amount"
-              },
-              {
-                "type": "TextBody",
-                "text": "₦${data.prefilledAmount}"
-              },
-              {
-                "type": "TextSubheading",
-                "text": "Account Number"
-              },
-              {
-                "type": "TextBody",
-                "text": "${data.prefilledAccountNumber}"
-              },
-              {
-                "type": "TextSubheading",
-                "text": "Bank"
-              },
-              {
-                "type": "TextBody",
-                "text": "${data.prefilledBankName}"
-              },
-              {
                 "type": "TextCaption",
-                "text": "⚠️ Copy these values into the form below"
+                "text": "Check the message above for the details to enter"
               }
             ],
             "else": [
