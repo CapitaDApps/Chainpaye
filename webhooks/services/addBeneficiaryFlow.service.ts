@@ -348,6 +348,20 @@ export async function getAddBeneficiaryFlowScreen(decryptedBody: {
             const paymentMethods = await fetchPaymentMethods(country).catch(() => []);
             const paymentMethodName = paymentMethods.find((pm) => pm.id === payment_method)?.title ?? payment_method;
 
+            // Provide user-friendly error messages
+            let errorMessage = "Could not verify account. Please check your details and try again.";
+            
+            if (isMobileMoney) {
+              errorMessage = "Could not verify mobile money account. Please check the phone number and selected provider.";
+            } else {
+              errorMessage = "Could not verify bank account. Please check the account number and selected bank.";
+            }
+
+            // If there's a specific error message from Paystack, use it
+            if (err.message && !err.message.includes("Could not")) {
+              errorMessage = err.message;
+            }
+
             return {
               screen: "BANK_DETAILS",
               data: {
@@ -357,9 +371,7 @@ export async function getAddBeneficiaryFlowScreen(decryptedBody: {
                 is_mobile_money: isMobileMoney,
                 is_bank_transfer: !isMobileMoney,
                 banks,
-                error_message:
-                  err.message ||
-                  "Could not verify account. Check the details and try again.",
+                error_message: errorMessage,
                 has_error: true,
               },
             };
