@@ -97,7 +97,7 @@ WHATSAPP_PAN_AFRICAN_OFFRAMP_FLOW_ID=your_production_flow_id
 WHATSAPP_STAGING_PAN_AFRICAN_OFFRAMP_FLOW_ID=your_staging_flow_id
 
 # Linkio API Key
-LINKIO_SEC_KEY=ngnc_s_lk_0cd3b9819b72a06fb4d5f28ded9accc4b434262b8d30620e12e8f932249bf3a2
+LINKIO_SEC_KEY=
 ```
 
 ### API Endpoints
@@ -133,7 +133,7 @@ Users must add beneficiaries using the "Add Beneficiary" flow before they can us
 ### Authentication
 All Linkio API requests require the `ngnc-sec-key` header:
 ```
-ngnc-sec-key: ngnc_s_lk_0cd3b9819b72a06fb4d5f28ded9accc4b434262b8d30620e12e8f932249bf3a2
+ngnc-sec-key: 
 ```
 
 ### Payment Methods
