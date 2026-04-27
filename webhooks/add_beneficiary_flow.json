@@ -2,7 +2,8 @@
   "version": "7.2",
   "data_api_version": "3.0",
   "routing_model": {
-    "SELECT_COUNTRY": ["BANK_DETAILS"],
+    "SELECT_COUNTRY": ["SELECT_PAYMENT_METHOD"],
+    "SELECT_PAYMENT_METHOD": ["BANK_DETAILS"],
     "BANK_DETAILS": ["CONFIRM"],
     "CONFIRM": ["PIN"],
     "PIN": ["SUCCESS"],
@@ -68,12 +69,95 @@
       }
     },
     {
+      "id": "SELECT_PAYMENT_METHOD",
+      "title": "Payment Method",
+      "data": {
+        "country": {
+          "type": "string",
+          "__example__": "ghana"
+        },
+        "payment_methods": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" }
+            }
+          },
+          "__example__": []
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "payment_method_form",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Select Payment Method"
+              },
+              {
+                "type": "TextBody",
+                "text": "${data.error_message}",
+                "visible": "${data.has_error}"
+              },
+              {
+                "type": "Dropdown",
+                "label": "Payment Method",
+                "name": "payment_method",
+                "required": true,
+                "data-source": "${data.payment_methods}"
+              },
+              {
+                "type": "Footer",
+                "label": "Next",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "country": "${data.country}",
+                    "payment_method": "${form.payment_method}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "id": "BANK_DETAILS",
       "title": "Bank Details",
       "data": {
         "country": {
           "type": "string",
           "__example__": "ghana"
+        },
+        "payment_method": {
+          "type": "string",
+          "__example__": "mtn_momo_gh"
+        },
+        "payment_method_name": {
+          "type": "string",
+          "__example__": "MTN Mobile Money"
+        },
+        "is_mobile_money": {
+          "type": "boolean",
+          "__example__": true
+        },
+        "is_bank_transfer": {
+          "type": "boolean",
+          "__example__": false
         },
         "banks": {
           "type": "array",
@@ -104,7 +188,11 @@
             "children": [
               {
                 "type": "TextHeading",
-                "text": "Bank Details"
+                "text": "Account Details"
+              },
+              {
+                "type": "TextBody",
+                "text": "Payment Method: ${data.payment_method_name}"
               },
               {
                 "type": "TextBody",
@@ -120,10 +208,19 @@
               },
               {
                 "type": "TextInput",
+                "label": "Mobile Money Phone Number",
+                "name": "phone_number",
+                "required": false,
+                "input-type": "phone",
+                "visible": "${data.is_mobile_money}"
+              },
+              {
+                "type": "TextInput",
                 "label": "Account Number",
                 "name": "account_number",
-                "required": true,
-                "input-type": "number"
+                "required": false,
+                "input-type": "number",
+                "visible": "${data.is_bank_transfer}"
               },
               {
                 "type": "TextInput",
@@ -149,6 +246,8 @@
                   "name": "data_exchange",
                   "payload": {
                     "country": "${data.country}",
+                    "payment_method": "${data.payment_method}",
+                    "phone_number": "${form.phone_number}",
                     "bank_id": "${form.bank_id}",
                     "account_number": "${form.account_number}",
                     "account_name": "${form.account_name}",
@@ -166,13 +265,18 @@
       "title": "Confirm Details",
       "data": {
         "country": { "type": "string", "__example__": "ghana" },
+        "payment_method": { "type": "string", "__example__": "mtn_momo_gh" },
+        "payment_method_name": { "type": "string", "__example__": "MTN Mobile Money" },
+        "phone_number": { "type": "string", "__example__": "+233123456789" },
         "bank_name": { "type": "string", "__example__": "Absa Bank" },
         "bank_code": { "type": "string", "__example__": "03" },
         "account_number": { "type": "string", "__example__": "9039221043" },
         "account_name": { "type": "string", "__example__": "John Doe" },
         "destination": { "type": "string", "__example__": "First Party (My Account)" },
         "destination_id": { "type": "string", "__example__": "first_party" },
-        "resolved_account_name": { "type": "string", "__example__": "JOHN DOE" }
+        "resolved_account_name": { "type": "string", "__example__": "JOHN DOE" },
+        "has_phone": { "type": "boolean", "__example__": false },
+        "has_account": { "type": "boolean", "__example__": true }
       },
       "layout": {
         "type": "SingleColumnLayout",
@@ -191,19 +295,30 @@
               },
               {
                 "type": "TextBody",
-                "text": "Bank: ${data.bank_name}"
+                "text": "`'Payment Method: '${data.payment_method_name}''`"
               },
               {
                 "type": "TextBody",
-                "text": "Account Number: ${data.account_number}"
+                "text": "`'Phone Number: '${data.phone_number}''`",
+                "visible": "${data.has_phone}"
               },
               {
                 "type": "TextBody",
-                "text": "Account Name: ${data.resolved_account_name}"
+                "text": "`'Bank: '${data.bank_name}''`",
+                "visible": "${data.has_account}"
               },
               {
                 "type": "TextBody",
-                "text": "Destination: ${data.destination}"
+                "text": "`'Account Number: '${data.account_number}''`",
+                "visible": "${data.has_account}"
+              },
+              {
+                "type": "TextBody",
+                "text": "`'Account Name: '${data.resolved_account_name}''`"
+              },
+              {
+                "type": "TextBody",
+                "text": "`'Destination: '${data.destination}''`"
               },
               {
                 "type": "Footer",
@@ -213,6 +328,8 @@
                   "next": { "type": "screen", "name": "PIN" },
                   "payload": {
                     "country": "${data.country}",
+                    "payment_method": "${data.payment_method}",
+                    "phone_number": "${data.phone_number}",
                     "bank_name": "${data.bank_name}",
                     "bank_code": "${data.bank_code}",
                     "account_number": "${data.account_number}",
@@ -231,6 +348,8 @@
       "title": "Enter PIN",
       "data": {
         "country": { "type": "string", "__example__": "ghana" },
+        "payment_method": { "type": "string", "__example__": "mtn_momo_gh" },
+        "phone_number": { "type": "string", "__example__": "+233123456789" },
         "bank_name": { "type": "string", "__example__": "Absa Bank" },
         "bank_code": { "type": "string", "__example__": "03" },
         "account_number": { "type": "string", "__example__": "9039221043" },
@@ -270,6 +389,8 @@
                   "payload": {
                     "pin": "${form.pin}",
                     "country": "${data.country}",
+                    "payment_method": "${data.payment_method}",
+                    "phone_number": "${data.phone_number}",
                     "bank_name": "${data.bank_name}",
                     "bank_code": "${data.bank_code}",
                     "account_number": "${data.account_number}",
