@@ -682,6 +682,22 @@ What would you like to sell?`;
     );
   }
 
+  async sendPanAfricanOfframpFlow(to: string) {
+    const panAfricanOfframpFlowId = WHATSAPP_CONFIG.FLOW_IDS.PAN_AFRICAN_OFFRAMP;
+    const panAfricanOfframpScreenId = "SELECT_CURRENCY";
+
+    await this.sendTextOnlyFlowWithDataById(
+      to,
+      panAfricanOfframpFlowId,
+      panAfricanOfframpScreenId,
+      {
+        body: `Spend your crypto across Africa 🌍\nSelect your preferred currency`,
+        cta: "Spend Crypto",
+      },
+      {},
+    );
+  }
+
   async sendMyAccountInfo(to: string) {
     const phone = to.startsWith("+") ? to : `+${to}`;
     const { user, wallet } = await userService.getUserToroWallet(phone);

@@ -22,6 +22,7 @@ import { withdrawalFlow } from "../controllers/withdrawalFlow.controller";
 import { imagePaymentFlowController } from "../controllers/imagePaymentFlow.controller";
 import { emailVerificationFlowController } from "../controllers/emailVerificationFlow.controller";
 import { addBeneficiaryFlowController } from "../controllers/addBeneficiaryFlow.controller";
+import { panAfricanOfframpFlowController } from "../controllers/panAfricanOfframpFlow.controller";
 import { verifyCrossmintWebhook } from "../middleware";
 
 const router: Router = express.Router();
@@ -45,6 +46,7 @@ router.post("/buy-crypto", onrampFlowController);
 router.post("/complete-transaction", onrampFlowController);
 router.post("/email-verification", emailVerificationFlowController);
 router.post("/add-beneficiary", addBeneficiaryFlowController);
+router.post("/pan-african-offramp", panAfricanOfframpFlowController);
 
 // Enhanced deposit notification webhooks with WorkflowController integration
 // Protected with Crossmint signature verification

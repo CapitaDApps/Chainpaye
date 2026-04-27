@@ -88,6 +88,12 @@ export async function handleOfframp(
       return;
     }
 
+    // Check if user typed "spend crypto" - show Pan African offramp flow
+    if (initialMessage && initialMessage.toLowerCase().trim() === "spend crypto") {
+      await whatsappBusinessService.sendPanAfricanOfframpFlow(phoneNumber);
+      return;
+    }
+
     // Store KYC status in Redis for use during transaction validation
     await redisClient.set(
       `offramp_kyc:${phoneNumber}`,
