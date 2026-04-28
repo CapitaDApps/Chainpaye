@@ -26,6 +26,26 @@
             { "id": "000013", "title": "GTBank" }
           ]
         },
+        "prefilledAmount": {
+          "type": "string",
+          "__example__": ""
+        },
+        "prefilledBankCode": {
+          "type": "string",
+          "__example__": ""
+        },
+        "prefilledBankName": {
+          "type": "string",
+          "__example__": ""
+        },
+        "prefilledAccountNumber": {
+          "type": "string",
+          "__example__": ""
+        },
+        "hasPrefillData": {
+          "type": "boolean",
+          "__example__": false
+        },
         "error_message": {
           "type": "string",
           "__example__": ""
@@ -35,8 +55,24 @@
         "type": "SingleColumnLayout",
         "children": [
           {
-            "type": "TextHeading",
-            "text": "Withdraw to Bank"
+            "type": "If",
+            "condition": "${data.hasPrefillData}",
+            "then": [
+              {
+                "type": "TextHeading",
+                "text": "Payment from Image 📸"
+              },
+              {
+                "type": "TextCaption",
+                "text": "Check the message above for the details to enter"
+              }
+            ],
+            "else": [
+              {
+                "type": "TextHeading",
+                "text": "Withdraw to Bank"
+              }
+            ]
           },
           {
             "type": "Form",
@@ -79,6 +115,10 @@
                   {
                     "id": "ARBITRUM",
                     "title": "Arbitrum"
+                  },
+                  {
+                    "id": "STELLAR",
+                    "title": "Stellar (XLM)"
                   }
                 ]
               },
@@ -100,10 +140,10 @@
               {
                 "type": "TextInput",
                 "name": "sell_amount",
-                "label": "Amount",
+                "label": "Amount (NGN)",
                 "required": true,
                 "input-type": "text",
-                "helper-text": "Min: ₦5,000 | Fee: $0.75 USD"
+                "helper-text": "Min: ₦5,000"
               },
               {
                 "type": "Footer",
@@ -170,7 +210,7 @@
         },
         "fee_info": {
           "type": "string",
-          "__example__": "Flat fee: $0.75 USD"
+          "__example__": "Flat fee: $0.30 USD"
         }
       },
       "layout": {
@@ -309,7 +349,7 @@
           },
           {
             "type": "TextBody",
-            "text": "`'Fee: $0.75 USD'`"
+            "text": "`'Fee: $0.30 USD'`"
           },
           {
             "type": "TextBody",
@@ -330,7 +370,7 @@
               {
                 "type": "TextInput",
                 "name": "pin",
-                "label": "4-6 Digit PIN",
+                "label": "4 Digit PIN",
                 "required": true,
                 "input-type": "password",
                 "min-chars": 4,

@@ -245,6 +245,7 @@ export class WorkflowController implements IWorkflowController {
           "base",
           "arbitrum",
           "solana",
+          "stellar",
           "hedera",
           "apechain",
           "lisk",

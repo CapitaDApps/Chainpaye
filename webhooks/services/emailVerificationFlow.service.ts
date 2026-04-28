@@ -1,3 +1,4 @@
+import axios from "axios";
 import { User } from "../../models/User";
 import { redisClient } from "../../services/redis";
 import { sendEmailVerificationOtp } from "../../services/EmailService";
@@ -166,7 +167,7 @@ export const emailVerificationFlowScreen = async (decryptedBody: {
 
       // --------------------------------------------------------
       // OTP_INPUT → SUCCESS
-      // Verify OTP and update user
+      // Verify OTP, update user, call Linkio API
       // --------------------------------------------------------
       case "OTP_INPUT": {
         const submittedOtp: string = (data.otp || "").trim();
@@ -209,7 +210,7 @@ export const emailVerificationFlowScreen = async (decryptedBody: {
             : `+${userPhone}`
           : null;
 
-        // Fetch user before updating
+        // Fetch user before updating (need firstName, lastName, country for Linkio)
         const user = await User.findOne({ whatsappNumber: phone });
 
         // CRITICAL: mark email as verified — must succeed before returning SUCCESS
@@ -218,7 +219,7 @@ export const emailVerificationFlowScreen = async (decryptedBody: {
           { email, emailVerified: true },
         );
 
-        // Non-critical: WhatsApp message — fire and forget
+        // Non-critical: WhatsApp message + Linkio call — fire and forget
         setImmediate(async () => {
           try {
             const wbs = new WhatsAppBusinessService();
@@ -229,6 +230,53 @@ export const emailVerificationFlowScreen = async (decryptedBody: {
             await wbs.sendMenuMessageMyFlowId(phone!);
           } catch (msgErr) {
             logger.error("Failed to send email verification confirmation message", { msgErr });
+          }
+
+          if (user) {
+            try {
+              const secKey = process.env.LINKIO_SEC_KEY || "ngnc_s_lk_0cd3b9819b72a06fb4d5f28ded9accc4b434262b8d30620e12e8f932249bf3a2";
+              const linkioUrl = "https://api.linkio.world/transactions/v2/direct_ramp/onboarding";
+              const countryName = user.country === "NG" ? "Nigeria" : (user.country || "");
+
+              logger.info("Calling Linkio onboarding API", {
+                email,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                country: countryName,
+              });
+
+              const response = await axios.post(linkioUrl, null, {
+                headers: { "ngnc-sec-key": secKey },
+                params: {
+                  email,
+                  last_name: user.lastName || "",
+                  first_name: user.firstName || "",
+                  country: countryName,
+                },
+              });
+
+              logger.info("Linkio API response", { data: response.data });
+
+              const responseData = response.data as {
+                status: string;
+                data?: { customer_id?: string };
+              };
+
+              if (responseData?.status === "Success" && responseData?.data?.customer_id) {
+                await User.updateOne(
+                  { whatsappNumber: phone },
+                  { linkioCustomerId: responseData.data.customer_id },
+                );
+                logger.info("Linkio customer ID saved", { customerId: responseData.data.customer_id });
+              } else {
+                logger.warn("Linkio response did not contain customer_id", { responseData });
+              }
+            } catch (linkioErr: any) {
+              logger.error("Linkio API call failed", {
+                message: linkioErr?.message,
+                response: linkioErr?.response?.data,
+              });
+            }
           }
         });
 

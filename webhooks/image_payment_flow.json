@@ -2,33 +2,35 @@
   "version": "7.2",
   "data_api_version": "3.0",
   "routing_model": {
-    "CONFIRM_BANK_DETAILS": ["SELECT_ASSET_CHAIN"],
-    "SELECT_ASSET_CHAIN": ["REVIEW_DETAILS"],
-    "REVIEW_DETAILS": ["AUTHORIZE_PAYMENT"],
-    "AUTHORIZE_PAYMENT": ["PROCESSING"],
+    "CONFIRM_DETAILS": ["SELECT_METHOD"],
+    "SELECT_METHOD": ["SELECT_CRYPTO", "PIN"],
+    "SELECT_CRYPTO": ["REVIEW_CRYPTO"],
+    "REVIEW_CRYPTO": ["PIN"],
+    "PIN": ["PROCESSING"],
     "PROCESSING": []
   },
   "screens": [
     {
-      "id": "CONFIRM_BANK_DETAILS",
-      "title": "Confirm Bank Details",
+      "id": "CONFIRM_DETAILS",
+      "title": "Confirm Payment",
       "data": {
         "accountNumber": { "type": "string", "__example__": "0123456789" },
         "accountName": { "type": "string", "__example__": "John Doe" },
         "bankName": { "type": "string", "__example__": "GTBank" },
         "bankCode": { "type": "string", "__example__": "000013" },
-        "amount": { "type": "string", "__example__": "5000" }
+        "amount": { "type": "string", "__example__": "5000" },
+        "currency": { "type": "string", "__example__": "NGN" }
       },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
           {
             "type": "TextHeading",
-            "text": "Detected Payment Details"
+            "text": "Review Payment Details"
           },
           {
             "type": "TextBody",
-            "text": "We extracted the following details from your image:"
+            "text": "We detected the following details from your image. Please confirm before proceeding."
           },
           {
             "type": "TextSubheading",
@@ -60,20 +62,21 @@
           },
           {
             "type": "TextBody",
-            "text": "₦${data.amount}"
+            "text": "`'₦'${data.amount}''`"
           },
           {
             "type": "Footer",
-            "label": "Confirm & Continue",
+            "label": "Continue",
             "on-click-action": {
-              "name": "data_exchange",
-              "next": { "type": "screen", "name": "SELECT_ASSET_CHAIN" },
+              "name": "navigate",
+              "next": { "type": "screen", "name": "SELECT_METHOD" },
               "payload": {
                 "accountNumber": "${data.accountNumber}",
                 "accountName": "${data.accountName}",
                 "bankName": "${data.bankName}",
                 "bankCode": "${data.bankCode}",
-                "amount": "${data.amount}"
+                "amount": "${data.amount}",
+                "currency": "${data.currency}"
               }
             }
           }
@@ -81,29 +84,93 @@
       }
     },
     {
-      "id": "SELECT_ASSET_CHAIN",
-      "title": "Select Asset & Network",
+      "id": "SELECT_METHOD",
+      "title": "Payment Method",
       "data": {
         "accountNumber": { "type": "string", "__example__": "0123456789" },
         "accountName": { "type": "string", "__example__": "John Doe" },
         "bankName": { "type": "string", "__example__": "GTBank" },
         "bankCode": { "type": "string", "__example__": "000013" },
-        "amount": { "type": "string", "__example__": "5000" }
+        "amount": { "type": "string", "__example__": "5000" },
+        "currency": { "type": "string", "__example__": "NGN" }
       },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
           {
             "type": "TextHeading",
-            "text": "Select Crypto to Sell"
+            "text": "Choose Payment Method"
+          },
+          {
+            "type": "TextBody",
+            "text": "How would you like to send ₦${data.amount} to ${data.accountName}?"
+          },
+          {
+            "type": "RadioButtonsGroup",
+            "name": "payment_method",
+            "label": "Payment Method",
+            "required": true,
+            "data-source": [
+              {
+                "id": "transfer",
+                "title": "Transfer (NGN Balance)",
+                "description": "Send from your NGN wallet balance"
+              },
+              {
+                "id": "offramp",
+                "title": "Pay with Crypto",
+                "description": "Convert crypto to NGN and send"
+              }
+            ]
+          },
+          {
+            "type": "Footer",
+            "label": "Continue",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "accountNumber": "${data.accountNumber}",
+                "accountName": "${data.accountName}",
+                "bankName": "${data.bankName}",
+                "bankCode": "${data.bankCode}",
+                "amount": "${data.amount}",
+                "currency": "${data.currency}",
+                "paymentMethod": "${form.payment_method}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "SELECT_CRYPTO",
+      "title": "Select Crypto",
+      "data": {
+        "accountNumber": { "type": "string", "__example__": "0123456789" },
+        "accountName": { "type": "string", "__example__": "John Doe" },
+        "bankName": { "type": "string", "__example__": "GTBank" },
+        "bankCode": { "type": "string", "__example__": "000013" },
+        "amount": { "type": "string", "__example__": "5000" },
+        "currency": { "type": "string", "__example__": "NGN" }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Select Asset & Network"
+          },
+          {
+            "type": "TextBody",
+            "text": "Choose the crypto asset and network to pay ₦${data.amount}"
           },
           {
             "type": "Form",
-            "name": "asset_form",
+            "name": "crypto_form",
             "children": [
               {
                 "type": "Dropdown",
-                "name": "currency",
+                "name": "asset",
                 "label": "Asset to Sell",
                 "required": true,
                 "data-source": [
@@ -138,12 +205,16 @@
                   {
                     "id": "ARBITRUM",
                     "title": "Arbitrum"
+                  },
+                  {
+                    "id": "STELLAR",
+                    "title": "Stellar (XLM)"
                   }
                 ]
               },
               {
                 "type": "Footer",
-                "label": "Get Quote",
+                "label": "Get Rate",
                 "on-click-action": {
                   "name": "data_exchange",
                   "payload": {
@@ -152,7 +223,8 @@
                     "bankName": "${data.bankName}",
                     "bankCode": "${data.bankCode}",
                     "amount": "${data.amount}",
-                    "currency": "${form.currency}",
+                    "currency": "${data.currency}",
+                    "asset": "${form.asset}",
                     "network": "${form.network}"
                   }
                 }
@@ -163,25 +235,38 @@
       }
     },
     {
-      "id": "REVIEW_DETAILS",
-      "title": "Review Payment",
+      "id": "REVIEW_CRYPTO",
+      "title": "Review Details",
       "data": {
         "accountNumber": { "type": "string", "__example__": "0123456789" },
         "accountName": { "type": "string", "__example__": "John Doe" },
         "bankName": { "type": "string", "__example__": "GTBank" },
         "bankCode": { "type": "string", "__example__": "000013" },
-        "amount": { "type": "string", "__example__": "5,000" },
-        "currency": { "type": "string", "__example__": "USDC" },
+        "amount": { "type": "string", "__example__": "5000" },
+        "currency": { "type": "string", "__example__": "NGN" },
+        "asset": { "type": "string", "__example__": "USDC" },
         "network": { "type": "string", "__example__": "BASE" },
-        "sellAmountUsd": { "type": "string", "__example__": "3.73" },
-        "rate": { "type": "string", "__example__": "₦1,460" }
+        "sellAmount": { "type": "string", "__example__": "3.73" },
+        "rate": { "type": "string", "__example__": "₦1,460" },
+        "error_message": { "type": "string", "__example__": "" },
+        "has_error": { "type": "boolean", "__example__": false }
       },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
           {
+            "type": "If",
+            "condition": "${data.has_error}",
+            "then": [
+              {
+                "type": "TextCaption",
+                "text": "${data.error_message}"
+              }
+            ]
+          },
+          {
             "type": "TextHeading",
-            "text": "Review Details"
+            "text": "Review Payment"
           },
           {
             "type": "TextBody",
@@ -201,7 +286,7 @@
           },
           {
             "type": "TextBody",
-            "text": "`'Selling: '${data.sellAmountUsd}' '${data.currency}''`"
+            "text": "`'Selling: '${data.sellAmount}' '${data.asset}''`"
           },
           {
             "type": "TextBody",
@@ -209,11 +294,11 @@
           },
           {
             "type": "TextBody",
-            "text": "`'Rate: 1 '${data.currency}' = '${data.rate}' (with spread)'`"
+            "text": "`'Rate: 1 '${data.asset}' = '${data.rate}' (with spread)'`"
           },
           {
             "type": "Footer",
-            "label": "Proceed to Payment",
+            "label": "Continue to PIN",
             "on-click-action": {
               "name": "data_exchange",
               "payload": {
@@ -223,8 +308,9 @@
                 "bankCode": "${data.bankCode}",
                 "amount": "${data.amount}",
                 "currency": "${data.currency}",
+                "asset": "${data.asset}",
                 "network": "${data.network}",
-                "sellAmountUsd": "${data.sellAmountUsd}",
+                "sellAmount": "${data.sellAmount}",
                 "rate": "${data.rate}"
               }
             }
@@ -233,18 +319,21 @@
       }
     },
     {
-      "id": "AUTHORIZE_PAYMENT",
-      "title": "Authorize Payment",
+      "id": "PIN",
+      "title": "Enter PIN",
       "data": {
         "accountNumber": { "type": "string", "__example__": "0123456789" },
         "accountName": { "type": "string", "__example__": "John Doe" },
         "bankName": { "type": "string", "__example__": "GTBank" },
         "bankCode": { "type": "string", "__example__": "000013" },
-        "amount": { "type": "string", "__example__": "5,000" },
-        "currency": { "type": "string", "__example__": "USDC" },
+        "amount": { "type": "string", "__example__": "5000" },
+        "currency": { "type": "string", "__example__": "NGN" },
+        "paymentMethod": { "type": "string", "__example__": "transfer" },
+        "asset": { "type": "string", "__example__": "USDC" },
         "network": { "type": "string", "__example__": "BASE" },
-        "sellAmountUsd": { "type": "string", "__example__": "3.73" },
-        "totalAmountUsd": { "type": "string", "__example__": "4.48" },
+        "sellAmount": { "type": "string", "__example__": "3.73" },
+        "rate": { "type": "string", "__example__": "₦1,460" },
+        "pinMessage": { "type": "string", "__example__": "Enter PIN to send ₦5000 to John Doe" },
         "error_message": { "type": "string", "__example__": "" },
         "has_error": { "type": "boolean", "__example__": false }
       },
@@ -252,59 +341,34 @@
         "type": "SingleColumnLayout",
         "children": [
           {
-            "type": "TextHeading",
-            "text": "Authorize Payment"
-          },
-          {
-            "type": "If",
-            "condition": "${data.has_error}",
-            "then": [
-              {
-                "type": "TextCaption",
-                "text": "${data.error_message}"
-              }
-            ]
-          },
-          {
-            "type": "TextBody",
-            "text": "`'To Receive: ₦'${data.amount}''`"
-          },
-          {
-            "type": "TextBody",
-            "text": "`'Selling: '${data.sellAmountUsd}' '${data.currency}''`"
-          },
-          {
-            "type": "TextBody",
-            "text": "`'Fee: $0.75 USD'`"
-          },
-          {
-            "type": "TextBody",
-            "text": "`'Total: '${data.totalAmountUsd}' '${data.currency}''`"
-          },
-          {
-            "type": "TextBody",
-            "text": "`'Network: '${data.network}''`"
-          },
-          {
-            "type": "TextBody",
-            "text": "Enter PIN to Confirm"
-          },
-          {
             "type": "Form",
             "name": "pin_form",
             "children": [
               {
+                "type": "If",
+                "condition": "${data.has_error}",
+                "then": [
+                  {
+                    "type": "TextCaption",
+                    "text": "${data.error_message}"
+                  }
+                ]
+              },
+              {
+                "type": "TextBody",
+                "text": "${data.pinMessage}"
+              },
+              {
                 "type": "TextInput",
+                "label": "PIN",
                 "name": "pin",
-                "label": "4-6 Digit PIN",
                 "required": true,
                 "input-type": "password",
-                "min-chars": 4,
-                "max-chars": 6
+                "helper-text": "4 digit security PIN"
               },
               {
                 "type": "Footer",
-                "label": "Sell & Withdraw",
+                "label": "Send Now",
                 "on-click-action": {
                   "name": "data_exchange",
                   "payload": {
@@ -315,9 +379,11 @@
                     "bankCode": "${data.bankCode}",
                     "amount": "${data.amount}",
                     "currency": "${data.currency}",
+                    "paymentMethod": "${data.paymentMethod}",
+                    "asset": "${data.asset}",
                     "network": "${data.network}",
-                    "sellAmountUsd": "${data.sellAmountUsd}",
-                    "totalAmountUsd": "${data.totalAmountUsd}"
+                    "sellAmount": "${data.sellAmount}",
+                    "rate": "${data.rate}"
                   }
                 }
               }
@@ -337,21 +403,18 @@
         "children": [
           {
             "type": "TextHeading",
-            "text": "Funds are underway! 🚀"
+            "text": "Payment Initiated 🚀"
           },
           {
             "type": "TextBody",
-            "text": "Your payment has been initiated. The funds usually hit the bank account in under 50 seconds."
+            "text": "Your payment is being processed. You will receive a confirmation message shortly."
           },
           {
             "type": "Footer",
             "label": "Done",
             "on-click-action": {
               "name": "complete",
-              "payload": {
-                "status": "payment_initiated",
-                "result": "success"
-              }
+              "payload": {}
             }
           }
         ]

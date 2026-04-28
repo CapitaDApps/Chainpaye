@@ -254,7 +254,6 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
                     message.from,
                   );
                 } else {
-                  // Send the image payment flow with extracted details
                   await whatsappBusinessService.sendImagePaymentConfirmFlow(phone, result);
                 }
               } else {

@@ -13,6 +13,8 @@ import {
   handleTransfer,
   handleWithdrawal,
   handleUsdDeposit,
+  handleAddBeneficiary,
+  handleViewBeneficiaries,
 } from "./handlers";
 import { handleStartCommand } from "./handlers/startCommandHandler";
 import { handleReferralCommand } from "./handlers/referralHandler";
@@ -38,28 +40,31 @@ async function handleWallets(phoneNumber: string): Promise<void> {
     // Get or create wallets for the user
     let wallets = await crossmintService.listWallets(user.userId);
 
-    // If no wallets exist, create them
-    if (!wallets || wallets.length === 0) {
-      console.log(`Creating wallets for user ${user.userId}`);
-      
+    // Always ensure all three wallets exist (handles existing users missing Stellar)
+    const hasStellar = wallets.some(w => w.chainType === "stellar");
+    const hasEvm = wallets.some(w => w.chainType === "evm");
+    const hasSolana = wallets.some(w => w.chainType === "solana");
+
+    if (!hasEvm || !hasSolana || !hasStellar) {
+      console.log(`Ensuring all wallets exist for user ${user.userId} (evm:${hasEvm}, solana:${hasSolana}, stellar:${hasStellar})`);
       try {
-        const [evmWallet, solanaWallet] = await Promise.all([
-          crossmintService.getOrCreateWallet(user.userId, "evm"),
-          crossmintService.getOrCreateWallet(user.userId, "solana"),
+        await Promise.all([
+          !hasEvm ? crossmintService.getOrCreateWallet(user.userId, "evm") : Promise.resolve(),
+          !hasSolana ? crossmintService.getOrCreateWallet(user.userId, "solana") : Promise.resolve(),
+          !hasStellar ? crossmintService.getOrCreateWallet(user.userId, "stellar") : Promise.resolve(),
         ]);
-        
-        // Fetch the wallets again after creation
         wallets = await crossmintService.listWallets(user.userId);
       } catch (createError) {
-        console.error("Error creating wallets:", createError);
-        await whatsappBusinessService.sendNormalMessage(
-          "❌ *Error Creating Wallets*\n\nCouldn't create your wallets. Please try again later.",
-          phoneNumber,
-        );
-        return;
+        console.error("Error creating missing wallets:", createError);
+        if (wallets.length === 0) {
+          await whatsappBusinessService.sendNormalMessage(
+            "❌ *Error Creating Wallets*\n\nCouldn't create your wallets. Please try again later.",
+            phoneNumber,
+          );
+          return;
+        }
       }
     }
-
     console.log(`Found ${wallets.length} wallets for user ${user.userId}:`, 
       wallets.map(w => `${w.chainType}: ${w.address}`));
 
@@ -109,7 +114,7 @@ async function handleWallets(phoneNumber: string): Promise<void> {
     // Process Solana wallet
     const solanaWallet = wallets.find(w => w.chainType === "solana");
     if (solanaWallet) {
-      message += `� *Solana Wallet*\n`;
+      message += `🟣 *Solana Wallet*\n`;
       message += `\`${solanaWallet.address}\`\n\n`;
       
       try {
@@ -138,6 +143,38 @@ async function handleWallets(phoneNumber: string): Promise<void> {
       }
     }
 
+    // Process Stellar wallet
+    const stellarWallet = wallets.find(w => w.chainType === "stellar");
+    if (stellarWallet) {
+      message += `⭐ *Stellar Wallet*\n`;
+      message += `\`${stellarWallet.address}\`\n\n`;
+
+      try {
+        const balances = await crossmintService.getBalancesByChain(
+          user.userId,
+          "stellar",
+          ["usdc"],
+        );
+
+        console.log(`Stellar balances for ${user.userId}:`, balances);
+
+        if (balances.length > 0) {
+          message += `*Balances:*\n`;
+          for (const balance of balances) {
+            const amount = parseFloat(balance.amount).toFixed(2);
+            const tokenName = (balance.symbol || balance.token || "UNKNOWN").toUpperCase();
+            message += `• ${tokenName}: ${amount}\n`;
+          }
+        } else {
+          message += `*Balance:* 0.00\n`;
+        }
+        message += `\n`;
+      } catch (error) {
+        console.error("Error fetching Stellar balances:", error);
+        message += `*Balance:* 0.00\n\n`;
+      }
+    }
+
     message += `💡 *Tip:* Your wallet addresses will be sent in separate messages for easy copying.`;
 
     // Send main message with balances
@@ -158,17 +195,18 @@ async function handleWallets(phoneNumber: string): Promise<void> {
       );
     }
     
-    // Send Solana wallet messages
+    // Send Solana wallet address
     if (solanaWallet) {
-      // Message 4: Solana instruction
-      // await whatsappBusinessService.sendNormalMessage(
-      //   "You can copy the address below to send crypto into your Solana wallet:",
-      //   phoneNumber
-      // );
-      
-      // Message 5: Solana address only
       await whatsappBusinessService.sendNormalMessage(
         solanaWallet.address,
+        phoneNumber
+      );
+    }
+
+    // Send Stellar wallet address
+    if (stellarWallet) {
+      await whatsappBusinessService.sendNormalMessage(
+        stellarWallet.address,
         phoneNumber
       );
     }
@@ -394,6 +432,14 @@ export async function commandRouteHandler(from: string, message: string) {
 
     case "resetPin":
       await handleResetPin(from);
+      break;
+
+    case "addBeneficiary":
+      await handleAddBeneficiary(from);
+      break;
+
+    case "viewBeneficiaries":
+      await handleViewBeneficiaries(from);
       break;
 
     case "paymentLink":
