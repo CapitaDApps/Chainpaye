@@ -1527,17 +1527,18 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
           transferPayload.signer = `external-wallet:${adminAddress}`;
         }
 
+        // NOTE: Memo commented out - switched to wallet that doesn't require memo ID
         // Add memo for Stellar transfers (required by most exchanges/custodians)
-        if (isStellarTransfer) {
-          const memoValue = process.env.STELLAR_MEMO_VALUE;
-          const memoType = process.env.STELLAR_MEMO_TYPE || "id";
-          if (memoValue) {
-            transferPayload.memo = {
-              type: memoType,
-              value: memoValue,
-            };
-          }
-        }
+        // if (isStellarTransfer) {
+        //   const memoValue = process.env.STELLAR_MEMO_VALUE;
+        //   const memoType = process.env.STELLAR_MEMO_TYPE || "id";
+        //   if (memoValue) {
+        //     transferPayload.memo = {
+        //       type: memoType,
+        //       value: memoValue,
+        //     };
+        //   }
+        // }
 
         logger.info(`Executing transfer attempt ${attempt}/${maxRetries}:`, {
           userId,
