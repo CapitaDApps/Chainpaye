@@ -27,6 +27,8 @@ export interface OfframpTransactionDetails {
   transactionReference: string;
   status?: "Successful" | "Pending" | "Failed";
   countryCode?: string; // IANA country code for local time formatting (e.g. "NG", "GB")
+  asset?: string; // Crypto asset (e.g., "USDC", "USDT")
+  chain?: string; // Blockchain network (e.g., "Stellar", "Base", "Solana")
 }
 
 /**

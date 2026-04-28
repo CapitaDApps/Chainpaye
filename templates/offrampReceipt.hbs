@@ -263,6 +263,20 @@
                     <span class="status-tag {{statusClass}}">{{status}}</span>
                 </div>
 
+                {{#if asset}}
+                <div class="detail-row">
+                    <span class="detail-label">Asset</span>
+                    <span class="detail-value highlight">{{asset}}</span>
+                </div>
+                {{/if}}
+
+                {{#if chain}}
+                <div class="detail-row">
+                    <span class="detail-label">Network</span>
+                    <span class="detail-value">{{chain}}</span>
+                </div>
+                {{/if}}
+
                 <div class="detail-row">
                     <span class="detail-label">Crypto Spent (USD)</span>
                     <span class="detail-value highlight">{{cryptoSpentUsd}}</span>

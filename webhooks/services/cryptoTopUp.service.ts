@@ -201,6 +201,8 @@ export async function processOfframpInBackground(
         transactionDate: new Date(),
         transactionReference: quoteId,
         status: "Successful",
+        asset: currency || "USDC", // Asset used (USDC/USDT)
+        chain: dexPayChain.charAt(0).toUpperCase() + dexPayChain.slice(1), // Capitalize chain name
         ...(userCountry?.code && { countryCode: userCountry.code }),
       });
       

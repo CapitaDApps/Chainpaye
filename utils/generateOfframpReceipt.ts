@@ -27,6 +27,8 @@ export interface OfframpReceiptData {
   dateTime: string; // Formatted date and time
   transactionReference: string; // Quote ID or transaction ID
   status: "Successful" | "Pending" | "Failed";
+  asset?: string; // Crypto asset (e.g., "USDC", "USDT")
+  chain?: string; // Blockchain network (e.g., "Stellar", "Base", "Solana")
 }
 
 // Map country codes to IANA timezone identifiers
