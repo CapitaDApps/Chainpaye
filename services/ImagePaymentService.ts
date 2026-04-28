@@ -114,6 +114,73 @@ Do not include any explanation, markdown, or extra text. Just the JSON.`,
   }
 
   /**
+   * Extract bank details from image without amount (for when user sends image without caption)
+   * Returns bank details that can be stored temporarily until user provides amount
+   */
+  async extractBankDetailsFromImage(
+    mediaId: string,
+  ): Promise<Omit<ExtractedPaymentDetails, "amount"> | { error: string }> {
+    // 1. Download image
+    let base64DataUrl: string;
+    try {
+      base64DataUrl = await this.downloadWhatsAppMedia(mediaId);
+    } catch (err) {
+      console.error("Error downloading WhatsApp media:", err);
+      return { error: "Could not download the image. Please try again." };
+    }
+
+    // 2. Extract details via OpenAI Vision
+    const extracted = await this.extractDetailsFromImage(base64DataUrl);
+
+    if (!extracted.accountNumber) {
+      return { error: "Could not detect an account number in the image. Please check the image is clear and try again." };
+    }
+    if (!extracted.bankName) {
+      return { error: "Could not detect a bank name in the image. Please check the image is clear and try again." };
+    }
+
+    // 3. Find the bank code from Toronet bank list
+    const banks = await this.toronetService.getBankListNGN();
+    const matchedBank = banks.find((b) =>
+      b.title.toLowerCase().includes(extracted.bankName!.toLowerCase()) ||
+      extracted.bankName!.toLowerCase().includes(b.title.toLowerCase()),
+    );
+
+    if (!matchedBank) {
+      return {
+        error: `Detected bank "${extracted.bankName}" is not supported. Please use the manual withdrawal option.`,
+      };
+    }
+
+    // 4. Resolve account name via Toronet
+    let accountName: string;
+    try {
+      accountName = await this.toronetService.resolveBankAccountNameNGN(
+        extracted.accountNumber,
+        matchedBank.id,
+      );
+    } catch (err) {
+      console.error("Error resolving account name:", err);
+      return {
+        error: `Could not verify account number ${extracted.accountNumber} at ${matchedBank.title}. Please check the details and try again.`,
+      };
+    }
+
+    if (!accountName) {
+      return {
+        error: `Account number ${extracted.accountNumber} not found at ${matchedBank.title}.`,
+      };
+    }
+
+    return {
+      accountNumber: extracted.accountNumber,
+      bankName: matchedBank.title,
+      bankCode: matchedBank.id,
+      accountName,
+    };
+  }
+
+  /**
    * Main entry point.
    * Downloads the image, extracts details via Vision, resolves account name,
    * and returns the full ExtractedPaymentDetails ready for the confirmation flow.

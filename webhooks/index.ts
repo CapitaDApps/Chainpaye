@@ -225,9 +225,46 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
             if (message.type == "text" && message.text.body) {
               await replyingMessage(message.id);
 
-              // Nigerian user without KYC - prompt for verification but still allow basic access
-              // They can still use the app, but some features may be limited
-              await commandRouteHandler(phone, message.text.body);
+              // Check if user has pending image payment (sent image without caption)
+              const pendingImagePayment = await redisClient.get(`image_payment_pending:${phone}`);
+              
+              if (pendingImagePayment) {
+                // User previously sent an image without caption, now they're providing the amount
+                const { ImagePaymentService } = await import("../services/ImagePaymentService");
+                const imagePaymentService = new ImagePaymentService();
+                
+                const bankDetails = JSON.parse(pendingImagePayment);
+                const caption = message.text.body;
+                
+                // Try to parse amount from their message
+                const amount = imagePaymentService.parseAmountFromCaption(caption);
+                
+                if (amount) {
+                  // Clear the pending payment
+                  await redisClient.del(`image_payment_pending:${phone}`);
+                  
+                  // Combine bank details with amount and launch flow
+                  const result = {
+                    ...bankDetails,
+                    amount,
+                  };
+                  
+                  await whatsappBusinessService.sendImagePaymentConfirmFlow(phone, result);
+                } else {
+                  // Amount not found, ask again
+                  await whatsappBusinessService.sendNormalMessage(
+                    "❌ Could not find an amount in your message.\n\n" +
+                    "💬 Please reply with the amount you want to send.\n" +
+                    "Example: *send 5000* or just *5000*",
+                    message.from,
+                  );
+                }
+              } else {
+                // Normal text message - route to command handler
+                // Nigerian user without KYC - prompt for verification but still allow basic access
+                // They can still use the app, but some features may be limited
+                await commandRouteHandler(phone, message.text.body);
+              }
             }
 
             // Handle image messages with a caption (image payment feature)
@@ -257,10 +294,42 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
                   await whatsappBusinessService.sendImagePaymentConfirmFlow(phone, result);
                 }
               } else {
+                // No caption - extract bank details and wait for amount
+                const { ImagePaymentService } = await import("../services/ImagePaymentService");
+                const imagePaymentService = new ImagePaymentService();
+
                 await whatsappBusinessService.sendNormalMessage(
-                  "📸 To pay from an image, add a caption with the amount.\nExample: *send 5000*",
+                  "🔍 Scanning your image for payment details...",
                   message.from,
                 );
+
+                // Extract bank details without amount
+                const extractResult = await imagePaymentService.extractBankDetailsFromImage(mediaId);
+
+                if ("error" in extractResult) {
+                  await whatsappBusinessService.sendNormalMessage(
+                    `❌ ${extractResult.error}`,
+                    message.from,
+                  );
+                } else {
+                  // Store bank details in Redis temporarily (30 minutes)
+                  await redisClient.set(
+                    `image_payment_pending:${phone}`,
+                    JSON.stringify(extractResult),
+                    "EX",
+                    1800
+                  );
+
+                  await whatsappBusinessService.sendNormalMessage(
+                    `✅ *Bank Details Detected*\n\n` +
+                    `🏦 *Bank:* ${extractResult.bankName}\n` +
+                    `🔢 *Account:* ${extractResult.accountNumber}\n` +
+                    `👤 *Name:* ${extractResult.accountName}\n\n` +
+                    `💬 *Reply with the amount you want to send*\n` +
+                    `Example: *send 5000* or just *5000*`,
+                    message.from,
+                  );
+                }
               }
             }
 
