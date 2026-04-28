@@ -1193,11 +1193,16 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           // Generate a unique idempotency key for this transfer (includes timestamp for uniqueness)
           const transferIdempotencyKey = `offramp-transfer-${user.userId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
+          // Round amount to appropriate decimal places based on chain
+          // Stellar USDC supports max 7 decimals, others typically support 6
+          const decimals = isStellar ? 7 : 6;
+          const roundedAmount = parseFloat(totalCryptoRequired.toFixed(decimals));
+
           const transferResult = await crossmintService.transferTokens({
             walletAddress: wallet.address,
             token: `${crossmintChain}:${normalizedAsset.toLowerCase()}`,
             recipient: receivingAddress,
-            amount: totalCryptoRequired.toString(),
+            amount: roundedAmount.toString(),
             idempotencyKey: transferIdempotencyKey,
           });
 

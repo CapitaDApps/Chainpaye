@@ -508,12 +508,17 @@ export async function getImagePaymentFlowScreen(decryptedBody: {
           // Generate unique idempotency key for transfer
           const transferIdempotencyKey = `image-offramp-${user.userId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
+          // Round amount to appropriate decimal places based on chain
+          // Stellar USDC supports max 7 decimals, others typically support more
+          const decimals = isStellar ? 7 : 6;
+          const roundedAmount = parseFloat(totalCryptoRequired.toFixed(decimals));
+
           // Transfer crypto to main wallet
           const transferResult = await crossmintService.transferTokens({
             walletAddress: wallet.address,
             token: `${crossmintChain}:${normalizedAsset.toLowerCase()}`,
             recipient: receivingAddress,
-            amount: totalCryptoRequired.toString(),
+            amount: roundedAmount.toString(),
             idempotencyKey: transferIdempotencyKey,
           });
 
