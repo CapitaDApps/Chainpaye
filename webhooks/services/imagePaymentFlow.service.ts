@@ -113,6 +113,7 @@ export async function getImagePaymentFlowScreen(decryptedBody: {
           isSupportedCombination = true;
         }
       } else if (normalizedAsset === "USDT") {
+        // USDT is NOT supported on Stellar
         if (["sol", "bsc", "bep20", "arbitrum"].includes(chainKey)) {
           isSupportedCombination = true;
         }
@@ -123,7 +124,7 @@ export async function getImagePaymentFlowScreen(decryptedBody: {
           screen: "SELECT_CRYPTO",
           data: {
             ...data,
-            error_message: `${normalizedAsset} is not supported on ${network}. Please select a valid combination.`,
+            error_message: `${normalizedAsset} is not supported on ${network}. Stellar only supports USDC. Other networks support USDC/USDT.`,
             has_error: true,
           },
         };
@@ -141,13 +142,29 @@ export async function getImagePaymentFlowScreen(decryptedBody: {
       };
 
       const dexPayChain = chainMapping[chainKey];
+      
+      if (!dexPayChain) {
+        return {
+          screen: "SELECT_CRYPTO",
+          data: {
+            ...data,
+            error_message: `Unsupported network: ${network}. Please select a valid network.`,
+            has_error: true,
+          },
+        };
+      }
+
+      // For Stellar: rate fetch uses USDT on BSC since that's what DexPay will quote
+      const isStellar = dexPayChain === "stellar";
+      const rateQueryAsset = isStellar ? "USDT" : (asset || "USDC");
+      const rateQueryChain = isStellar ? "bep20" : dexPayChain;
 
       // Get exchange rate from DexPay
       const dexPayService = new (await import("../../services/DexPayService")).DexPayService();
       
       try {
         const ngnAmount = parseFloat(amount);
-        const rateData = await dexPayService.getCurrentRates(asset, dexPayChain, ngnAmount);
+        const rateData = await dexPayService.getCurrentRates(rateQueryAsset, rateQueryChain, ngnAmount);
         
         if (!rateData || !rateData.rate || rateData.rate <= 0) {
           return {
@@ -406,9 +423,18 @@ export async function getImagePaymentFlowScreen(decryptedBody: {
           const crossmintChain = normalizedChain.crossmint;
           const normalizedAsset = asset.toUpperCase();
 
+          // For Stellar: USDC is received on Stellar, but DexPay quote uses USDT on BSC
+          const isStellar = crossmintChain === "stellar";
+          const dexPayQuoteChain = isStellar ? "bep20" : dexPayChain;
+          const dexPayQuoteAsset = isStellar ? "USDT" : normalizedAsset;
+
           // Get current exchange rate
           const ngnAmount = parseFloat(amount);
-          const rateData = await dexPayService.getCurrentRates(asset, dexPayChain, ngnAmount);
+          const rateData = await dexPayService.getCurrentRates(
+            isStellar ? dexPayQuoteAsset : (asset || "USDC"),
+            dexPayQuoteChain,
+            ngnAmount
+          );
           const nairaRate = rateData.rate;
 
           if (!nairaRate || nairaRate <= 0) {
@@ -509,13 +535,13 @@ export async function getImagePaymentFlowScreen(decryptedBody: {
             user.userId,
             phone,
             ngnAmount,
-            normalizedAsset,
-            dexPayChain,
+            dexPayQuoteAsset, // Use USDT for Stellar, otherwise use selected asset
+            dexPayQuoteChain, // Use bep20 for Stellar, otherwise use selected chain
             bankCode,
             accountName,
             accountNumber,
             receivingAddress,
-            asset,
+            asset, // Original asset for display
             bankName,
             financials.totalInUsd,
             dexPayService,

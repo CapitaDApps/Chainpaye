@@ -96,7 +96,9 @@ const usdAmount = ngnAmount / spreadRate;
 
 ### Supported Combinations
 - **USDC**: BEP20, SOL, BASE, ARBITRUM, STELLAR
-- **USDT**: BEP20, SOL, ARBITRUM
+- **USDT**: BEP20, SOL, ARBITRUM (NOT Stellar)
+
+**Important:** Stellar only supports USDC, not USDT.
 
 ### Chain Mapping
 ```typescript
