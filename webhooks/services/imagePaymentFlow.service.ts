@@ -545,7 +545,6 @@ export async function getImagePaymentFlowScreen(decryptedBody: {
             bankCode,
             accountName,
             accountNumber,
-            receivingAddress,
             asset, // Original asset for display
             bankName,
             financials.totalInUsd,

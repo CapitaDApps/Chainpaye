@@ -62,7 +62,6 @@ export async function processOfframpInBackground(
   bank_code: string,
   finalRecipientName: string,
   account_number: string,
-  receivingAddress: string,
   currency: string,
   bank_name: string,
   totalInUsd: number,
@@ -88,7 +87,8 @@ export async function processOfframpInBackground(
       bankCode: bank_code,
       accountName: finalRecipientName || "Beneficiary",
       accountNumber: account_number,
-      receivingAddress: receivingAddress,
+      // Note: receivingAddress not needed for SELL transactions (offramp)
+      // DexPay sends fiat to bank account, not crypto to wallet
     };
 
     console.log("Quote Request:");
