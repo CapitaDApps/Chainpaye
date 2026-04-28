@@ -642,12 +642,15 @@ export class DexPayService implements IBankingManager, IDexPayService {
    */
   getReceivingAddress(chain?: string): string {
     // ChainPaye DexPay wallet addresses for different networks
-    const chainPayeWallets: Record<string, string> = {
+    const chainPayeWallets = {
       solana: "3947D9DUMD4Rj4ssjUy17qVXiKN4zCdUe2vEDpHvfdCk",
       bep20: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f",
       arbitrum: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f",
       base: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f",
-      stellar: process.env.STELLAR_RECEIVING_ADDRESS || "",
+      // Add more chains as needed
+      // hedera: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f", // Assuming EVM-compatible
+      // apechain: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f", // Assuming EVM-compatible
+      // lisk: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f", // Assuming EVM-compatible
     };
 
     if (chain) {
@@ -681,7 +684,6 @@ export class DexPayService implements IBankingManager, IDexPayService {
           "base",
           "arbitrum",
           "solana",
-          "stellar",
           "hedera",
           "apechain",
           "lisk",

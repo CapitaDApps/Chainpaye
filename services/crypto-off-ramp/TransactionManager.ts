@@ -640,14 +640,10 @@ export class TransactionManager implements ITransactionManager {
 
     try {
       // Create quote request from transaction
-      // For Stellar: USDC on Stellar is received, but DexPay quote uses USDT on BSC
-      const dexpayAsset = transaction.chain === "stellar" ? "USDT" as const : transaction.asset;
-      const dexpayChain = transaction.chain === "stellar" ? "bep20" as const : transaction.chain;
-
       const quoteRequest: QuoteRequest = {
         fiatAmount: transaction.fiatAmount,
-        asset: dexpayAsset,
-        chain: dexpayChain,
+        asset: transaction.asset,
+        chain: transaction.chain,
         type: "SELL",
         bankCode: transaction.bankCode,
         accountName: transaction.accountName,
@@ -956,7 +952,6 @@ export class TransactionManager implements ITransactionManager {
       hedera: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f",
       apechain: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f",
       lisk: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f",
-      stellar: process.env.STELLAR_RECEIVING_ADDRESS || "",
     };
 
     return receivingAddresses[chain] || receivingAddresses.solana;

@@ -870,37 +870,6 @@ const COMMANDS: Record<string, CommandConfig> = {
     description: "Reset your PIN via email",
     priority: 9,
   },
-  // ============================================================
-  // ADD BENEFICIARY
-  // User wants to add a bank account beneficiary
-  // ============================================================
-  addBeneficiary: {
-    triggers: [
-      "/addbeneficiary",
-      "add beneficiary",
-      "add a beneficiary",
-      "new beneficiary",
-      "save beneficiary",
-      "add bank account",
-      "add payout account",
-    ],
-    description: "Add a bank account beneficiary for Ghana or Kenya payouts",
-    priority: 5,
-  },
-  viewBeneficiaries: {
-    triggers: [
-      "/beneficiaries",
-      "beneficiaries",
-      "my beneficiaries",
-      "view beneficiaries",
-      "show beneficiaries",
-      "list beneficiaries",
-      "saved accounts",
-      "my saved accounts",
-    ],
-    description: "View your saved beneficiary accounts",
-    priority: 5,
-  },
 };
 
 export { COMMANDS };

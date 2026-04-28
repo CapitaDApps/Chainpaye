@@ -54,44 +54,7 @@ export async function getImagePaymentFlowScreen(decryptedBody: {
     const phone = userPhone.startsWith("+") ? userPhone : `+${userPhone}`;
 
     if (screen === "PIN") {
-      const { pin, accountNumber, accountName, bankName, bankCode, amount, currency, paymentMethod } = data;
-
-      // Validate required fields
-      if (!pin || !accountNumber || !accountName || !bankName || !bankCode || !amount || !paymentMethod) {
-        return {
-          screen: "PIN",
-          data: {
-            ...data,
-            error_message: "Missing required payment information. Please try again.",
-            has_error: true,
-          },
-        };
-      }
-
-      // Validate amount is a positive number
-      const numericAmount = parseFloat(amount);
-      if (isNaN(numericAmount) || numericAmount <= 0) {
-        return {
-          screen: "PIN",
-          data: {
-            ...data,
-            error_message: "Invalid amount. Please enter a valid positive number.",
-            has_error: true,
-          },
-        };
-      }
-
-      // Validate account number format (10 digits for Nigerian banks)
-      if (!/^\d{10}$/.test(accountNumber)) {
-        return {
-          screen: "PIN",
-          data: {
-            ...data,
-            error_message: "Invalid account number. Must be 10 digits.",
-            has_error: true,
-          },
-        };
-      }
+      const { pin, accountNumber, accountName, bankName, bankCode, amount, currency } = data;
 
       const userService = new UserService();
       const toronetService = new ToronetService();
@@ -107,130 +70,74 @@ export async function getImagePaymentFlowScreen(decryptedBody: {
           data: {
             ...data,
             error_message: "Incorrect PIN. Please try again.",
-            has_error: true,
           },
         };
       }
 
-      if (paymentMethod === "transfer") {
-        // Check balance
-        const balanceNGN = await toronetService.getBalanceNGN(wallet.publicKey);
-        if (+balanceNGN.balance < +amount) {
-          return {
-            screen: "PIN",
-            data: {
-              ...data,
-              error_message: `Insufficient balance. Available: ₦${balanceNGN.balance.toFixed(2)}`,
-              has_error: true,
-            },
-          };
-        }
-
-        const withdrawalNanoId = nanoid();
-
-        // Process withdrawal asynchronously — return success screen immediately
-        toronetService
-          .withdraw({
-            userAddress: wallet.publicKey,
-            password: wallet.password,
-            bankName,
-            routingNo: bankCode,
-            accountName,
-            accoountNo: accountNumber,
-            phoneNumber: phone,
-            amount,
-            currency: currency || "NGN",
-            fullName: `${user.firstName || ""} ${user.lastName || ""}`.trim(),
-          })
-          .then(async (withdrawalResp) => {
-            if (withdrawalResp.success) {
-              const tx = await TransactionService.recordWithdrawal({
-                fromUser: user._id as Types.ObjectId,
-                amount,
-                status: TransactionStatus.COMPLETED,
-                refId: withdrawalResp.data?.paymentReference!,
-                toronetTxId: `TXID_${withdrawalResp.hash}`,
-                currency: "NGN",
-                bankDetails: { accountName, bankName, accountNumber, routingNumber: bankCode },
-              });
-
-              await sendTransactionReceipt((tx._id as Types.ObjectId).toString(), phone);
-            } else {
-              const tx = await TransactionService.recordWithdrawal({
-                fromUser: user._id as Types.ObjectId,
-                amount,
-                status: TransactionStatus.FAILED,
-                refId: withdrawalNanoId,
-                toronetTxId: `TXID_${withdrawalNanoId}`,
-                currency: "NGN",
-                failureReason: withdrawalResp.message,
-                bankDetails: { accountName, bankName, accountNumber, routingNumber: bankCode },
-              });
-
-              whatsappBusinessService.sendNormalMessage(
-                `❌ Payment failed: ${withdrawalResp.message}`,
-                phone,
-              );
-
-              await sendTransactionReceipt((tx._id as Types.ObjectId).toString(), phone);
-            }
-          })
-          .catch((err) => console.error("Error processing image payment:", err));
-
-        return { screen: "PROCESSING", data: {} };
-      } else if (paymentMethod === "offramp") {
-        // Store offramp details in Redis for the offramp flow to pick up
-        const offrampKey = `offramp:image_payment:${phone}`;
-        await redisClient.set(
-          offrampKey,
-          JSON.stringify({
-            accountNumber,
-            accountName,
-            bankName,
-            bankCode,
-            amount,
-            currency: currency || "NGN",
-            userId: user._id.toString(),
-          }),
-          "EX",
-          3600 // 1 hour expiry
-        );
-
-        // Send a message with the details BEFORE launching the flow
-        const detailsMessage = `📸 *Payment Details from Image*\n\n` +
-          `💰 *Amount:* ₦${amount}\n` +
-          `🏦 *Bank:* ${bankName}\n` +
-          `🔢 *Account:* ${accountNumber}\n` +
-          `👤 *Name:* ${accountName}\n\n` +
-          `⚠️ *Please enter these details in the form that will open next.*\n\n` +
-          `_Tip: Keep this message visible while filling the form_`;
-
-        await whatsappBusinessService.sendNormalMessage(detailsMessage, phone);
-
-        // Wait a moment for the message to be delivered
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        // Automatically trigger the offramp flow
-        // The sendCryptoDepositAddress method will handle fetching banks and launching the flow
-        await whatsappBusinessService.sendCryptoDepositAddress(
-          phone,
-          "USDC", // Default token
-          "base" as any, // Default network
-          "" // Empty address since we're just triggering the flow
-        );
-
-        return { screen: "PROCESSING", data: {} };
-      } else {
-        // Invalid payment method
+      // Check balance
+      const balanceNGN = await toronetService.getBalanceNGN(wallet.publicKey);
+      if (+balanceNGN.balance < +amount) {
         return {
           screen: "PIN",
           data: {
             ...data,
-            error_message: "Invalid payment method selected. Please try again.",
-            has_error: true,
+            error_message: `Insufficient balance. Available: ₦${balanceNGN.balance.toFixed(2)}`,
           },
         };
       }
+
+      const withdrawalNanoId = nanoid();
+
+      // Process withdrawal asynchronously — return success screen immediately
+      toronetService
+        .withdraw({
+          userAddress: wallet.publicKey,
+          password: wallet.password,
+          bankName,
+          routingNo: bankCode,
+          accountName,
+          accoountNo: accountNumber,
+          phoneNumber: phone,
+          amount,
+          currency: currency || "NGN",
+          fullName: `${user.firstName || ""} ${user.lastName || ""}`.trim(),
+        })
+        .then(async (withdrawalResp) => {
+          if (withdrawalResp.success) {
+            const tx = await TransactionService.recordWithdrawal({
+              fromUser: user._id as Types.ObjectId,
+              amount,
+              status: TransactionStatus.COMPLETED,
+              refId: withdrawalResp.data?.paymentReference!,
+              toronetTxId: `TXID_${withdrawalResp.hash}`,
+              currency: "NGN",
+              bankDetails: { accountName, bankName, accountNumber, routingNumber: bankCode },
+            });
+
+            await sendTransactionReceipt((tx._id as Types.ObjectId).toString(), phone);
+          } else {
+            const tx = await TransactionService.recordWithdrawal({
+              fromUser: user._id as Types.ObjectId,
+              amount,
+              status: TransactionStatus.FAILED,
+              refId: withdrawalNanoId,
+              toronetTxId: `TXID_${withdrawalNanoId}`,
+              currency: "NGN",
+              failureReason: withdrawalResp.message,
+              bankDetails: { accountName, bankName, accountNumber, routingNumber: bankCode },
+            });
+
+            whatsappBusinessService.sendNormalMessage(
+              `❌ Payment failed: ${withdrawalResp.message}`,
+              phone,
+            );
+
+            await sendTransactionReceipt((tx._id as Types.ObjectId).toString(), phone);
+          }
+        })
+        .catch((err) => console.error("Error processing image payment:", err));
+
+      return { screen: "PROCESSING", data: {} };
     }
   }
 

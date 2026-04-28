@@ -282,7 +282,6 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
       const supportedChainTypes = [
         "evm",
         "solana",
-        "stellar",
         "bsc",
         "base",
         "arbitrum",
@@ -296,10 +295,10 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         );
       }
 
-      const crossmintWallet =
-        chainType.toLowerCase() === "stellar"
-          ? await this.createStellarWallet(userId)
-          : await this.createWalletInternal(userId, chainType);
+      const crossmintWallet = await this.createWalletInternal(
+        userId,
+        chainType,
+      );
 
       // Register wallet-to-user mapping as per requirement 4.4
       this.registerWalletUserMapping(crossmintWallet.address, userId);
@@ -559,7 +558,6 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
       const supportedChainTypes = [
         "evm",
         "solana",
-        "stellar",
         "bsc",
         "base",
         "arbitrum",
@@ -821,7 +819,7 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
    */
   async listWallets(userId: string): Promise<CrossmintWallet[]> {
     const wallets: CrossmintWallet[] = [];
-    const chainTypes = ["evm", "solana", "stellar"];
+    const chainTypes = ["evm", "solana"];
 
     await Promise.all(
       chainTypes.map(async (chainType) => {
@@ -901,45 +899,6 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
   }
 
   /**
-   * Create a Stellar wallet for a user using api-key signer (no external wallet address needed)
-   */
-  async createStellarWallet(userId: string): Promise<CrossmintWallet> {
-    try {
-      const requestBody = {
-        chainType: "stellar",
-        type: "smart",
-        config: {
-          adminSigner: {
-            type: "api-key",
-          },
-        },
-        owner: `userId:${userId}`,
-      };
-
-      const response = await axios.post(
-        `${this.baseUrl}/wallets`,
-        requestBody,
-        {
-          headers: {
-            "X-API-KEY": this.apiKey,
-            "Content-Type": "application/json",
-          },
-        },
-      );
-
-      logger.info(`Created stellar wallet for user ${userId}: ${response.data.address}`);
-      return response.data;
-    } catch (error: any) {
-      logger.error(
-        `Error creating stellar wallet for user ${userId}: ${error.response?.data?.message || error.message}`,
-      );
-      throw new Error(
-        `Failed to create stellar wallet: ${error.response?.data?.message || error.message}`,
-      );
-    }
-  }
-
-  /**
    * Get chain identifier for balance API calls
    */
   getChainIdentifier(chain: string): string {
@@ -964,11 +923,6 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
     chain: string,
     tokens: string[] = ["usdc", "usdt"],
   ): Promise<CrossmintBalance[]> {
-    // Stellar has its own wallet and only supports USDC
-    if (chain.toLowerCase() === "stellar") {
-      return this.getWalletBalancesInternal(userId, "stellar", ["usdc"]);
-    }
-
     // Helper to request balances for a specific chain using the unified EVM wallet
     if (this.isEvmChain(chain)) {
       const chainId = "evm";
@@ -1178,6 +1132,7 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
     chainType: string,
   ): Promise<CrossmintWallet> {
     try {
+      // First try to get existing wallet
       const existingWallet = await this.getWalletByChain(userId, chainType);
 
       if (existingWallet) {
@@ -1185,10 +1140,9 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         return existingWallet;
       }
 
+      // Create new wallet if none exists
       logger.info(`Creating new ${chainType} wallet for user ${userId}`);
-      return chainType.toLowerCase() === "stellar"
-        ? await this.createStellarWallet(userId)
-        : await this.createWalletInternal(userId, chainType);
+      return await this.createWalletInternal(userId, chainType);
     } catch (error: any) {
       logger.error(
         `Error getting or creating ${chainType} wallet for user ${userId}: ${error.message}`,
@@ -1268,10 +1222,9 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
   getTokenChainIdentifier(chainType: string): string {
     const tokenChainMapping: { [key: string]: string } = {
       solana: "solana",
-      stellar: "stellar",
-      bsc: "bsc",
+      bsc: "bsc", // For BEP20 tokens
       arbitrum: "arbitrum",
-      base: "base",
+      base: "base", // Production Base mainnet
       hedera: "hedera",
       apechain: "apechain",
       lisk: "lisk",
@@ -1295,7 +1248,6 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
 
     const chainMapping: { [key: string]: string } = {
       solana: "solana",
-      stellar: "stellar",
       bep20: "bsc",
       base: "base",
       arbitrum: "arbitrum",
@@ -1313,14 +1265,13 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
   getSupportedAssets(chain: string): string[] {
     const supportedAssets: { [key: string]: string[] } = {
       bep20: ["usdc", "usdt"],
-      bsc: ["usdc", "usdt"],
+      bsc: ["usdc", "usdt"], // BSC is the same as BEP20
       base: ["usdc"],
       arbitrum: ["usdc", "usdt"],
       solana: ["usdc", "usdt"],
       hedera: ["usdc", "usdt"],
       apechain: ["usdc", "usdt"],
       lisk: ["usdc", "usdt"],
-      stellar: ["usdc"],
     };
 
     return supportedAssets[chain.toLowerCase()] || [];
@@ -1504,14 +1455,14 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         }
 
         // Enhanced request with idempotency support and external wallet signer
-        const isStellarTransfer = chainType.toLowerCase() === "stellar";
-
-        const transferPayload: Record<string, any> = {
+        const transferPayload = {
           amount,
           recipient: toAddress,
           transactionType: "direct",
           // Add idempotency key to prevent duplicate transfers
           idempotencyKey: currentIdempotencyKey,
+          // Configure external wallet signer for transaction signing
+          signer: `external-wallet:${adminAddress}`,
           // Add metadata for off-ramp workflow tracking
           metadata: {
             userId,
@@ -1520,24 +1471,6 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
             originalIdempotencyKey: idempotencyKey,
           },
         };
-
-        // Stellar uses api-key signer — no external wallet signer needed
-        // Other chains require the external wallet signer for approval
-        if (!isStellarTransfer) {
-          transferPayload.signer = `external-wallet:${adminAddress}`;
-        }
-
-        // Add memo for Stellar transfers (required by most exchanges/custodians)
-        if (isStellarTransfer) {
-          const memoValue = process.env.STELLAR_MEMO_VALUE;
-          const memoType = process.env.STELLAR_MEMO_TYPE || "id";
-          if (memoValue) {
-            transferPayload.memo = {
-              type: memoType,
-              value: memoValue,
-            };
-          }
-        }
 
         logger.info(`Executing transfer attempt ${attempt}/${maxRetries}:`, {
           userId,
@@ -2220,9 +2153,8 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
    */
   private mapChainTypeToChain(chainType: string): string {
     const chainMapping: { [key: string]: string } = {
-      evm: "base",
+      evm: "base", // Default EVM chain for balances
       solana: "solana",
-      stellar: "stellar",
       bsc: "bep20",
       base: "base",
       arbitrum: "arbitrum",

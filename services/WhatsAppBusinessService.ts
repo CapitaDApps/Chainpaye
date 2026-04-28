@@ -682,22 +682,6 @@ What would you like to sell?`;
     );
   }
 
-  async sendPanAfricanOfframpFlow(to: string) {
-    const panAfricanOfframpFlowId = WHATSAPP_CONFIG.FLOW_IDS.PAN_AFRICAN_OFFRAMP;
-    const panAfricanOfframpScreenId = "SELECT_CURRENCY";
-
-    // Send flow starting at currency selection screen
-    await this.sendTextOnlyFlowById(
-      to,
-      panAfricanOfframpFlowId,
-      panAfricanOfframpScreenId,
-      {
-        body: `Spend your crypto across Africa 🌍\nSelect your preferred currency`,
-        cta: "Spend Crypto",
-      },
-    );
-  }
-
   async sendMyAccountInfo(to: string) {
     const phone = to.startsWith("+") ? to : `+${to}`;
     const { user, wallet } = await userService.getUserToroWallet(phone);
@@ -820,25 +804,12 @@ USD: USD ${usdBalance.balance.toFixed(2)}`;
     );
   }
 
-  async sendEmailVerificationFlowById(to: string): Promise<void> {    const flowId = WHATSAPP_CONFIG.FLOW_IDS.EMAIL_VERIFICATION;
+  async sendEmailVerificationFlowById(to: string): Promise<void> {
+    const flowId = WHATSAPP_CONFIG.FLOW_IDS.EMAIL_VERIFICATION;
     await this.sendTextOnlyFlowById(to, flowId, "EMAIL_INPUT", {
       header: "Verify Your Email",
       body: "Please verify your email address to access all Chainpaye features.",
       cta: "Verify Email",
-    });
-  }
-
-  async sendAddBeneficiaryFlowById(to: string): Promise<void> {
-    const flowId = WHATSAPP_CONFIG.FLOW_IDS.ADD_BENEFICIARY;
-    if (!flowId) {
-      throw new Error(
-        "Missing WhatsApp add beneficiary flow ID. Set WHATSAPP_ADD_BENEFICIARY_FLOW_ID.",
-      );
-    }
-    await this.sendTextOnlyFlowById(to, flowId, "SELECT_COUNTRY", {
-      header: "Add Beneficiary",
-      body: "Add a bank account beneficiary for Ghana or Kenya payouts.",
-      cta: "Add Beneficiary",
     });
   }
 

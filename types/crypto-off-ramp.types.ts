@@ -40,14 +40,13 @@ export type SupportedChain =
   | "base"
   | "arbitrum"
   | "solana"
-  | "stellar"
   | "hedera"
   | "apechain"
   | "lisk";
 
 // Supported asset-chain combinations as defined in requirements
 export const SUPPORTED_ASSETS: Record<SupportedAsset, SupportedChain[]> = {
-  USDC: ["bep20", "base", "arbitrum", "solana", "stellar", "hedera", "apechain", "lisk"],
+  USDC: ["bep20", "base", "arbitrum", "solana", "hedera", "apechain", "lisk"],
   USDT: ["bep20", "arbitrum", "solana", "hedera", "apechain", "lisk"],
 };
 

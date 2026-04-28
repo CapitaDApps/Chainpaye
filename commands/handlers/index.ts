@@ -10,7 +10,6 @@ export { handleWithdrawal } from "./withdrawalHandler";
 export { handleStartCommand } from "./startCommandHandler";
 export { handleReferralCommand, handleWithdrawCommand, handleReferralHistoryCommand } from "./referralHandler";
 export { handleUsdDeposit } from "./usdDepositHandler";
-export { handleAddBeneficiary, handleViewBeneficiaries } from "./addBeneficiaryHandler";
 
 export {
   handleAccountConfirmation,

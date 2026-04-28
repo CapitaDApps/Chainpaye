@@ -1,6 +1,5 @@
 export type NormalizedNetworkType =
   | "Solana"
-  | "Stellar"
   | "Ethereum"
   | "Polygon"
   | "Tron"
