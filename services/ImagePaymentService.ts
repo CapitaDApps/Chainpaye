@@ -3,29 +3,29 @@
  *
  * Downloads a WhatsApp media image, sends it to OpenAI Vision to extract
  * bank payment details (account number, bank name), then resolves the
- * account name via Toronet before triggering a confirmation flow.
+ * account name via DexPay before triggering a confirmation flow.
  */
 
 import axios from "axios";
 import OpenAI from "openai";
-import { ToronetService } from "./ToronetService";
+import { DexPayService } from "./DexPayService";
 
 export interface ExtractedPaymentDetails {
   accountNumber: string;
   bankName: string;
-  accountName: string; // resolved via Toronet
+  accountName: string; // resolved via DexPay
   bankCode: string;
   amount: string; // from caption
 }
 
 export class ImagePaymentService {
   private openai: OpenAI;
-  private toronetService: ToronetService;
+  private dexPayService: DexPayService;
   private GRAPH_API_TOKEN: string;
 
   constructor() {
     this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    this.toronetService = new ToronetService();
+    this.dexPayService = new DexPayService();
     this.GRAPH_API_TOKEN = process.env.GRAPH_API_TOKEN || "";
   }
 
@@ -147,11 +147,11 @@ Do not include any explanation, markdown, or extra text. Just the JSON.`,
       return { error: "Could not detect a bank name in the image. Please check the image is clear and try again." };
     }
 
-    // 4. Find the bank code from Toronet bank list
-    const banks = await this.toronetService.getBankListNGN();
+    // 4. Find the bank code from DexPay bank list
+    const banks = await this.dexPayService.getSupportedBanks();
     const matchedBank = banks.find((b) =>
-      b.title.toLowerCase().includes(extracted.bankName!.toLowerCase()) ||
-      extracted.bankName!.toLowerCase().includes(b.title.toLowerCase()),
+      b.name.toLowerCase().includes(extracted.bankName!.toLowerCase()) ||
+      extracted.bankName!.toLowerCase().includes(b.name.toLowerCase()),
     );
 
     if (!matchedBank) {
@@ -160,31 +160,31 @@ Do not include any explanation, markdown, or extra text. Just the JSON.`,
       };
     }
 
-    // 5. Resolve account name via Toronet
-    let accountName: string;
+    // 5. Resolve account name via DexPay
+    let resolution;
     try {
-      accountName = await this.toronetService.resolveBankAccountNameNGN(
+      resolution = await this.dexPayService.resolveBank(
+        matchedBank.code,
         extracted.accountNumber,
-        matchedBank.id,
       );
     } catch (err) {
       console.error("Error resolving account name:", err);
       return {
-        error: `Could not verify account number ${extracted.accountNumber} at ${matchedBank.title}. Please check the details and try again.`,
+        error: `Could not verify account number ${extracted.accountNumber} at ${matchedBank.name}. Please check the details and try again.`,
       };
     }
 
-    if (!accountName) {
+    if (!resolution.isValid || !resolution.accountName) {
       return {
-        error: `Account number ${extracted.accountNumber} not found at ${matchedBank.title}.`,
+        error: `Account number ${extracted.accountNumber} not found at ${matchedBank.name}.`,
       };
     }
 
     return {
       accountNumber: extracted.accountNumber,
-      bankName: matchedBank.title,
-      bankCode: matchedBank.id,
-      accountName,
+      bankName: matchedBank.name,
+      bankCode: matchedBank.code,
+      accountName: resolution.accountName,
       amount,
     };
   }
