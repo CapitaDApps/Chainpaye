@@ -548,7 +548,6 @@ export async function getImagePaymentFlowScreen(decryptedBody: {
             asset, // Original asset for display
             bankName,
             financials.totalInUsd,
-            dexPayService,
             transferIdempotencyKey,
           ).catch((err) => console.error("Background offramp processing error:", err));
 

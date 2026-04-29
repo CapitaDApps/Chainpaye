@@ -65,10 +65,13 @@ export async function processOfframpInBackground(
   currency: string,
   bank_name: string,
   totalInUsd: number,
-  dexPayService: any,
   idempotencyKey?: string,
 ): Promise<void> {
   try {
+    // Import DexPayService inside the function to avoid circular dependencies
+    const { DexPayService } = await import("../../services/DexPayService");
+    const dexPayService = new DexPayService();
+    
     // Wait for crypto transaction to settle
     logger.info("[OFFRAMP-BG] Waiting 20s for crypto settlement...");
     console.log("\n⏳ [Background] Waiting 20 seconds for crypto transaction to settle...\n");
@@ -1306,11 +1309,9 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             bank_code,
             finalRecipientName || "Beneficiary",
             account_number,
-            receivingAddress,
             currency || "USDT",
             bank_name || "Bank",
             financials.totalInUsd,
-            dexPayService,
             idempotencyKey,
           ).catch((err) =>
             logger.error(

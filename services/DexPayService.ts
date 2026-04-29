@@ -43,7 +43,7 @@ export interface LegacyQuoteRequest {
   bankCode: string;
   accountName: string;
   accountNumber: string;
-  receivingAddress: string;
+  receivingAddress?: string; // Optional - not needed for SELL transactions (offramp)
 }
 
 // Legacy Quote interface for backward compatibility
