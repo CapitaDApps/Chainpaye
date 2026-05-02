@@ -674,6 +674,14 @@ export class ToronetService {
   }
 
   async getBalanceNGN(address: string): Promise<BalanceResult> {
+    // Update virtual wallet to sync any pending deposits before checking balance
+    try {
+      await this.updateVirtualWallet(address);
+    } catch (error) {
+      console.error("Error updating virtual wallet for NGN balance check:", error);
+      // Continue with balance check even if update fails
+    }
+
     const body = this.formBalanceBody(address);
     // const resp = await  this.axiosInstance.get("/currency/naira/")
     // const resp = await fetch(`${this.baseUrl}/currency/naira/`, {
@@ -697,6 +705,14 @@ export class ToronetService {
   }
 
   async getBalanceUSD(address: string): Promise<BalanceResult> {
+    // Update virtual wallet to sync any pending deposits before checking balance
+    try {
+      await this.updateVirtualWallet(address);
+    } catch (error) {
+      console.error("Error updating virtual wallet for USD balance check:", error);
+      // Continue with balance check even if update fails
+    }
+
     const body = this.formBalanceBody(address);
     // const resp = await  this.axiosInstance.get("/currency/dollar/")
     // const resp = await fetch(`${this.baseUrl}/currency/dollar/`, {
@@ -721,6 +737,14 @@ export class ToronetService {
   }
 
   async getBalanceEUR(address: string): Promise<BalanceResult> {
+    // Update virtual wallet to sync any pending deposits before checking balance
+    try {
+      await this.updateVirtualWallet(address);
+    } catch (error) {
+      console.error("Error updating virtual wallet for EUR balance check:", error);
+      // Continue with balance check even if update fails
+    }
+
     const body = this.formBalanceBody(address);
 
     try {
@@ -748,6 +772,14 @@ export class ToronetService {
   }
 
   async getBalanceGBP(address: string): Promise<BalanceResult> {
+    // Update virtual wallet to sync any pending deposits before checking balance
+    try {
+      await this.updateVirtualWallet(address);
+    } catch (error) {
+      console.error("Error updating virtual wallet for GBP balance check:", error);
+      // Continue with balance check even if update fails
+    }
+
     const body = this.formBalanceBody(address);
 
     try {
