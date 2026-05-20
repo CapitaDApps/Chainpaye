@@ -576,6 +576,13 @@ What can I do for you?
         body: "Complete your National ID verification to unlock all Chainpaye features including bank withdrawals.",
         cta: "Start Verification",
       });
+    } else if (country === "GH") {
+      const kycGhFlowId = WHATSAPP_CONFIG.FLOW_IDS.KYC_GH;
+      await this.sendTextOnlyFlowById(to, kycGhFlowId, "PASSPORT_INPUT", {
+        header: "Verify Your Identity",
+        body: "Complete your passport verification to unlock all Chainpaye features including bank withdrawals.",
+        cta: "Start Verification",
+      });
     } else {
       // Default: Nigeria BVN flow
       const kycFlowId = WHATSAPP_CONFIG.FLOW_IDS.KYC;

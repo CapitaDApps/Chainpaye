@@ -1,0 +1,147 @@
+{
+  "version": "7.2",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "PASSPORT_INPUT": ["VERIFICATION_COMPLETE"],
+    "VERIFICATION_COMPLETE": []
+  },
+  "screens": [
+    {
+      "id": "PASSPORT_INPUT",
+      "title": "Identity Verification",
+      "data": {
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "passport_form",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Verify Your Identity"
+              },
+              {
+                "type": "TextBody",
+                "text": "Enter your details exactly as they appear on your passport."
+              },
+              {
+                "type": "TextInput",
+                "label": "First Name",
+                "name": "first_name",
+                "required": true,
+                "input-type": "text"
+              },
+              {
+                "type": "TextInput",
+                "label": "Last Name",
+                "name": "last_name",
+                "required": true,
+                "input-type": "text"
+              },
+              {
+                "type": "DatePicker",
+                "label": "Date of Birth",
+                "name": "dob",
+                "required": true,
+                "min-date": "1900-01-01",
+                "max-date": "2010-01-01",
+                "helper-text": "You must be 18 or older"
+              },
+              {
+                "type": "TextInput",
+                "label": "Passport Number",
+                "name": "passport_number",
+                "required": true,
+                "input-type": "text",
+                "helper-text": "Your Ghanaian passport number"
+              },
+              {
+                "type": "TextBody",
+                "text": "${data.error_message}",
+                "visible": "${data.has_error}"
+              },
+              {
+                "type": "Footer",
+                "label": "Verify",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "first_name": "${form.first_name}",
+                    "last_name": "${form.last_name}",
+                    "dob": "${form.dob}",
+                    "passport_number": "${form.passport_number}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "VERIFICATION_COMPLETE",
+      "title": "Verification Complete",
+      "terminal": true,
+      "success": true,
+      "data": {
+        "first_name": {
+          "type": "string",
+          "__example__": "John"
+        },
+        "verified": {
+          "type": "boolean",
+          "__example__": true
+        },
+        "already_verified": {
+          "type": "boolean",
+          "__example__": false
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Verification Successful! ✅",
+            "visible": "${data.verified}"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Congratulations '${data.first_name}'! Your identity has been verified. You now have full access to all Chainpaye features.'`",
+            "visible": "${data.verified}"
+          },
+          {
+            "type": "TextHeading",
+            "text": "Already Verified ✓",
+            "visible": "${data.already_verified}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Your account is already verified. You have full access to all features.",
+            "visible": "${data.already_verified}"
+          },
+          {
+            "type": "Footer",
+            "label": "Done",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {
+                "type": "kyc-complete"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
