@@ -1,9 +1,9 @@
 import { Wallet } from "../../models/Wallet";
 import { redisClient } from "../../services/redis";
+import { DojahService } from "../../services/DojahService";
 import { ToronetService } from "../../services/ToronetService";
 import { UserService } from "../../services/UserService";
 import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService";
-import { formatDate } from "../utils/formatDate";
 import { handleKYCCompletion } from "../controllers/referral.controller";
 
 // ============================================================
@@ -30,6 +30,7 @@ export const kycFlowScreen = async (decryptedBody: {
   });
 
   const userService = new UserService();
+  const dojahService = new DojahService();
   const toronetService = new ToronetService();
   const whatsappBusinessService = new WhatsAppBusinessService();
 
@@ -236,14 +237,12 @@ export const kycFlowScreen = async (decryptedBody: {
 
           console.log("DEBUG: Performing KYC with BVN");
 
-          // Perform KYC verification via Toronet
-          const kycResult = await toronetService.performKYC({
+          // Perform KYC verification via Dojah
+          const kycResult = await dojahService.verifyBVN({
             firstName: firstName,
             lastName: lastName,
             bvn: bvn,
-            dob: formatDate(dob),
-            address: userToroWallet.publicKey,
-            phoneNumber: phone,
+            dob: dob, // already yyyy-mm-dd from the form
           });
 
           console.log("DEBUG: KYC Result", kycResult);

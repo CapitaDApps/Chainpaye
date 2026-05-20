@@ -525,12 +525,26 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
           result.id || result.transactionId || this.generateRandomString(16),
       };
     } catch (error: any) {
+      // Enhanced error logging for debugging
       logger.error(`Transfer failed for request:`, {
         walletAddress: transferRequest.walletAddress,
         token: transferRequest.token,
         amount: transferRequest.amount,
         error: error.message,
+        errorCode: error.code,
+        statusCode: error.response?.status,
+        responseData: error.response?.data,
+        stack: error.stack,
       });
+      
+      // Also log to console for immediate visibility
+      console.error("\n❌ TRANSFER FAILED - DETAILED ERROR:");
+      console.error("Message:", error.message);
+      console.error("Status Code:", error.response?.status);
+      console.error("Response Data:", JSON.stringify(error.response?.data, null, 2));
+      console.error("Full Error:", error);
+      console.error("========================================\n");
+      
       return {
         success: false,
         error: this.translateTransferError(error),
@@ -2212,7 +2226,14 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
       errorMessage,
       errorCode,
       error,
+      responseData: error.response?.data,
     });
+    
+    // In development, include actual error for debugging
+    if (process.env.NODE_ENV === 'development' || process.env.DEBUG_TRANSFERS === 'true') {
+      return `Transfer failed: ${errorMessage}. Status: ${errorCode}. Please check logs for details.`;
+    }
+    
     return "Transfer failed due to an unexpected error. Please try again or contact support if the problem persists.";
   }
 
