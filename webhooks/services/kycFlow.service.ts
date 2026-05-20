@@ -182,9 +182,8 @@ export const kycFlowScreen = async (decryptedBody: {
             };
           }
 
-          // Get user wallet for KYC
-          const { wallet: userToroWallet, user } =
-            await userService.getUserToroWallet(phone);
+          // Get user for KYC
+          const user = await userService.getUser(phone);
 
           if (!user) {
             return {
