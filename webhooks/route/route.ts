@@ -9,6 +9,7 @@ import {
 import { generateLinkFlow } from "../controllers/grl.controller";
 import { invoiceController } from "../controllers/invoice.controller";
 import { kycFlowController } from "../controllers/kyc.controller";
+import { keKycFlowController } from "../controllers/keKyc.controller";
 import { paymentLinkSuccessWebhook } from "../controllers/paymentLinkWebhook.controller";
 import { handleReferralWithdrawalFlow } from "../controllers/referralWithdrawalFlow.controller";
 import { onrampFlowController } from "../controllers/onrampFlow.controller";
@@ -33,6 +34,7 @@ router.post("/topup", topupFlow);
 router.post("/create-invoice", invoiceController);
 router.post("/user-setup", userSetup);
 router.post("/kyc", kycFlowController);
+router.post("/ke-kyc", keKycFlowController);
 router.post("/withdrawal-flow", withdrawalFlow);
 router.post("/image-payment", imagePaymentFlowController);
 router.post("/referral-withdrawal", handleReferralWithdrawalFlow);

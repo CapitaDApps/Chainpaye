@@ -7,7 +7,14 @@ interface BVNVerificationParams {
   dob: string; // yyyy-mm-dd
 }
 
-interface BVNVerificationResult {
+interface KenyanIDVerificationParams {
+  id: string;
+  firstName: string;
+  lastName: string;
+  dob: string; // yyyy-mm-dd
+}
+
+interface VerificationResult {
   success: boolean;
   message: string;
 }
@@ -35,7 +42,7 @@ export class DojahService {
     });
   }
 
-  async verifyBVN(params: BVNVerificationParams): Promise<BVNVerificationResult> {
+  async verifyBVN(params: BVNVerificationParams): Promise<VerificationResult> {
     try {
       const response = await this.axiosInstance.get("/api/v1/kyc/bvn", {
         params: {
@@ -71,6 +78,40 @@ export class DojahService {
         error.response?.data?.error ||
         error.response?.data?.message ||
         "BVN verification failed. Please try again.";
+      return { success: false, message };
+    }
+  }
+
+  async verifyKenyanID(params: KenyanIDVerificationParams): Promise<VerificationResult> {
+    try {
+      const response = await this.axiosInstance.get("/api/v1/ke/kyc/id", {
+        params: { id: params.id },
+      });
+
+      const entity = response.data?.entity;
+
+      if (!entity || !entity.id) {
+        return { success: false, message: "Could not verify ID. Please check the number and try again." };
+      }
+
+      if (entity.is_first_name_match === false) {
+        return { success: false, message: "Registered first name does not match ID information" };
+      }
+
+      if (entity.is_last_name_match === false) {
+        return { success: false, message: "Registered last name does not match ID information" };
+      }
+
+      if (entity.is_date_of_birth_match === false) {
+        return { success: false, message: "Registered date of birth does not match ID information" };
+      }
+
+      return { success: true, message: "ID verified successfully" };
+    } catch (error: any) {
+      const message =
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        "ID verification failed. Please try again.";
       return { success: false, message };
     }
   }

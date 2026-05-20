@@ -562,18 +562,29 @@ What can I do for you?
   }
 
   /**
-   * Send KYC verification flow to Nigerian users
-   * This allows them to complete BVN verification
+   * Send KYC verification flow based on user's country
+   * Nigeria → BVN flow, Kenya → National ID flow
    */
   async sendKycFlowById(to: string) {
-    // TODO: Replace with actual KYC flow ID after uploading to Meta Business Suite
-    const kycFlowId = WHATSAPP_CONFIG.FLOW_IDS.KYC;
-    const kycScreenId = "COUNTRY_SELECT";
-    await this.sendTextOnlyFlowById(to, kycFlowId, kycScreenId, {
-      header: "Verify Your Identity",
-      body: "Complete your BVN verification to unlock all Chainpaye features including bank withdrawals.",
-      cta: "Start Verification",
-    });
+    const user = await User.findOne({ whatsappNumber: to });
+    const country = user?.country || "NG";
+
+    if (country === "KE") {
+      const kycKeFlowId = WHATSAPP_CONFIG.FLOW_IDS.KYC_KE;
+      await this.sendTextOnlyFlowById(to, kycKeFlowId, "ID_INPUT", {
+        header: "Verify Your Identity",
+        body: "Complete your National ID verification to unlock all Chainpaye features including bank withdrawals.",
+        cta: "Start Verification",
+      });
+    } else {
+      // Default: Nigeria BVN flow
+      const kycFlowId = WHATSAPP_CONFIG.FLOW_IDS.KYC;
+      await this.sendTextOnlyFlowById(to, kycFlowId, "COUNTRY_SELECT", {
+        header: "Verify Your Identity",
+        body: "Complete your BVN verification to unlock all Chainpaye features including bank withdrawals.",
+        cta: "Start Verification",
+      });
+    }
   }
 
   async sendUsdDepositFlowById(to: string) {
