@@ -43,7 +43,7 @@ export interface LegacyQuoteRequest {
   bankCode: string;
   accountName: string;
   accountNumber: string;
-  receivingAddress?: string; // Optional - not needed for SELL transactions (offramp)
+  receivingAddress: string;
 }
 
 // Legacy Quote interface for backward compatibility
@@ -290,21 +290,24 @@ export class DexPayService implements IBankingManager, IDexPayService {
   async getCurrentRates(
     asset: string,
     chain: string,
-    amount: number = 1000,
+    amount: number = 10000,
   ): Promise<ExchangeRate> {
     try {
       // DexPay API format: /rate/{asset}?fiatAmount=X&chain=Y
       const assetUpper = asset.toUpperCase();
       const mappedChain = this.mapChainForDexPay(chain);
 
+      // Always use 10000 as the fiat amount for rate fetching regardless of the actual transaction amount
+      const rateQueryAmount = 10000;
+
       logger.info(
-        `Fetching rates from DexPay for ${assetUpper} on ${mappedChain} using fiatAmount=${amount}`,
+        `Fetching rates from DexPay for ${assetUpper} on ${mappedChain} using fiatAmount=${rateQueryAmount}`,
       );
 
       const response = await axios.get(`${this.baseUrl}/rate/${assetUpper}`, {
         headers: this.getHeaders(),
         params: {
-          fiatAmount: amount, // Use provided amount or default to 1000 NGN
+          fiatAmount: rateQueryAmount, // Always use 10000 NGN for consistent rate fetching
           chain: mappedChain,
         },
       });
@@ -642,12 +645,15 @@ export class DexPayService implements IBankingManager, IDexPayService {
    */
   getReceivingAddress(chain?: string): string {
     // ChainPaye DexPay wallet addresses for different networks
-    const chainPayeWallets: Record<string, string> = {
+    const chainPayeWallets = {
       solana: "3947D9DUMD4Rj4ssjUy17qVXiKN4zCdUe2vEDpHvfdCk",
       bep20: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f",
       arbitrum: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f",
       base: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f",
-      stellar: process.env.STELLAR_RECEIVING_ADDRESS || "",
+      // Add more chains as needed
+      // hedera: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f", // Assuming EVM-compatible
+      // apechain: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f", // Assuming EVM-compatible
+      // lisk: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f", // Assuming EVM-compatible
     };
 
     if (chain) {
@@ -681,7 +687,6 @@ export class DexPayService implements IBankingManager, IDexPayService {
           "base",
           "arbitrum",
           "solana",
-          "stellar",
           "hedera",
           "apechain",
           "lisk",

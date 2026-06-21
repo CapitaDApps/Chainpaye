@@ -53,7 +53,7 @@ const FALLBACK_BANKS: Bank[] = [
  * Process DexPay quote and completion in background after transfer succeeds
  * This allows us to return success screen immediately without waiting
  */
-export async function processOfframpInBackground(
+async function processOfframpInBackground(
   userId: string,
   phone: string,
   ngnAmount: number,
@@ -62,16 +62,14 @@ export async function processOfframpInBackground(
   bank_code: string,
   finalRecipientName: string,
   account_number: string,
+  receivingAddress: string,
   currency: string,
   bank_name: string,
   totalInUsd: number,
+  dexPayService: any,
   idempotencyKey?: string,
 ): Promise<void> {
   try {
-    // Import DexPayService inside the function to avoid circular dependencies
-    const { DexPayService } = await import("../../services/DexPayService");
-    const dexPayService = new DexPayService();
-    
     // Wait for crypto transaction to settle
     logger.info("[OFFRAMP-BG] Waiting 20s for crypto settlement...");
     console.log("\n⏳ [Background] Waiting 20 seconds for crypto transaction to settle...\n");
@@ -90,8 +88,7 @@ export async function processOfframpInBackground(
       bankCode: bank_code,
       accountName: finalRecipientName || "Beneficiary",
       accountNumber: account_number,
-      // Note: receivingAddress not needed for SELL transactions (offramp)
-      // DexPay sends fiat to bank account, not crypto to wallet
+      receivingAddress: receivingAddress,
     };
 
     console.log("Quote Request:");
@@ -204,8 +201,6 @@ export async function processOfframpInBackground(
         transactionDate: new Date(),
         transactionReference: quoteId,
         status: "Successful",
-        asset: currency || "USDC", // Asset used (USDC/USDT)
-        chain: dexPayChain.charAt(0).toUpperCase() + dexPayChain.slice(1), // Capitalize chain name
         ...(userCountry?.code && { countryCode: userCountry.code }),
       });
       
@@ -226,7 +221,7 @@ export async function processOfframpInBackground(
       const rateData = await dexPayService.getCurrentRates(
         normalizedAsset,
         dexPayChain,
-        ngnAmount,
+        10000,
       );
       const exchangeRate = rateData.rate;
       const sellAmountUsd = ngnAmount / exchangeRate;
@@ -344,52 +339,11 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
       );
     }
 
-    // Check if there's prefilled data from image payment flow
-    const imagePaymentKey = `offramp:image_payment:${phone}`;
-    const imagePaymentData = await redisClient.get(imagePaymentKey);
-    
-    let responseData: any = { banks, hasPrefillData: false };
-
-    if (imagePaymentData) {
-      try {
-        const prefillData = JSON.parse(imagePaymentData);
-        
-        // Find matching bank from the list
-        let matchedBankCode = prefillData.bankCode;
-        const matchedBank = banks.find(
-          (b) =>
-            b.id === prefillData.bankCode ||
-            b.title.toLowerCase().includes(prefillData.bankName.toLowerCase()) ||
-            prefillData.bankName.toLowerCase().includes(b.title.toLowerCase())
-        );
-
-        if (matchedBank) {
-          matchedBankCode = matchedBank.id;
-        }
-
-        // Add prefilled data to response
-        responseData = {
-          banks,
-          prefilledAmount: prefillData.amount.toString(),
-          prefilledBankCode: matchedBankCode,
-          prefilledBankName: matchedBank ? matchedBank.title : prefillData.bankName,
-          prefilledAccountNumber: prefillData.accountNumber,
-          hasPrefillData: true,
-        };
-
-        logger.info(`[OFFRAMP-INIT] Prefilled data from image payment: amount=${prefillData.amount}, bank=${matchedBank ? matchedBank.title : prefillData.bankName}, account=${prefillData.accountNumber}`);
-        
-        // Clean up the Redis key after reading to prevent reuse
-        await redisClient.del(imagePaymentKey);
-        logger.info(`[OFFRAMP-INIT] Cleaned up prefill data from Redis`);
-      } catch (error) {
-        logger.error("Error parsing image payment prefill data: " + (error as Error).message);
-      }
-    }
-
     return {
       screen: "OFFRAMP_DETAILS",
-      data: responseData,
+      data: {
+        banks: banks,
+      },
     };
   }
 
@@ -570,10 +524,8 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           bsc: "bep20",
           base: "base",
           arbitrum: "arbitrum",
-          stellar: "stellar",
           // Aliases
           bep20: "bep20",
-          solana: "solana",
         };
 
         const dexPayChain = chainMapping[network.toLowerCase()];
@@ -592,7 +544,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             screen: "OFFRAMP_DETAILS",
             data: {
               banks: banks,
-              error_message: `Unsupported network: ${network}. Supported: BSC, SOL, BASE, ARBITRUM, STELLAR`,
+              error_message: `Unsupported network: ${network}. Supported: BSC, SOL, BASE, ARBITRUM`,
             },
           };
         }
@@ -603,12 +555,12 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
         let isSupportedCombination = false;
 
         if (normalizedAsset === "USDC") {
-          // USDC supported on all chains including Stellar
-          if (["sol", "bsc", "base", "arbitrum", "bep20", "stellar"].includes(chainKey)) {
+          // USDC supported on all 4 chains
+          if (["sol", "bsc", "base", "arbitrum", "bep20"].includes(chainKey)) {
             isSupportedCombination = true;
           }
         } else if (normalizedAsset === "USDT") {
-          // USDT only supported on BSC and SOL (not Stellar)
+          // USDT only supported on BSC and SOL
           if (["sol", "bsc", "bep20"].includes(chainKey)) {
             isSupportedCombination = true;
           }
@@ -628,7 +580,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             screen: "OFFRAMP_DETAILS",
             data: {
               banks: banks,
-              error_message: `${normalizedAsset} is not supported on ${network}. Supported: BSC (USDC/USDT), SOL (USDC/USDT), BASE (USDC), ARBITRUM (USDC), STELLAR (USDC)`,
+              error_message: `${normalizedAsset} is not supported on ${network}. Supported: BSC (USDC/USDT), SOL (USDC/USDT), BASE (USDC), ARBITRUM (USDC)`,
             },
           };
         }
@@ -637,16 +589,11 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
         let rateDisplay = "Current market rate"; // Fallback
         let sellAmountUsd = "0.00"; // Amount in USD (excluding fees)
 
-        // For Stellar: rate fetch uses USDT on BSC since that's what DexPay will quote
-        const isStellarPreview = dexPayChain === "stellar";
-        const rateQueryAsset = isStellarPreview ? "USDT" : currency;
-        const rateQueryChain = isStellarPreview ? "bep20" : dexPayChain;
-
         try {
           const rateData = await dexPayService.getCurrentRates(
-            rateQueryAsset,
-            rateQueryChain,
-            ngnAmount,
+            currency,
+            dexPayChain,
+            10000,
           );
           if (rateData && rateData.rate > 0) {
             // Apply spread to the rate (user sees worse rate) - configurable via env
@@ -856,7 +803,6 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             bep20: { dexPay: "bep20", crossmint: "bsc" },
             base: { dexPay: "base", crossmint: "base" },
             arbitrum: { dexPay: "arbitrum", crossmint: "arbitrum" },
-            stellar: { dexPay: "stellar", crossmint: "stellar" },
           };
 
           const normalizedChain = chainMapping[network.toLowerCase()];
@@ -865,27 +811,28 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
               screen: "OFFRAMP_CRYPTO_REVIEW",
               data: {
                 ...data,
-                error_message: `Unsupported network: ${network}. Supported: BEP20, SOL, BASE, ARBITRUM, STELLAR`,
+                error_message: `Unsupported network: ${network}. Supported: BEP20, SOL, BASE, ARBITRUM`,
                 has_error: true,
               },
             };
           }
 
           // Validate Asset + Chain Combinations
-          const normalizedAsset = currency.toUpperCase();
+          const normalizedAsset = currency.toUpperCase(); // Ensure uppercase for comparison
           const chainKey = network.toLowerCase();
+          // Note: chainKey might be 'sol', 'solana', 'bsc', 'bep20', 'base', 'arbitrum'
 
           let isSupportedCombination = false;
 
           if (normalizedAsset === "USDC") {
-            // USDC supported on all chains including Stellar
+            // USDC supported on all 4 chains
             if (
-              ["sol", "solana", "bsc", "bep20", "base", "arbitrum", "stellar"].includes(chainKey)
+              ["sol", "solana", "bsc", "bep20", "base", "arbitrum"].includes(chainKey)
             ) {
               isSupportedCombination = true;
             }
           } else if (normalizedAsset === "USDT") {
-            // USDT supported on BEP20, SOL, and ARBITRUM (not Stellar)
+            // USDT supported on BEP20, SOL, and ARBITRUM
             if (["sol", "solana", "bsc", "bep20", "arbitrum"].includes(chainKey)) {
               isSupportedCombination = true;
             }
@@ -896,7 +843,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
               screen: "OFFRAMP_CRYPTO_REVIEW",
               data: {
                 ...data,
-                error_message: `${normalizedAsset} is not supported on ${network}. Supported: BEP20 (USDC/USDT), SOL (USDC/USDT), BASE (USDC), ARBITRUM (USDC/USDT), STELLAR (USDC)`,
+                error_message: `${normalizedAsset} is not supported on ${network}. Supported: BEP20 (USDC/USDT), SOL (USDC/USDT), BASE (USDC), ARBITRUM (USDC/USDT)`,
                 has_error: true,
               },
             };
@@ -904,11 +851,6 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
 
           const dexPayChain = normalizedChain.dexPay;
           const crossmintChain = normalizedChain.crossmint;
-
-          // For Stellar: USDC is received on Stellar, but DexPay quote uses USDT on BSC
-          const isStellar = crossmintChain === "stellar";
-          const dexPayQuoteChain = isStellar ? "bep20" : dexPayChain;
-          const dexPayQuoteAsset = isStellar ? "USDT" : normalizedAsset;
 
           // ============================================================
           // CONSOLE LOG: CHAIN MAPPING
@@ -940,9 +882,9 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
 
           try {
             const rateData = await dexPayService.getCurrentRates(
-              isStellar ? dexPayQuoteAsset : currency,
-              dexPayQuoteChain,
-              ngnAmount,
+              currency,
+              dexPayChain,
+              10000,
             );
 
             nairaRate = rateData.rate;
@@ -1198,16 +1140,11 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           // Generate a unique idempotency key for this transfer (includes timestamp for uniqueness)
           const transferIdempotencyKey = `offramp-transfer-${user.userId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-          // Round amount to appropriate decimal places based on chain
-          // Stellar USDC supports max 7 decimals, others typically support 6
-          const decimals = isStellar ? 7 : 6;
-          const roundedAmount = parseFloat(totalCryptoRequired.toFixed(decimals));
-
           const transferResult = await crossmintService.transferTokens({
             walletAddress: wallet.address,
             token: `${crossmintChain}:${normalizedAsset.toLowerCase()}`,
             recipient: receivingAddress,
-            amount: roundedAmount.toString(),
+            amount: totalCryptoRequired.toString(),
             idempotencyKey: transferIdempotencyKey,
           });
 
@@ -1304,15 +1241,17 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             user.userId,
             phone,
             ngnAmount,
-            dexPayQuoteAsset,
-            dexPayQuoteChain,
+            normalizedAsset,
+            dexPayChain,
             bank_code,
             finalRecipientName || "Beneficiary",
             account_number,
+            receivingAddress,
             currency || "USDT",
             bank_name || "Bank",
             financials.totalInUsd,
-            idempotencyKey,
+            dexPayService,
+            idempotencyKey, // Pass idempotency key for completion tracking
           ).catch((err) =>
             logger.error(
               "[OFFRAMP] Background processing error: " + (err as Error).message,

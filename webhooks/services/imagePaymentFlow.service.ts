@@ -164,7 +164,7 @@ export async function getImagePaymentFlowScreen(decryptedBody: {
       
       try {
         const ngnAmount = parseFloat(amount);
-        const rateData = await dexPayService.getCurrentRates(rateQueryAsset, rateQueryChain, ngnAmount);
+        const rateData = await dexPayService.getCurrentRates(rateQueryAsset, rateQueryChain, 10000);
         
         if (!rateData || !rateData.rate || rateData.rate <= 0) {
           return {
@@ -433,7 +433,7 @@ export async function getImagePaymentFlowScreen(decryptedBody: {
           const rateData = await dexPayService.getCurrentRates(
             isStellar ? dexPayQuoteAsset : (asset || "USDC"),
             dexPayQuoteChain,
-            ngnAmount
+            10000
           );
           const nairaRate = rateData.rate;
 
