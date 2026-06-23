@@ -1233,7 +1233,7 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
       const response = await axios.post(
         `${this.baseUrl}/wallets/${wallet.address}/tokens/${tokenIdentifier}/transfers`,
         {
-          amount,
+          amount: this.sanitizeAmount(amount, 6),
           recipient: toAddress,
           executionRoute: "direct",
           // Configure external wallet signer for transaction signing
@@ -1506,8 +1506,12 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         // Enhanced request with idempotency support and external wallet signer
         const isStellarTransfer = chainType.toLowerCase() === "stellar";
 
+        // Crossmint rejects amounts with more than 6 decimal places.
+        // Truncate (floor) rather than round to avoid sending more than intended.
+        const sanitizedAmount = this.sanitizeAmount(amount, 6);
+
         const transferPayload: Record<string, any> = {
-          amount,
+          amount: sanitizedAmount,
           recipient: toAddress,
           transactionType: "direct",
           // Add idempotency key to prevent duplicate transfers
@@ -2347,6 +2351,26 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
   }
 
   /**
+   * Sanitize a transfer amount to at most `maxDecimals` decimal places.
+   * Uses floor (truncation) rather than rounding to avoid sending more than
+   * the caller intended.  Returns the value as a string without trailing zeros.
+   *
+   * Examples:
+   *   sanitizeAmount("9.678900360005484", 6) → "9.678900"
+   *   sanitizeAmount("10.0",              6) → "10"
+   */
+  private sanitizeAmount(amount: string, maxDecimals: number): string {
+    const parsed = parseFloat(amount);
+    if (isNaN(parsed)) return amount; // let the API return the validation error
+
+    const factor = Math.pow(10, maxDecimals);
+    const truncated = Math.floor(parsed * factor) / factor;
+
+    // toFixed gives exactly maxDecimals places; parseFloat strips trailing zeros
+    return parseFloat(truncated.toFixed(maxDecimals)).toString();
+  }
+
+  /**
    * Generate a random string of specified length
    */
   private generateRandomString(length: number): string {
@@ -2645,6 +2669,214 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
     } catch (error: any) {
       logger.error("Error estimating transfer fees:", error.message);
       throw new Error(`Failed to estimate transfer fees: ${error.message}`);
+    }
+  }
+
+  // ========================================
+  // Solana USDT Transfer
+  // ========================================
+
+  /**
+   * Transfer USDT on Solana from a user's Crossmint smart wallet to any Solana address.
+   *
+   * Flow:
+   *  1. Resolve the user's Solana smart wallet (created on demand if missing).
+   *  2. Confirm the wallet holds enough USDT.
+   *  3. POST to Crossmint transfers endpoint with the external-wallet signer.
+   *  4. If the transaction lands in `awaiting-approval` state, auto-sign and
+   *     submit the approval using the configured Solana admin key.
+   *
+   * @param userId        - Internal user identifier (maps to Crossmint `userId:<id>:solana:smart`)
+   * @param recipientAddress - Destination Solana wallet address (base58)
+   * @param amount        - Human-readable USDT amount, e.g. "10.5"
+   * @param idempotencyKey - Caller-supplied unique key (10–64 chars) to prevent duplicate sends
+   *
+   * @returns `{ success: true, transactionId }` on success, or `{ success: false, error }` on failure.
+   */
+  async transferSolanaUsdt(
+    userId: string,
+    recipientAddress: string,
+    amount: string,
+    idempotencyKey: string,
+  ): Promise<{ success: boolean; transactionId?: string; error?: string }> {
+    const CHAIN = "solana";
+    const TOKEN = "usdt";
+    const TOKEN_IDENTIFIER = `${CHAIN}:${TOKEN}`; // "solana:usdt"
+
+    try {
+      // ── 1. Input validation ──────────────────────────────────────────────
+      if (!userId?.trim()) {
+        return { success: false, error: "userId is required" };
+      }
+      if (!this.isValidWalletAddress(recipientAddress)) {
+        return { success: false, error: `Invalid Solana recipient address: ${recipientAddress}` };
+      }
+      const parsedAmount = parseFloat(amount);
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        return { success: false, error: "Amount must be a positive number" };
+      }
+      if (!idempotencyKey || idempotencyKey.length < 10 || idempotencyKey.length > 64) {
+        return { success: false, error: "idempotencyKey must be between 10 and 64 characters" };
+      }
+
+      // ── 2. Resolve (or create) the user's Solana wallet ─────────────────
+      logger.info(`[SolanaUSDT] Resolving wallet for user ${userId}`);
+      let wallet = await this.getWalletByChain(userId, CHAIN);
+      if (!wallet) {
+        logger.info(`[SolanaUSDT] No Solana wallet found — creating one for user ${userId}`);
+        wallet = await this.createWalletInternal(userId, CHAIN);
+        this.registerWalletUserMapping(wallet.address, userId);
+      } else {
+        this.registerWalletUserMapping(wallet.address, userId);
+      }
+
+      logger.info(`[SolanaUSDT] Using wallet ${wallet.address} for user ${userId}`);
+
+      // ── 3. Verify USDT balance ───────────────────────────────────────────
+      const rawBalances = await this.getBalancesByChain(userId, CHAIN, [TOKEN]);
+      const usdtBalance = rawBalances.find(
+        (b) => (b.symbol || b.token || "").toLowerCase() === TOKEN,
+      );
+
+      const availableAmount = usdtBalance ? parseFloat(usdtBalance.amount) : 0;
+      logger.info(`[SolanaUSDT] Available USDT balance: ${availableAmount} for user ${userId}`);
+
+      if (availableAmount < parsedAmount) {
+        return {
+          success: false,
+          error: `Insufficient USDT balance. Available: ${availableAmount}, Required: ${parsedAmount}`,
+        };
+      }
+
+      // ── 4. Resolve admin signer ──────────────────────────────────────────
+      const adminAddress = this.adminSolanaAddress;
+      if (!adminAddress) {
+        return {
+          success: false,
+          error:
+            "Solana admin signer not configured. Please set CROSSMINT_ADMIN_SOLANA_ADDRESS.",
+        };
+      }
+
+      // ── 5. Build and submit the transfer request ─────────────────────────
+      const transferEndpoint = `${this.baseUrl}/wallets/${wallet.address}/tokens/${TOKEN_IDENTIFIER}/transfers`;
+
+      // Crossmint rejects amounts with more than 6 decimal places — truncate before sending.
+      const sanitizedAmount = this.sanitizeAmount(amount, 6);
+
+      const transferPayload = {
+        amount: sanitizedAmount,
+        recipient: recipientAddress,
+        transactionType: "direct",
+        idempotencyKey,
+        signer: `external-wallet:${adminAddress}`,
+        metadata: {
+          userId,
+          token: TOKEN_IDENTIFIER,
+          workflowType: "solana-usdt-transfer",
+        },
+      };
+
+      logger.info(`[SolanaUSDT] Submitting transfer:`, {
+        endpoint: transferEndpoint,
+        amount,
+        recipient: recipientAddress,
+        idempotencyKey,
+        signer: `external-wallet:${adminAddress}`,
+      });
+
+      const response = await axios.post(transferEndpoint, transferPayload, {
+        headers: {
+          "X-API-KEY": this.apiKey,
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
+        },
+        timeout: 30_000,
+      });
+
+      logger.info(`[SolanaUSDT] Crossmint response status: ${response.data.status}`, {
+        transactionId: response.data.id,
+      });
+
+      // ── 6. Handle awaiting-approval (external-wallet signing required) ───
+      if (response.data.status === "awaiting-approval") {
+        const pendingApproval = response.data.approvals?.pending?.[0];
+        if (!pendingApproval?.message) {
+          return {
+            success: false,
+            error: `Transaction ${response.data.id} is awaiting approval but no signing message was returned.`,
+          };
+        }
+
+        logger.info(`[SolanaUSDT] Transaction awaiting approval — signing with admin key`, {
+          transactionId: response.data.id,
+        });
+
+        try {
+          const approvalResult = await this.submitTransactionApproval(
+            wallet.address,
+            response.data.id,
+            pendingApproval.message,
+            adminAddress,
+          );
+
+          logger.info(`[SolanaUSDT] Approval submitted successfully`, {
+            transactionId: response.data.id,
+            approvalStatus: approvalResult?.status,
+          });
+
+          return {
+            success: true,
+            transactionId: response.data.id,
+          };
+        } catch (approvalErr: any) {
+          logger.error(`[SolanaUSDT] Auto-approval failed`, {
+            transactionId: response.data.id,
+            error: approvalErr.message,
+          });
+          return {
+            success: false,
+            error: `Transfer created (id: ${response.data.id}) but approval signing failed: ${approvalErr.message}`,
+          };
+        }
+      }
+
+      // ── 7. Non-approval responses (completed / confirmed / pending / etc.) ─
+      const transactionId = response.data.id ?? response.data.transactionId ?? "";
+      logger.info(`[SolanaUSDT] Transfer accepted by Crossmint`, {
+        transactionId,
+        status: response.data.status,
+      });
+
+      return { success: true, transactionId };
+    } catch (error: any) {
+      const apiError =
+        error.response?.data?.message || error.response?.data?.error || error.message;
+
+      // Idempotency replay — treat as success, transaction was already sent
+      if (error.response?.status === 409) {
+        logger.warn(`[SolanaUSDT] Idempotency conflict — transfer already processed`, {
+          idempotencyKey,
+          error: apiError,
+        });
+        return {
+          success: false,
+          error: `Transfer with idempotency key "${idempotencyKey}" was already processed.`,
+        };
+      }
+
+      logger.error(`[SolanaUSDT] Transfer failed`, {
+        userId,
+        recipient: recipientAddress,
+        amount,
+        error: apiError,
+        statusCode: error.response?.status,
+      });
+
+      return {
+        success: false,
+        error: this.translateTransferError(error),
+      };
     }
   }
 
