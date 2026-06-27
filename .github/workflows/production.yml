@@ -63,7 +63,7 @@ jobs:
           path: release/
 
       - name: Write .env for production
-        run: printf '%s' "${{ secrets.PRODUCTION_ENV }}" > release/.env
+        run: echo "${{ secrets.PRODUCTION_ENV }}" | base64 -d > release/.env
 
       - name: Ensure ~/app exists on server
         uses: appleboy/ssh-action@v1.0.0

@@ -50,7 +50,7 @@ jobs:
         run: rm -rf .git .github .gitignore
 
       - name: Write .env for staging
-        run: printf '%s' "${{ secrets.STAGING_ENV }}" > .env
+        run: echo "${{ secrets.STAGING_ENV }}" | base64 -d > .env
 
       - name: Ensure ~/staging exists on server
         uses: appleboy/ssh-action@v1.0.0
