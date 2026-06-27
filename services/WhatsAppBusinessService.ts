@@ -265,15 +265,10 @@ export class WhatsAppBusinessService {
 
     await this.sendImageFlowById(to, introFlowId, introInitScreedId, {
       link,
-      body: `Welcome to Chainpaye! 🚀
-
-We make managing money as easy as sending a text. Here's what you can do:
-
-💸 **Global Transfers**: Send & receive USD, EUR, and GBP instantly.
-🔗 **Get Paid Fast**: Create payment links in seconds.
-🔄 **Crypto to Cash**: Convert crypto to fiat in under 50 seconds.
-
-No complex apps, just secure & fast payments right here! ✨`,
+      body: `Welcome to Chainpaye! 🎉
+      - Send, Receive and Convert USD 🇺🇸 | GBP 🇬🇧 | EUR 🇪🇺 | NGN 🇳🇬.
+      - Spend stablecoins like cash, cutting out middle-men and Banks🏦.
+      - Generate payment links & collect USD 🇺🇸 | NGN 🇳🇬 seamlessly`,
       cta: "Sign Up",
     });
   }
@@ -281,31 +276,138 @@ No complex apps, just secure & fast payments right here! ✨`,
   async sendMenuMessageMyFlowId(to: string) {
     // const topUpFlowId = "1513776869736922";
     // const topupScreenInitId = "TOPUP_WALLET";
-    await this.sendNormalMessage(
-      `Hi, it’s Chainpaye 💳🏦! What’s good? 😊
+    
+    // Get personalized greeting
+    const phone = to.startsWith("+") ? to : `+${to}`;
+    let greeting = "Hi";
+    
+    try {
+      const user = await userService.getUser(phone);
+      if (user) {
+        // Get appropriate name
+        let firstName = "";
+        if (user.isVerified && user.firstName) {
+          // User has done KYC, use firstName
+          firstName = user.firstName as string;
+        } else if (user.fullName) {
+          // Split fullName and use first part
+          firstName = user.fullName?.split(" ")[0] || "";
+        }
+        
+        // Get time-based greeting based on user's timezone
+        let timeGreeting = "";
+        try {
+          // Map country codes to timezones
+          const countryTimezones: { [key: string]: string } = {
+            'NG': 'Africa/Lagos',
+            'US': 'America/New_York',
+            'GB': 'Europe/London',
+            'CA': 'America/Toronto',
+            'GH': 'Africa/Accra',
+            'KE': 'Africa/Nairobi',
+            'ZA': 'Africa/Johannesburg'
+          };
+          
+          const timezone = countryTimezones[user.country] || 'UTC';
+          const userTime = new Date().toLocaleString('en-US', { 
+            timeZone: timezone,
+            hour12: false,
+            hour: 'numeric'
+          });
+          const currentHour = parseInt(userTime);
+          
+          if (currentHour < 12) {
+            timeGreeting = "Good morning";
+          } else if (currentHour <= 17) {
+            timeGreeting = "Good afternoon";
+          } else {
+            timeGreeting = "Good evening";
+          }
+        } catch (error) {
+          // Fallback to server time if timezone calculation fails
+          const currentHour = new Date().getHours();
+          if (currentHour < 12) {
+            timeGreeting = "Good morning";
+          } else if (currentHour <= 17) {
+            timeGreeting = "Good afternoon";
+          } else {
+            timeGreeting = "Good evening";
+          }
+        }
+        
+        // Combine greeting with name if available
+        if (firstName) {
+          greeting = `${timeGreeting} ${firstName}`;
+        } else {
+          greeting = timeGreeting;
+        }
+      }
+    } catch (error) {
+      // If user lookup fails, use default greeting
+      console.log("Error getting user for greeting:", error);
+    }
+    
+//     await this.sendNormalMessage(
+//       `${greeting}, it’s Chainpaye 💳🏦!
+
+// What can I do for you?
+
+// 💰 Deposit — Top up instantly!
+
+// 💳 Send crypto — Spend crypto anywhere.
+ 
+// 🌍 Send — Pay friends in a flash using Whatsapp NO.
+
+// 🏦 Withdraw — Cash out to your bank.`,
+//       to,
+//     );
+
+    await this.sendListMessage(
+      to,"",
+      `${greeting},\n 
+it’s Chainpaye 💳🏦!
 
 What can I do for you?
 
 💰 Deposit — Top up instantly!
 
-💳 Offramp — Spend crypto anywhere.
+💳 Send crypto — Spend crypto anywhere.
  
 🌍 Send — Pay friends in a flash using Whatsapp NO.
 
 🏦 Withdraw — Cash out to your bank.`,
-      to,
-    );
-
-    await this.sendListMessage(
-      to,
-      "Other menu",
-      "Select an action to continue.",
       // "Powered by Chainpaye",
       "View Menu",
       [
         {
           title: "Other menu",
           rows: [
+          {
+            id:"other_menu_ngn_deposit",
+            title:"Deposit NGN",
+            description:"Fund your NGN wallet"
+          },
+          {
+            id:"other_menu_USD_deposit",
+            title:"Deposit USD",
+            description:"Fund your USD wallet"
+          },
+          {
+            id:"other_menu_withdraw",
+            title:"Withdraw To Bank",
+            description:"Withdraw your funds to your bank account"
+          },
+          {
+            id:"other_menu_spend_crypto",
+            title:"Spend Crypto",
+            description:"Spend crypto like cash"
+          },
+          {
+            id:"other_menu_wallets",
+            title:"Wallets",
+            description:"View list of crypto wallets and balances"
+          },
+          
             {
               id: "other_menu_payment_link",
               title: "Payment link",
@@ -316,11 +418,24 @@ What can I do for you?
               title: "Transaction history",
               description: "View your recent transactions",
             },
+          {
+            id:"other_menu_referral",
+            title:"Referral",
+            description:"View referral stats and details"
+          },
+          
+          
             {
               id: "other_menu_support",
               title: "Support",
               description: "Contact Chainpaye support",
             },
+            {
+              id: "other_menu_reset_pin",
+              title: "Reset PIN",
+              description: "Reset your transaction PIN",
+            },
+            
           ],
         },
       ],
@@ -331,9 +446,9 @@ What can I do for you?
     const topUpFlowId = WHATSAPP_CONFIG.FLOW_IDS.TOPUP;
     const topUpScreenInitId = "TOPUP_WALLET";
     await this.sendTextOnlyFlowById(to, topUpFlowId, topUpScreenInitId, {
-      header: "Top up Wallet",
-      body: "Top up your Chainpaye wallet in seconds and start sending or receiving money globally.",
-      cta: "Start Top-up",
+      header: "⚡ Confirm Deposit",
+      body: "1. Transfer NGN to the account above.\n2. Tap \"Deposit Completed\" below.\n3. Enter the amount to confirm.",
+      cta: "Deposit Completed",
     });
   }
 
@@ -402,15 +517,15 @@ What can I do for you?
       convertFlowScreen,
       {
         header: "Convert Fiat",
-        body: "Convert between NGN, USD, EUR, and GBP seamlessly.",
+        body: "Convert between NGN and USD seamlessly.",
         cta: "Start Conversion",
       },
       {
         currencies: [
           { id: "USD", title: "USD" },
           { id: "NGN", title: "NGN" },
-          { id: "EUR", title: "EUR" },
-          { id: "GBP", title: "GBP" },
+          // { id: "EUR", title: "EUR" },
+          // { id: "GBP", title: "GBP" },
         ],
       },
     );
@@ -439,26 +554,79 @@ What can I do for you?
         currencies: [
           { id: "NGN", title: "NGN" },
           { id: "USD", title: "USD" },
-          { id: "GBP", title: "GBP" },
-          { id: "EUR", title: "EUR" },
+          // { id: "GBP", title: "GBP" },
+          // { id: "EUR", title: "EUR" },
         ],
       },
     );
   }
 
   /**
-   * Send KYC verification flow to Nigerian users
-   * This allows them to complete BVN verification
+   * Send KYC verification flow based on user's country
+   * Nigeria → BVN flow, Kenya → National ID flow
    */
   async sendKycFlowById(to: string) {
-    // TODO: Replace with actual KYC flow ID after uploading to Meta Business Suite
-    const kycFlowId = WHATSAPP_CONFIG.FLOW_IDS.KYC;
-    const kycScreenId = "COUNTRY_SELECT";
-    await this.sendTextOnlyFlowById(to, kycFlowId, kycScreenId, {
-      header: "Verify Your Identity",
-      body: "Complete your BVN verification to unlock all Chainpaye features including bank withdrawals.",
-      cta: "Start Verification",
+    const user = await User.findOne({ whatsappNumber: to });
+    const country = user?.country || "NG";
+
+    if (country === "KE") {
+      const kycKeFlowId = WHATSAPP_CONFIG.FLOW_IDS.KYC_KE;
+      await this.sendTextOnlyFlowById(to, kycKeFlowId, "ID_INPUT", {
+        header: "Verify Your Identity",
+        body: "Complete your National ID verification to unlock all Chainpaye features including bank withdrawals.",
+        cta: "Start Verification",
+      });
+    } else if (country === "GH") {
+      const kycGhFlowId = WHATSAPP_CONFIG.FLOW_IDS.KYC_GH;
+      await this.sendTextOnlyFlowById(to, kycGhFlowId, "PASSPORT_INPUT", {
+        header: "Verify Your Identity",
+        body: "Complete your passport verification to unlock all Chainpaye features including bank withdrawals.",
+        cta: "Start Verification",
+      });
+    } else {
+      // Default: Nigeria BVN flow
+      const kycFlowId = WHATSAPP_CONFIG.FLOW_IDS.KYC;
+      await this.sendTextOnlyFlowById(to, kycFlowId, "COUNTRY_SELECT", {
+        header: "Verify Your Identity",
+        body: "Complete your BVN verification to unlock all Chainpaye features including bank withdrawals.",
+        cta: "Start Verification",
+      });
+    }
+  }
+
+  async sendUsdDepositFlowById(to: string) {
+    const usdDepositFlowId = WHATSAPP_CONFIG.FLOW_IDS.USD_DEPOSIT;
+    const usdDepositScreenId = "TOPUP_WALLET";
+    await this.sendTextOnlyFlowById(to, usdDepositFlowId, usdDepositScreenId, {
+      header: "USD Deposit",
+      body: "Deposit USD to your Chainpaye wallet using bank transfer.",
+      cta: "Start Deposit",
     });
+  }
+
+  async sendBankDetailsFlowById(to: string, data: { amount: string; transactionId: string }) {
+    const bankDetailsFlowId = WHATSAPP_CONFIG.FLOW_IDS.BANK_DETAILS;
+    const bankDetailsScreenId = "BANK_DETAILS";
+    
+    // Store flow data in Redis for the second flow
+    await redisClient.set(
+      `BANK_DETAILS_FLOW_${to}`,
+      JSON.stringify(data),
+      "EX",
+      CONSTANTS.CACHE_24HRS,
+    );
+
+    await this.sendTextOnlyFlowWithDataById(
+      to,
+      bankDetailsFlowId,
+      bankDetailsScreenId,
+      {
+        header: "Complete Transfer",
+        body: "👆copy and Include the above transaction ID above in your payment description/remark for faster processing.\nThen comeback and click complete transfer.",
+        cta: "Complete Transfer",
+      },
+      data,
+    );
   }
 
   async sendOfframpInstructions(to: string) {
@@ -485,43 +653,22 @@ What would you like to sell?`;
     network: NormalizedNetworkType,
     address: string,
   ) {
-    // Message 1: Send the deposit address
-    // await this.sendNormalMessage(address, to);
-
-    // Fetch banks for the offramp flow
-    let banks: { id: string; title: string }[] = [
-      { id: "000014", title: "Access Bank" },
-      { id: "000013", title: "GTBank" },
-      { id: "000015", title: "Zenith Bank" },
-      { id: "999992", title: "Opay" },
-      { id: "090267", title: "Kuda Bank" },
-    ];
-
-    try {
-      const dexPayBanks = await dexPayService.getBanks();
-      if (dexPayBanks && dexPayBanks.length > 0) {
-        banks = dexPayBanks.map((b) => ({ id: b.code, title: b.name }));
-      }
-      console.log("DEBUG: Fetched banks for offramp:", banks.length);
-    } catch (error) {
-      console.error("DEBUG: Error fetching banks, using fallback:", error);
-    }
-
-    // Start the flow with banks data
+    // Start the flow at the currency selection screen
     const cryptoTopUpFlowId = WHATSAPP_CONFIG.FLOW_IDS.OFFRAMP;
-    const cryptoTopUpScreenId = "OFFRAMP_DETAILS";
+    const cryptoTopUpScreenId = "SELECT_CURRENCY";
 
     await this.sendTextOnlyFlowWithDataById(
       to,
       cryptoTopUpFlowId,
       cryptoTopUpScreenId,
       {
-        body: `Spend stablecoin like 💸 
+        body: `Complete the flow to \nSpend stablecoin like cash💸 
      `,
-        cta: "Complete Off ramp",
+        cta: "Spend crypto",
       },
       {
-        banks: banks,
+        has_error: false,
+        error_message: "",
       },
     );
 
@@ -573,39 +720,134 @@ Account No: ${user.whatsappNumber.replace("+", "")}
 
 Available Balances:
 NGN: NGN ${ngnBalance.balance.toFixed(2)}
-USD: USD ${usdBalance.balance.toFixed(2)}
-EUR: EUR ${eurBalance.balance.toFixed(2)}
-GBP: GBP ${gbpBalance.balance.toFixed(2)}`;
+USD: USD ${usdBalance.balance.toFixed(2)}`;
+// let message = `Hello ${displayName},
+
+// Account No: ${user.whatsappNumber.replace("+", "")}
+
+// Available Balances:
+// NGN: NGN ${ngnBalance.balance.toFixed(2)}
+// USD: USD ${usdBalance.balance.toFixed(2)}
+// EUR: EUR ${eurBalance.balance.toFixed(2)}
+// GBP: GBP ${gbpBalance.balance.toFixed(2)}`;
 
     let accountnumber: string | null = null;
 
-    if (user.country === "NG") {
-      const [vw] = await Promise.all([
-        toronetService.getVirtualWalletByAddress(wallet.publicKey),
-        toronetService.updateVirtualWallet(wallet.publicKey),
-      ]);
+//     if (user.country === "NG") {
+//       const [vw] = await Promise.all([
+//         toronetService.getVirtualWalletByAddress(wallet.publicKey),
+//         toronetService.updateVirtualWallet(wallet.publicKey),
+//       ]);
 
-      if (vw.result) {
-        message += `\n\n
-*FUND YOUR ACCOUNT*
+//       if (vw.result) {
+//         message += `\n\n
+// *FUND YOUR ACCOUNT*
 
-To top up your NGN balance, transfer to:
+// To top up your NGN balance, transfer to:
 
-Bank: FCMB
-Account Name: ${vw.accountname}
-(NGN Deposits Only)
+// Bank: FCMB
+// Account Name: ${vw.accountname}
+// (NGN Deposits Only)
 
-Copy the account number below
-      `;
-        accountnumber = vw.accountnumber;
-      }
-    }
+// Copy the account number below
+//       `;
+//         accountnumber = vw.accountnumber;
+//       }
+//     }
 
     await this.sendNormalMessage(message, to);
-    if (accountnumber) {
-      await this.sendNormalMessage(accountnumber, to);
-    }
+    // if (accountnumber) {
+    //   await this.sendNormalMessage(accountnumber, to);
+    // }
   }
+  async sendReferralWithdrawalFlow(to: string, currentBalance: number) {
+    const referralWithdrawalFlowId = WHATSAPP_CONFIG.FLOW_IDS.REFERRAL_WITHDRAWAL;
+    const referralWithdrawalScreenId = "WITHDRAWAL_DETAILS";
+
+    if (!referralWithdrawalFlowId) {
+      throw new Error(
+        "Missing WhatsApp referral withdrawal flow ID. Set WHATSAPP_REFERRAL_WITHDRAWAL_FLOW_ID (or staging equivalent).",
+      );
+    }
+
+    // Get user's EVM address from Crossmint
+    const phone = to.startsWith("+") ? to : `+${to}`;
+    const user = await User.findOne({ whatsappNumber: phone });
+    
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Get or create EVM wallet to get EVM address
+    const crossmintService = new (await import("./CrossmintService")).CrossmintService();
+    const wallet = await crossmintService.getOrCreateWallet(user._id.toString(), "evm");
+
+    await this.sendTextOnlyFlowWithDataById(
+      to,
+      referralWithdrawalFlowId,
+      referralWithdrawalScreenId,
+      {
+        header: "Withdraw Earnings",
+        body: "Withdraw your referral earnings as USDT on Base chain directly to your wallet.",
+        cta: "Withdraw Earnings",
+      },
+      {
+        currentBalance: currentBalance.toFixed(2),
+        minAmount: "20",
+        chain: "Base",
+        token: "USDT",
+        evmAddress: wallet.address,
+      },
+    );
+  }
+
+  async sendEmailVerificationFlowById(to: string): Promise<void> {    const flowId = WHATSAPP_CONFIG.FLOW_IDS.EMAIL_VERIFICATION;
+    await this.sendTextOnlyFlowById(to, flowId, "EMAIL_INPUT", {
+      header: "Verify Your Email",
+      body: "Please verify your email address to access all Chainpaye features.",
+      cta: "Verify Email",
+    });
+  }
+
+  async sendAddBeneficiaryFlowById(to: string): Promise<void> {
+    const flowId = WHATSAPP_CONFIG.FLOW_IDS.ADD_BENEFICIARY;
+    if (!flowId) {
+      throw new Error(
+        "Missing WhatsApp add beneficiary flow ID. Set WHATSAPP_ADD_BENEFICIARY_FLOW_ID.",
+      );
+    }
+    await this.sendTextOnlyFlowById(to, flowId, "SELECT_COUNTRY", {
+      header: "Add Beneficiary",
+      body: "Add a bank account beneficiary for Ghana or Kenya payouts.",
+      cta: "Add Beneficiary",
+    });
+  }
+
+  async sendResetPinEmailCollectionFlow(to: string) {
+    const flowId = WHATSAPP_CONFIG.FLOW_IDS.RESET_PIN;
+
+    if (!flowId) {
+      throw new Error(
+        "Missing WhatsApp reset PIN flow ID. Set WHATSAPP_RESET_PIN_FLOW_ID (or staging equivalent).",
+      );
+    }
+
+    await this.sendTextOnlyFlowWithDataById(
+      to,
+      flowId,
+      "COLLECT_EMAIL",
+      {
+        header: "Reset Your PIN",
+        body: "We need your email address to send you a secure PIN reset link.",
+        cta: "Continue",
+      },
+      {
+        has_error: false,
+        error_message: "",
+      },
+    );
+  }
+
   async sendSupportMessage(to: string) {
     const message = `🆘 *Need Help?*
 
@@ -613,6 +855,7 @@ For support, please DM our team:
 
 *📞 Brain:* +2348106535142
 *📞 Ben:* +2348130348865
+*📞 Eddy:* +2348135246063
 
 Our team is ready to assist you!`;
 
@@ -634,10 +877,12 @@ Our team is ready to assist you!`;
       type: "interactive",
       interactive: {
         type: "list",
-        header: {
-          type: "text",
-          text: headerText,
-        },
+        ...(headerText && {
+          header: {
+            type: "text",
+            text: headerText,
+          },
+        }),
         body: {
           text: bodyText,
         },
@@ -858,6 +1103,108 @@ Our team is ready to assist you!`;
       );
       throw error;
     }
+  }
+
+  async sendImagePaymentConfirmFlow(
+    to: string,
+    details: {
+      accountNumber: string;
+      accountName: string;
+      bankName: string;
+      bankCode: string;
+      amount: string;
+      currency?: string;
+    },
+  ): Promise<void> {
+    const flowId = WHATSAPP_CONFIG.FLOW_IDS.IMAGE_PAYMENT;
+    if (!flowId) {
+      throw new Error(
+        "Missing WhatsApp image payment flow ID. Set WHATSAPP_IMAGE_PAYMENT_FLOW_ID.",
+      );
+    }
+    await this.sendTextOnlyFlowWithDataById(
+      to,
+      flowId,
+      "CONFIRM_DETAILS",
+      {
+        header: "📸 Payment from Image",
+        body: "We detected payment details from your image. Review and confirm below.",
+        cta: "Review Payment",
+      },
+      {
+        accountNumber: details.accountNumber,
+        accountName: details.accountName,
+        bankName: details.bankName,
+        bankCode: details.bankCode,
+        amount: details.amount,
+        currency: details.currency || "NGN",
+      },
+    );
+  }
+
+  async sendBuyCryptoFlow(to: string): Promise<void> {    const flowId = WHATSAPP_CONFIG.FLOW_IDS.ONRAMP;
+    if (!flowId) {
+      throw new Error(
+        "Missing WhatsApp onramp flow ID. Set WHATSAPP_ONRAMP_FLOW_ID.",
+      );
+    }
+    await this.sendTextOnlyFlowWithDataById(
+      to,
+      flowId,
+      "BUY_CRYPTO_FORM",
+      {
+        header: "Buy Crypto",
+        body: "Buy USDC or USDT with NGN instantly. Select your asset, chain, and enter the amount.",
+        cta: "Buy Crypto",
+      },
+      { init: true },
+    );
+  }
+
+  async sendCompleteTransactionFlow(
+    to: string,
+    quoteData: {
+      id: string;
+      fiatAmount: number;
+      tokenAmount: number;
+      price: number;
+      paymentAccount: {
+        accountName: string;
+        accountNumber: string;
+        bankName: string;
+      };
+      receivingAddress: string;
+      asset: string;
+      chain: string;
+    },
+  ): Promise<void> {
+    const flowId = WHATSAPP_CONFIG.FLOW_IDS.COMPLETE_TRANSACTION;
+    if (!flowId) {
+      throw new Error(
+        "Missing WhatsApp complete transaction flow ID. Set WHATSAPP_COMPLETE_TRANSACTION_FLOW_ID.",
+      );
+    }
+    await this.sendTextOnlyFlowWithDataById(
+      to,
+      flowId,
+      "COMPLETE_TRANSACTION_FORM",
+      {
+        header: "Complete Transaction",
+        body: "Send the NGN amount to the account below, then tap Complete Transaction to confirm.",
+        cta: "Complete Transaction",
+      },
+      {
+        quoteId: quoteData.id,
+        fiatAmount: String(quoteData.fiatAmount),
+        tokenAmount: String(quoteData.tokenAmount),
+        price: String(quoteData.price),
+        bankName: quoteData.paymentAccount.bankName,
+        accountName: quoteData.paymentAccount.accountName,
+        accountNumber: quoteData.paymentAccount.accountNumber,
+        asset: quoteData.asset,
+        chain: quoteData.chain,
+      },
+    );
   }
 
   async handleButtonPayload(payload: ButtonPayloadType, to: string) {

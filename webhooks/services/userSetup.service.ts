@@ -2,6 +2,8 @@ import { redisClient } from "../../services/redis";
 import { UserService } from "../../services/UserService";
 import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService";
 import { getCountryCodeFromPhoneNumber } from "../../utils/countryCodeMapping";
+import { SignupIntegrationServiceImpl } from "../../services/SignupIntegrationService";
+import { logger } from "../../utils/logger";
 
 // ============================================================
 // ACCOUNT SETUP FLOW SERVICE
@@ -66,11 +68,58 @@ export const userSetupScreen = async (decryptedBody: {
   if (action === "INIT") {
     // Detect country from phone number
     const detectedCountry = getCountryCodeFromPhoneNumber(phone);
+    
+    // Check for stored referral code from "start [code]" command
+    const signupIntegrationService = new SignupIntegrationServiceImpl();
+    const formData = await signupIntegrationService.prePopulateReferralField(phone);
+    
+    console.log("DEBUG: INIT - Phone:", phone);
+    console.log("DEBUG: INIT - Form data:", JSON.stringify(formData, null, 2));
+    
+    logger.info(`Signup INIT for ${phone}`, {
+      detectedCountry,
+      hasReferralCode: formData.isPrePopulated,
+      referralCode: formData.referralCode
+    });
+    
+    // If user has a referral code, get the referrer's name and show special screen
+    if (formData.isPrePopulated && formData.referralCode) {
+      try {
+        console.log("DEBUG: INIT - Has referral code, getting referrer info");
+        const { ReferralCodeValidatorService } = await import('../../services/ReferralCodeValidatorService');
+        const validator = new ReferralCodeValidatorService();
+        const result = await validator.validateAndGetReferrer(formData.referralCode);
+        
+        console.log("DEBUG: INIT - Validator result:", JSON.stringify(result, null, 2));
+        
+        if (result.validation.isValid && result.referrer) {
+          console.log("DEBUG: INIT - Returning PERSONAL_INFO_WITH_REFERRAL screen");
+          return {
+            screen: "PERSONAL_INFO_WITH_REFERRAL",
+            data: {
+              countries: countries,
+              default_country: detectedCountry || "NG",
+              referral_code: formData.referralCode,
+              referrer_name: result.referrer.name
+            },
+          };
+        }
+      } catch (error) {
+        logger.error('Error getting referrer info for flow', { error, code: formData.referralCode });
+        console.error("DEBUG: INIT - Error getting referrer info:", error);
+        // Fall through to normal screen if error
+      }
+    }
+    
+    console.log("DEBUG: INIT - Returning normal PERSONAL_INFO screen");
+    // Default screen without referral
     return {
       screen: "PERSONAL_INFO",
       data: {
         countries: countries,
         default_country: detectedCountry || "NG",
+        referral_code: "",
+        has_referral: false
       },
     };
   }
@@ -79,10 +128,11 @@ export const userSetupScreen = async (decryptedBody: {
     // Handle the request based on the current screen
     switch (screen) {
       // --------------------------------------------------------
-      // PERSONAL_INFO → COUNTRY_SELECT
-      // User submits name and DOB
+      // PERSONAL_INFO or PERSONAL_INFO_WITH_REFERRAL → SECURITY_INFO
+      // User submits name and country
       // --------------------------------------------------------
       case "PERSONAL_INFO":
+      case "PERSONAL_INFO_WITH_REFERRAL":
         console.log("DEBUG: Case PERSONAL_INFO");
         try {
           const fullName = data.full_name?.trim();
@@ -91,14 +141,34 @@ export const userSetupScreen = async (decryptedBody: {
 
           // Validate required fields
           if (!fullName || fullName.split(" ").length < 2) {
+            // Return to the same screen they came from
+            const returnScreen = screen === "PERSONAL_INFO_WITH_REFERRAL" ? "PERSONAL_INFO_WITH_REFERRAL" : "PERSONAL_INFO";
+            
+            // If returning to referral screen, need to get referrer name again
+            let returnData: any = {
+              countries: countries,
+              default_country: data.country || "NG",
+              error_message: "Please enter your full name (First and Last name)",
+            };
+            
+            if (returnScreen === "PERSONAL_INFO_WITH_REFERRAL" && data.referral_code) {
+              try {
+                const { ReferralCodeValidatorService } = await import('../../services/ReferralCodeValidatorService');
+                const validator = new ReferralCodeValidatorService();
+                const result = await validator.validateAndGetReferrer(data.referral_code);
+                
+                if (result.validation.isValid && result.referrer) {
+                  returnData.referral_code = data.referral_code;
+                  returnData.referrer_name = result.referrer.name;
+                }
+              } catch (error) {
+                logger.error('Error getting referrer info', { error });
+              }
+            }
+            
             return {
-              screen: "PERSONAL_INFO",
-              data: {
-                countries: countries,
-                default_country: data.country || "NG",
-                error_message:
-                  "Please enter your full name (First and Last name)",
-              },
+              screen: returnScreen,
+              data: returnData,
             };
           }
 
@@ -106,6 +176,21 @@ export const userSetupScreen = async (decryptedBody: {
           const nameParts = fullName.split(" ");
           const firstName = nameParts[0];
           const lastName = nameParts.slice(1).join(" ");
+
+          // Get referral code - either from form submission or from stored data
+          let referralCode = data.referral_code?.trim() || "";
+          console.log("DEBUG: Referral code from form:", data.referral_code);
+          
+          // If no referral code in form, check if it was stored from INIT
+          if (!referralCode) {
+            console.log("DEBUG: No referral code in form, checking Redis");
+            const signupIntegrationService = new SignupIntegrationServiceImpl();
+            const formData = await signupIntegrationService.prePopulateReferralField(phone);
+            referralCode = formData.referralCode || "";
+            console.log("DEBUG: Referral code from Redis:", referralCode);
+          }
+
+          console.log("DEBUG: Final referral code to pass to SECURITY_INFO:", referralCode);
 
           // Proceed to security setup (Skipping COUNTRY_SELECT)
           return {
@@ -116,6 +201,7 @@ export const userSetupScreen = async (decryptedBody: {
               last_name: lastName,
               // dob: dob, // Removed
               country: data.country || "NG",
+              referral_code: referralCode,
             },
           };
         } catch (error) {
@@ -221,15 +307,19 @@ export const userSetupScreen = async (decryptedBody: {
           const existingUser = await userService.getUser(phone);
           console.log("DEBUG: Existing user found?", !!existingUser);
 
+          let userId: string;
           if (!existingUser) {
             // Create new user WITHOUT KYC verification
-            await userService.createUser({
+            const newUser = await userService.createUser({
               whatsappNumber: phone,
               pin: pin,
               fullName:
                 data.full_name || `${data.first_name} ${data.last_name}`,
             });
-            console.log("DEBUG: User created successfully");
+            userId = newUser.userId; // Fixed: UserService.createUser now returns user data
+            logger.info(`User created successfully: ${userId}`);
+          } else {
+            userId = existingUser.userId;
           }
 
           // Update user with profile information
@@ -238,6 +328,36 @@ export const userSetupScreen = async (decryptedBody: {
             dob: "", // No DOB collected at signup
           });
           console.log("DEBUG: User profile updated");
+
+          // Process referral code if provided
+          const referralCode = data.referral_code?.trim();
+          console.log("DEBUG: Referral code from data:", referralCode);
+          console.log("DEBUG: Full data object:", JSON.stringify(data, null, 2));
+          
+          if (referralCode) {
+            try {
+              console.log("DEBUG: Processing referral code:", referralCode, "for user:", userId);
+              const signupIntegrationService = new SignupIntegrationServiceImpl();
+              await signupIntegrationService.processReferralOnSignup(userId, referralCode);
+              
+              // Clean up temporary Redis storage after successful relationship creation
+              await signupIntegrationService.cleanupTemporaryStorage(phone);
+              
+              logger.info(`Referral relationship created for user ${userId} with code ${referralCode}`);
+              console.log("DEBUG: Referral relationship created successfully");
+            } catch (referralError: any) {
+              // Log referral error but don't fail signup
+              logger.error(`Failed to process referral code for user ${userId}:`, {
+                error: referralError.message,
+                code: referralCode,
+                stack: referralError.stack
+              });
+              console.error("DEBUG: Referral error:", referralError);
+              // Continue with signup - referral is optional
+            }
+          } else {
+            console.log("DEBUG: No referral code provided, skipping referral processing");
+          }
 
           // Store account creation info in Redis for welcome message
           const userFullName =
@@ -264,6 +384,7 @@ export const userSetupScreen = async (decryptedBody: {
           };
         } catch (error) {
           console.error("Error in SECURITY_INFO screen:", error);
+          logger.error("Error in SECURITY_INFO screen:", error);
           return {
             screen: "SECURITY_INFO",
             data: {

@@ -17,7 +17,9 @@ import { userService, whatsappBusinessService } from "../../services";
 import { crossmintService } from "../../services/CrossmintService";
 import { dexPayService } from "../../services/DexPayService";
 import { redisClient } from "../../services/redis";
+import { logger } from "../../utils/logger";
 import { NormalizedNetworkType } from "../types";
+import { OfframpTransaction, OfframpStatus } from "../../models/OfframpTransaction";
 
 // Import new architecture services
 import { AuthenticationService } from "../../services/crypto-off-ramp/AuthenticationService";
@@ -86,14 +88,13 @@ export async function handleOfframp(
       return;
     }
 
-    // Check if user is verified (required for off-ramp)
-    if (!user.isVerified) {
-      await whatsappBusinessService.sendNormalMessage(
-        "🔒 *Verification Required*\n\nYou need to complete KYC verification to use the off-ramp feature.\n\nType *kyc* to start verification.",
-        phoneNumber,
-      );
-      return;
-    }
+    // Store KYC status in Redis for use during transaction validation
+    await redisClient.set(
+      `offramp_kyc:${phoneNumber}`,
+      user.isVerified ? "verified" : "unverified",
+      "EX",
+      30 * 60,
+    );
 
     // Initialize workflow using WorkflowController
     const workflowState = await workflowController.initiateOffRamp(user.userId);
@@ -131,7 +132,7 @@ export async function handleOfframp(
 
 /**
  * Display user's existing wallets with balances using WorkflowController
- * If user has no wallets, create EVM and Solana wallets and send offramp flow
+ * If user has no wallets, create EVM, Solana, and Stellar wallets and send offramp flow
  * Requirements: 2.1, 2.2, 2.3, 2.4
  */
 async function displayUserWallets(
@@ -141,59 +142,62 @@ async function displayUserWallets(
 ): Promise<void> {
   try {
     // Get all user wallets
-    const wallets = await crossmintService.listWallets(userId);
+    let wallets = await crossmintService.listWallets(userId);
 
-    // If user has NO wallets, create wallets and send the offramp flow
-    if (!wallets || wallets.length === 0) {
+    // Ensure all three wallets exist — handles existing users who don't have Stellar yet
+    const hasStellar = wallets.some(w => w.chainType === "stellar");
+    const hasEvm = wallets.some(w => w.chainType === "evm");
+    const hasSolana = wallets.some(w => w.chainType === "solana");
+
+    if (!hasEvm || !hasSolana || !hasStellar) {
       console.log(
-        `[OFFRAMP] User ${userId} has no wallets - creating EVM and Solana wallets`,
+        `[OFFRAMP] User ${userId} missing wallets (evm:${hasEvm}, solana:${hasSolana}, stellar:${hasStellar}) - creating missing ones`,
       );
-
       try {
-        // Create both EVM and Solana wallets for the user
-        const [evmWallet, solanaWallet] = await Promise.all([
-          crossmintService.getOrCreateWallet(userId, "evm"),
-          crossmintService.getOrCreateWallet(userId, "solana"),
+        const [evmWallet, solanaWallet, stellarWallet] = await Promise.all([
+          !hasEvm ? crossmintService.getOrCreateWallet(userId, "evm") : Promise.resolve(null),
+          !hasSolana ? crossmintService.getOrCreateWallet(userId, "solana") : Promise.resolve(null),
+          !hasStellar ? crossmintService.getOrCreateWallet(userId, "stellar") : Promise.resolve(null),
         ]);
 
-        console.log(
-          `[OFFRAMP] Created wallets - EVM: ${evmWallet.address}, Solana: ${solanaWallet.address}`,
-        );
+        // If this was a brand new user (no wallets at all), show creation message
+        if (!hasEvm && !hasSolana && !hasStellar && evmWallet && solanaWallet && stellarWallet) {
+          console.log(
+            `[OFFRAMP] Created wallets - EVM: ${evmWallet.address}, Solana: ${solanaWallet.address}, Stellar: ${stellarWallet.address}`,
+          );
 
-        // Send wallet info message to user
-        let walletMessage = `🆕 *Wallets Created Successfully!*\n\n`;
-        walletMessage += `We've created crypto wallets for you:\n\n`;
-        walletMessage += `🔷 *EVM Wallet* (for USDC/USDT on BSC, Base, Arbitrum, etc.)\n`;
-        walletMessage += `\`${evmWallet.address}\`\n\n`;
-        walletMessage += `🟣 *Solana Wallet* (for USDC on Solana)\n`;
-        walletMessage += `\`${solanaWallet.address}\`\n\n`;
-        walletMessage += `💡 Deposit crypto to these addresses, then use the button below to sell and withdraw to your bank account.`;
+          let walletMessage = `🆕 *Wallets Created Successfully!*\n\n`;
+          walletMessage += `We've created crypto wallets for you:\n\n`;
+          walletMessage += `🔷 *EVM Wallet* (for USDC/USDT on BSC, Base, Arbitrum, etc.)\n`;
+          walletMessage += `\`${evmWallet.address}\`\n\n`;
+          walletMessage += `🟣 *Solana Wallet* (for USDC on Solana)\n`;
+          walletMessage += `\`${solanaWallet.address}\`\n\n`;
+          walletMessage += `⭐ *Stellar Wallet* (for USDC on Stellar)\n`;
+          walletMessage += `\`${stellarWallet.address}\`\n\n`;
+          walletMessage += `💡 Deposit crypto to these addresses, then use the button below to sell and withdraw to your bank account.\n`;
+          walletMessage += `Type wallet in the chat to copy your wallets for crypto deposit.`;
 
-        await whatsappBusinessService.sendNormalMessage(
-          walletMessage,
-          phoneNumber,
-        );
+          await whatsappBusinessService.sendNormalMessage(walletMessage, phoneNumber);
+          await whatsappBusinessService.sendCryptoDepositAddress(
+            phoneNumber,
+            "USDC",
+            "base" as NormalizedNetworkType,
+            evmWallet.address,
+          );
+          return;
+        }
 
-        // Send the offramp flow to the user
-        // TODO! Verify the flow ID is correct for your Meta Business Suite setup
-        await whatsappBusinessService.sendCryptoDepositAddress(
-          phoneNumber,
-          "USDC", // Default token
-          "base" as NormalizedNetworkType, // Default network
-          evmWallet.address, // Show EVM address by default
-        );
-
-        return;
+        // Refresh wallet list after creating missing ones
+        wallets = await crossmintService.listWallets(userId);
       } catch (createError) {
-        console.error(
-          `[OFFRAMP] Error creating wallets for user ${userId}:`,
-          createError,
-        );
-        await whatsappBusinessService.sendNormalMessage(
-          "❌ *Error Creating Wallets*\n\nCouldn't create your wallets. Please try again later or contact support.",
-          phoneNumber,
-        );
-        return;
+        console.error(`[OFFRAMP] Error creating missing wallets for user ${userId}:`, createError);
+        if (wallets.length === 0) {
+          await whatsappBusinessService.sendNormalMessage(
+            "❌ *Error Creating Wallets*\n\nCouldn't create your wallets. Please try again later or contact support.",
+            phoneNumber,
+          );
+          return;
+        }
       }
     }
 
@@ -209,7 +213,7 @@ async function displayUserWallets(
           balances = await crossmintService.getBalancesByChain(
             userId,
             "solana",
-            ["usdc", "sol"],
+            ["usdc", "usdt"],
           );
         } else if (wallet.chainType === "evm") {
           // For EVM wallets, fetch balances from each supported chain separately
@@ -310,6 +314,32 @@ async function displayUserWallets(
         phoneNumber,
       );
 
+      // Send EVM, Solana, and Stellar wallet addresses as separate messages
+      const evmWallet = wallets.find(w => w.chainType === "evm");
+      const solanaWallet = wallets.find(w => w.chainType === "solana");
+      const stellarWallet = wallets.find(w => w.chainType === "stellar");
+      
+      if (evmWallet) {
+        await whatsappBusinessService.sendNormalMessage(
+          evmWallet.address,
+          phoneNumber
+        );
+      }
+      
+      if (solanaWallet) {
+        await whatsappBusinessService.sendNormalMessage(
+          solanaWallet.address,
+          phoneNumber
+        );
+      }
+
+      if (stellarWallet) {
+        await whatsappBusinessService.sendNormalMessage(
+          stellarWallet.address,
+          phoneNumber
+        );
+      }
+
       // Send the offramp flow
       const firstWallet = wallets[0];
       if (firstWallet) {
@@ -376,6 +406,32 @@ async function displayUserWallets(
       phoneNumber,
     );
 
+    // Send EVM, Solana, and Stellar wallet addresses as separate messages
+    const evmWallet = wallets.find(w => w.chainType === "evm");
+    const solanaWallet = wallets.find(w => w.chainType === "solana");
+    const stellarWallet = wallets.find(w => w.chainType === "stellar");
+    
+    if (evmWallet) {
+      await whatsappBusinessService.sendNormalMessage(
+        evmWallet.address,
+        phoneNumber
+      );
+    }
+    
+    if (solanaWallet) {
+      await whatsappBusinessService.sendNormalMessage(
+        solanaWallet.address,
+        phoneNumber
+      );
+    }
+
+    if (stellarWallet) {
+      await whatsappBusinessService.sendNormalMessage(
+        stellarWallet.address,
+        phoneNumber
+      );
+    }
+
     // Also send the offramp flow so user can easily start offramping
     const primaryWallet = walletsWithBalances[0];
     const primaryBalance = primaryWallet.balances[0];
@@ -422,7 +478,7 @@ export async function handleAssetSelection(
 
     // Parse asset and chain from message
     const assetChainMatch = message.match(
-      /\b(usdc|usdt)\b.*?\b(bep20|base|arbitrum|solana|hedera|apechain|lisk)\b/i,
+      /\b(usdc|usdt)\b.*?\b(bep20|base|arbitrum|solana|stellar|hedera|apechain|lisk)\b/i,
     );
 
     if (!assetChainMatch) {
@@ -649,9 +705,7 @@ export async function handleSpendCrypto(phoneNumber: string): Promise<boolean> {
     await whatsappBusinessService.sendNormalMessage(
       `💰 *Enter Amount*\n\nHow much NGN do you want to withdraw to your bank account?\n\n` +
         `Example: 50000\n\n` +
-        `⚠️ *Note:* Additional fees will apply:\n` +
-        `• Platform fee: 1.5%\n` +
-        `• DexPay fee: $0.20\n\n` +
+        `⚠️ *Note:* A flat fee of $0.75 USD will apply.\n\n` +
         `Type the amount in NGN:`,
       phoneNumber,
     );
@@ -693,6 +747,16 @@ export async function handleAmountInput(
     }
 
     const ngnAmount = parseFloat(amountMatch[1]?.replace(/,/g, "") || "0");
+
+    // Check minimum offramp amount (configurable via env)
+    const minOfframpAmount = parseFloat(process.env.OFFRAMP_MIN_AMOUNT_NGN || "5000");
+    if (ngnAmount < minOfframpAmount) {
+      await whatsappBusinessService.sendNormalMessage(
+        `❌ *Amount Too Low*\n\nMinimum offramp amount is ₦${minOfframpAmount.toLocaleString()}.\n\nPlease enter a higher amount:`,
+        phoneNumber,
+      );
+      return true;
+    }
 
     // Validate amount using ValidationService
     const validation = validationService.validateTransactionLimits(
@@ -1047,16 +1111,52 @@ export async function handleAccountConfirmation(
       return true;
     }
 
+    // ============================================================
+    // NON-KYC LIMITS CHECK
+    // ============================================================
+    const kycStatus = await redisClient.get(`offramp_kyc:${phoneNumber}`);
+    if (kycStatus === "unverified") {
+      const NON_KYC_MAX_USD = 1000;
+      const NON_KYC_MAX_DAILY_TXN = 5;
+
+      // Check single transaction limit
+      if (financialCalc.totalInUsd > NON_KYC_MAX_USD) {
+        await whatsappBusinessService.sendNormalMessage(
+          `❌ *Transaction Limit Exceeded*\n\nUnverified accounts can only offramp up to $${NON_KYC_MAX_USD} USD per transaction.\n\nYour transaction requires ${financialCalc.totalInUsd.toFixed(2)} USD.\n\nType *kyc* to complete verification and unlock higher limits.`,
+          phoneNumber,
+        );
+        return true;
+      }
+
+      // Check daily transaction count (successful transactions only)
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const dailyCount = await OfframpTransaction.countDocuments({
+        userId: workflowState.userId,
+        status: OfframpStatus.COMPLETED,
+        createdAt: { $gte: startOfDay },
+      });
+
+      if (dailyCount >= NON_KYC_MAX_DAILY_TXN) {
+        await whatsappBusinessService.sendNormalMessage(
+          `❌ *Daily Limit Reached*\n\nUnverified accounts can only perform ${NON_KYC_MAX_DAILY_TXN} successful transactions per day. You have reached your limit for today.\n\nType *kyc* to complete verification and unlock unlimited transactions.`,
+          phoneNumber,
+        );
+        return true;
+      }
+    }
+
     // Show transaction summary and ask for PIN
+    const spreadRate = financialService.getUserFacingRate(workflowState.stepData.exchangeRate);
+    
     const summaryMessage =
       `💱 *Transaction Summary*\n\n` +
       `💰 *Amount:* ₦${amount.toLocaleString()}\n` +
-      `📊 *Rate:* 1 ${selectedAsset.toUpperCase()} = ₦${exchangeRate.toLocaleString()}\n` +
+      `📊 *Rate:* 1 ${selectedAsset.toUpperCase()} = ₦${spreadRate.toFixed(2)}\n` +
       `🔸 *Crypto Required:* ${financialCalc.totalInUsd.toFixed(6)} ${selectedAsset.toUpperCase()}\n\n` +
-      `💸 *Fees:*\n` +
-      `• Platform Fee (1.5%): ₦${financialCalc.chainpayeFee.toLocaleString()}\n` +
-      `• DexPay Fee: ₦${financialCalc.dexpayFee.toLocaleString()}\n` +
-      `• Total Fees: ₦${financialCalc.totalFees.toLocaleString()}\n\n` +
+      `💸 *Fee:*\n` +
+      `• Platform Fee: $0.75 USD\n\n` +
       `🏦 *Destination:*\n` +
       `${workflowState.stepData.bankName}\n` +
       `${workflowState.stepData.accountName}\n` +
@@ -1108,6 +1208,51 @@ export async function handlePinVerification(
 
     const pin = pinMatch[1]!;
 
+    // ============================================================
+    // IDEMPOTENCY CHECK - Prevent duplicate PIN submissions
+    // ============================================================
+    const transactionIdentifier = `${workflowState.userId}:${workflowState.stepData.amount}:${workflowState.stepData.bankCode}:${workflowState.stepData.accountNumber}:${workflowState.stepData.selectedAsset}:${workflowState.stepData.selectedChain}`;
+    const idempotencyKey = `offramp:pin:${Buffer.from(transactionIdentifier).toString('base64')}`;
+    
+    // Check if PIN was already submitted for this transaction
+    const existingPinSubmission = await redisClient.get(idempotencyKey);
+    
+    if (existingPinSubmission) {
+      const submissionData = JSON.parse(existingPinSubmission);
+      logger.warn(`[OFFRAMP] Duplicate PIN submission detected for workflow ${workflowId}`);
+      
+      if (submissionData.status === 'processing') {
+        await whatsappBusinessService.sendNormalMessage(
+          "⏳ *Transaction In Progress*\n\nYour transaction is already being processed. Please wait for completion.\n\nDo not submit your PIN again.",
+          phoneNumber,
+        );
+        return true;
+      }
+      
+      if (submissionData.status === 'completed') {
+        await whatsappBusinessService.sendNormalMessage(
+          "✅ *Transaction Already Completed*\n\nThis transaction was already processed successfully.\n\nType *offramp* to start a new transaction.",
+          phoneNumber,
+        );
+        return true;
+      }
+    }
+    
+    // Mark PIN as submitted (expires in 10 minutes)
+    await redisClient.set(
+      idempotencyKey,
+      JSON.stringify({
+        status: 'processing',
+        workflowId: workflowId,
+        userId: workflowState.userId,
+        submittedAt: new Date().toISOString(),
+      }),
+      'EX',
+      600 // 10 minutes
+    );
+    
+    logger.info(`[OFFRAMP] PIN submission marked as processing: ${idempotencyKey}`);
+
     // Verify PIN using AuthenticationService
     const pinValid = await authenticationService.validatePin(
       workflowState.userId,
@@ -1121,6 +1266,9 @@ export async function handlePinVerification(
     });
 
     if (!stepResult.success) {
+      // Clean up idempotency lock on PIN validation failure
+      await redisClient.del(idempotencyKey);
+      
       await whatsappBusinessService.sendNormalMessage(
         `❌ *${stepResult.error}*`,
         phoneNumber,
@@ -1129,7 +1277,7 @@ export async function handlePinVerification(
     }
 
     // Execute the off-ramp transaction
-    await executeOfframpTransaction(phoneNumber, workflowId);
+    await executeOfframpTransaction(phoneNumber, workflowId, idempotencyKey);
     return true;
   } catch (error) {
     console.error(`Error in handlePinVerification for ${phoneNumber}:`, error);
@@ -1148,6 +1296,7 @@ export async function handlePinVerification(
 async function executeOfframpTransaction(
   phoneNumber: string,
   workflowId: string,
+  idempotencyKey?: string,
 ): Promise<void> {
   try {
     await whatsappBusinessService.sendNormalMessage(
@@ -1284,18 +1433,34 @@ async function executeOfframpTransaction(
         );
 
         if (completionResult.success) {
+          // Update idempotency record to mark as completed
+          if (idempotencyKey) {
+            await redisClient.set(
+              idempotencyKey,
+              JSON.stringify({
+                status: 'completed',
+                workflowId: workflowId,
+                transactionId: result.transactionId,
+                completedAt: new Date().toISOString(),
+              }),
+              'EX',
+              300 // Keep for 5 minutes to prevent immediate duplicates
+            );
+            logger.info(`[OFFRAMP] Transaction marked as completed: ${idempotencyKey}`);
+          }
+          
           // Send comprehensive success message with all details
+          const spreadRate = financialService.getUserFacingRate(workflowState.stepData.exchangeRate);
+          
           const successMessage =
             `🎉 *Transaction Successful!*\n\n` +
             `✅ Your off-ramp has been completed successfully!\n\n` +
             `💰 *Transaction Details:*\n` +
             `• Amount: ₦${workflowState.stepData.amount.toLocaleString()}\n` +
             `• Crypto Used: ${financialCalc.totalInUsd.toFixed(6)} ${workflowState.stepData.selectedAsset.toUpperCase()}\n` +
-            `• Exchange Rate: 1 ${workflowState.stepData.selectedAsset.toUpperCase()} = ₦${workflowState.stepData.exchangeRate.toLocaleString()}\n\n` +
-            `💸 *Fees Applied:*\n` +
-            `• Platform Fee: ₦${financialCalc.chainpayeFee.toLocaleString()}\n` +
-            `• Banking Fee: ₦${financialCalc.dexpayFee.toLocaleString()}\n` +
-            `• Total Fees: ₦${financialCalc.totalFees.toLocaleString()}\n\n` +
+            `• Exchange Rate: 1 ${workflowState.stepData.selectedAsset.toUpperCase()} = ₦${spreadRate.toFixed(2)}\n\n` +
+            `💸 *Fee Applied:*\n` +
+            `• Platform Fee: $0.75 USD\n\n` +
             `🏦 *Destination Account:*\n` +
             `• Bank: ${workflowState.stepData.bankName}\n` +
             `• Account Name: ${workflowState.stepData.accountName}\n` +
@@ -1331,12 +1496,22 @@ async function executeOfframpTransaction(
             }
           }
         } else {
+          // Clean up idempotency lock on completion failure
+          if (idempotencyKey) {
+            await redisClient.del(idempotencyKey);
+          }
+          
           await whatsappBusinessService.sendNormalMessage(
             `❌ *Transaction Completion Error*\n\n${completionResult.error}\n\nYour crypto transfer was successful, but there was an issue finalizing the transaction. Please contact support.\n\nReference: ${result.transactionId}`,
             phoneNumber,
           );
         }
       } else {
+        // Clean up idempotency lock on quote failure
+        if (idempotencyKey) {
+          await redisClient.del(idempotencyKey);
+        }
+        
         await whatsappBusinessService.sendNormalMessage(
           `❌ *Quote Creation Failed*\n\n${quoteStepResult.error}\n\nYour crypto transfer was successful, but we couldn't create the banking quote. Please contact support.\n\nReference: ${result.transactionId}`,
           phoneNumber,
@@ -1388,6 +1563,11 @@ async function executeOfframpTransaction(
         phoneNumber,
       );
 
+      // Clean up idempotency lock on transaction failure
+      if (idempotencyKey) {
+        await redisClient.del(idempotencyKey);
+      }
+
       // Clean up failed workflow session
       phoneToWorkflowMap.delete(phoneNumber);
       await redisClient.del(`offramp_workflow:${phoneNumber}`);
@@ -1426,6 +1606,11 @@ async function executeOfframpTransaction(
       "\n\nPlease contact support for assistance or try again later.";
 
     await whatsappBusinessService.sendNormalMessage(errorMessage, phoneNumber);
+
+    // Clean up idempotency lock on error
+    if (idempotencyKey) {
+      await redisClient.del(idempotencyKey);
+    }
 
     // Clean up failed workflow session
     phoneToWorkflowMap.delete(phoneNumber);
@@ -1789,6 +1974,7 @@ async function sendFallbackDepositNotification(
 function mapChainToWebhookFormat(chain: string): string {
   const chainMapping: Record<string, string> = {
     solana: "solana",
+    stellar: "stellar",
     bep20: "bsc",
     arbitrum: "arbitrum",
     base: "base",
@@ -2078,10 +2264,11 @@ function getSupportedAssetsMessage(): string {
   return (
     `💡 *Tell me what asset you want to deposit and its chain.*\n\n` +
     `*Supported Assets & Chains:*\n` +
-    `🔸 *USDC:* BSC (BEP20), Base, Arbitrum, Solana\n` +
+    `🔸 *USDC:* BSC (BEP20), Base, Arbitrum, Solana, Stellar\n` +
     `🔸 *USDT:* BSC (BEP20), Solana\n\n` +
     `*Examples:*\n` +
     `• "USDC on Solana"\n` +
+    `• "USDC on Stellar"\n` +
     `• "USDT BEP20"\n` +
     `• "USDC Base"`
   );
@@ -2095,6 +2282,8 @@ function parseNormalizedNetwork(chain: string): NormalizedNetworkType {
   switch (chainLower) {
     case "solana":
       return "Solana";
+    case "stellar":
+      return "Stellar";
     case "bep20":
     case "bsc":
       return "BNB Smart Chain";

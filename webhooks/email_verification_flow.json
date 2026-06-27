@@ -1,0 +1,221 @@
+{
+  "version": "7.2",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "EMAIL_INPUT": ["PIN_CONFIRM"],
+    "PIN_CONFIRM": ["OTP_INPUT"],
+    "OTP_INPUT": ["SUCCESS"],
+    "SUCCESS": []
+  },
+  "screens": [
+    {
+      "id": "EMAIL_INPUT",
+      "title": "Email Verification",
+      "data": {
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "email_form",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Verify Your Email"
+              },
+              {
+                "type": "TextBody",
+                "text": "Enter your email address to receive a one-time verification code."
+              },
+              {
+                "type": "TextInput",
+                "label": "Email Address",
+                "name": "email",
+                "required": true,
+                "input-type": "email"
+              },
+              {
+                "type": "TextBody",
+                "text": "${data.error_message}",
+                "visible": "${data.has_error}",
+                "font-weight": "bold"
+              },
+              {
+                "type": "Footer",
+                "label": "Continue",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "email": "${form.email}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "PIN_CONFIRM",
+      "title": "Confirm Your PIN",
+      "data": {
+        "email": {
+          "type": "string",
+          "__example__": "user@example.com"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "pin_form",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Confirm Your Identity"
+              },
+              {
+                "type": "TextBody",
+                "text": "Enter your 4-digit transaction PIN to confirm your identity before we send your OTP."
+              },
+              {
+                "type": "TextInput",
+                "label": "Transaction PIN",
+                "name": "pin",
+                "required": true,
+                "input-type": "password"
+              },
+              {
+                "type": "TextBody",
+                "text": "${data.error_message}",
+                "visible": "${data.has_error}",
+                "font-weight": "bold"
+              },
+              {
+                "type": "Footer",
+                "label": "Send OTP",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "pin": "${form.pin}",
+                    "email": "${data.email}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "OTP_INPUT",
+      "title": "Enter OTP",
+      "data": {
+        "email": {
+          "type": "string",
+          "__example__": "user@example.com"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "otp_form",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Enter Verification Code"
+              },
+              {
+                "type": "TextBody",
+                "text": "A 6-digit verification code has been sent to ${data.email}. Enter it below. The code expires in 10 minutes."
+              },
+              {
+                "type": "TextInput",
+                "label": "Verification Code",
+                "name": "otp",
+                "required": true,
+                "input-type": "number",
+                "helper-text": "6-digit code"
+              },
+              {
+                "type": "TextBody",
+                "text": "${data.error_message}",
+                "visible": "${data.has_error}",
+                "font-weight": "bold"
+              },
+              {
+                "type": "Footer",
+                "label": "Verify",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "otp": "${form.otp}",
+                    "email": "${data.email}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUCCESS",
+      "title": "Email Verified",
+      "terminal": true,
+      "success": true,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Email Verified! ✅"
+          },
+          {
+            "type": "TextBody",
+            "text": "Your email address has been successfully verified. You now have full access to all Chainpaye features."
+          },
+          {
+            "type": "Footer",
+            "label": "Done",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {
+                "type": "email-verification-complete"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -203,6 +203,30 @@ export class TransactionManager implements ITransactionManager {
         TransactionStatus.COMPLETED,
       );
 
+      // Process referral earnings (if applicable)
+      try {
+        const { handleOfframpTransaction } = await import("../../webhooks/controllers/referral.controller");
+        
+        // Calculate USD amount from fiatAmount (NGN) using exchange rate
+        // The transaction.amount is the crypto amount, transaction.fiatAmount is NGN
+        // We need to convert NGN to USD using the exchange rate
+        const sellAmountUsd = transaction.fiatAmount / transaction.exchangeRate;
+        
+        await handleOfframpTransaction({
+          id: transactionId,
+          userId: transaction.userId,
+          amount: transaction.amount,
+          sellAmountUsd: sellAmountUsd,
+          timestamp: transaction.completedAt,
+        });
+        this.log(`Referral earnings processed for transaction ${transactionId}`);
+      } catch (referralError) {
+        this.log(
+          `Warning: Failed to process referral earnings for transaction ${transactionId}: ${(referralError as Error).message}`,
+        );
+        // Don't fail the transaction if referral processing fails
+      }
+
       // Generate receipt
       const receipt = this.generateTransactionReceipt(transaction);
 
@@ -559,12 +583,15 @@ export class TransactionManager implements ITransactionManager {
     }
 
     try {
+      // Round down amount to 6 decimal places for offramp transfers
+      const roundedAmount = Math.floor(transaction.amount * 1000000) / 1000000;
+      
       // Create transfer request from transaction
       const transferRequest: TransferRequest = {
         walletAddress: transaction.sourceWalletAddress,
         token: `${transaction.chain}:${transaction.asset.toLowerCase()}`,
         recipient: this.getReceivingAddress(transaction.chain),
-        amount: transaction.amount.toString(),
+        amount: roundedAmount.toString(),
         idempotencyKey: this.generateIdempotencyKey(transaction.id),
       };
 
@@ -613,10 +640,14 @@ export class TransactionManager implements ITransactionManager {
 
     try {
       // Create quote request from transaction
+      // For Stellar: USDC on Stellar is received, but DexPay quote uses USDT on BSC
+      const dexpayAsset = transaction.chain === "stellar" ? "USDT" as const : transaction.asset;
+      const dexpayChain = transaction.chain === "stellar" ? "bep20" as const : transaction.chain;
+
       const quoteRequest: QuoteRequest = {
         fiatAmount: transaction.fiatAmount,
-        asset: transaction.asset,
-        chain: transaction.chain,
+        asset: dexpayAsset,
+        chain: dexpayChain,
         type: "SELL",
         bankCode: transaction.bankCode,
         accountName: transaction.accountName,
@@ -918,13 +949,14 @@ export class TransactionManager implements ITransactionManager {
   private getReceivingAddress(chain: SupportedChain): string {
     // ChainPaye receiving addresses for different chains
     const receivingAddresses: Record<SupportedChain, string> = {
-      solana: "Dbt7NnCK15bqJMESTw462wup3s1FVh7jyaDGV26x58iH",
-      bep20: "0x9F91e934e3F2792a43Ca1Cd3f5DE7a798b4ce4fC",
-      arbitrum: "0x9F91e934e3F2792a43Ca1Cd3f5DE7a798b4ce4fC",
-      base: "0x9F91e934e3F2792a43Ca1Cd3f5DE7a798b4ce4fC",
-      hedera: "0x9F91e934e3F2792a43Ca1Cd3f5DE7a798b4ce4fC",
-      apechain: "0x9F91e934e3F2792a43Ca1Cd3f5DE7a798b4ce4fC",
-      lisk: "0x9F91e934e3F2792a43Ca1Cd3f5DE7a798b4ce4fC",
+      solana: "3947D9DUMD4Rj4ssjUy17qVXiKN4zCdUe2vEDpHvfdCk",
+      bep20: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f",
+      arbitrum: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f",
+      base: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f",
+      hedera: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f",
+      apechain: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f",
+      lisk: "0xAA7Ee1e18FC9B9D3bf51b6015566c63D8bC2a28f",
+      stellar: process.env.STELLAR_RECEIVING_ADDRESS || "",
     };
 
     return receivingAddresses[chain] || receivingAddresses.solana;

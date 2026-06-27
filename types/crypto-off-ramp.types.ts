@@ -40,13 +40,14 @@ export type SupportedChain =
   | "base"
   | "arbitrum"
   | "solana"
+  | "stellar"
   | "hedera"
   | "apechain"
   | "lisk";
 
 // Supported asset-chain combinations as defined in requirements
 export const SUPPORTED_ASSETS: Record<SupportedAsset, SupportedChain[]> = {
-  USDC: ["bep20", "base", "arbitrum", "solana", "hedera", "apechain", "lisk"],
+  USDC: ["bep20", "base", "arbitrum", "solana", "stellar", "hedera", "apechain", "lisk"],
   USDT: ["bep20", "arbitrum", "solana", "hedera", "apechain", "lisk"],
 };
 
@@ -90,8 +91,8 @@ export interface OffRampTransaction {
 
   // Financial Details
   exchangeRate: number;
-  chainpayeFee: number; // 1.5% of amount
-  dexpayFee: number; // $0.2 in NGN
+  chainpayeFee: number; // Flat $0.75 USD fee
+  dexpayFee: number; // $0 (spread covers this)
   totalFees: number;
   fiatAmount: number; // Amount in NGN
 
@@ -279,7 +280,6 @@ export interface IDexPayService {
   getCurrentRates(
     asset: string,
     chain: string,
-    amount?: number,
   ): Promise<ExchangeRate>;
   createQuote(quoteRequest: QuoteRequest): Promise<Quote>;
   finalizeQuote(quoteId: string): Promise<QuoteResult>;
@@ -338,7 +338,6 @@ export interface IBankingManager {
   getCurrentRates(
     asset: string,
     chain: string,
-    amount?: number,
   ): Promise<ExchangeRate>;
   validateBankDetails(
     bankCode: string,

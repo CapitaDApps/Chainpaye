@@ -40,7 +40,7 @@ export interface CreateWalletRequest {
   type: "smart";
   config: {
     adminSigner: {
-      type: "api-key";
+      type: "external-wallet";
       address: string;
     };
   };
@@ -66,6 +66,43 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
 
   private get adminSignerAddress(): string {
     return process.env.CROSSMINT_ADMIN_SIGNER_ADDRESS || "";
+  }
+
+  private get adminSolanaAddress(): string {
+    return process.env.CROSSMINT_ADMIN_SOLANA_ADDRESS || "";
+  }
+
+  private get adminEvmAddress(): string {
+    return process.env.CROSSMINT_ADMIN_EVM_ADDRESS || "";
+  }
+
+  private get adminEvmPrivateKey(): string {
+    return process.env.CROSSMINT_ADMIN_EVM_PRIVATE_KEY || "";
+  }
+
+  private get adminSolanaPrivateKey(): string {
+    return process.env.CROSSMINT_ADMIN_SOLANA_PRIVATE_KEY || "";
+  }
+
+  /**
+   * Get the appropriate admin address based on chain type
+   */
+  private getAdminAddressForChain(chainType: string): string {
+    const normalizedChainType = chainType.toLowerCase();
+    
+    // Solana chain
+    if (normalizedChainType === "solana") {
+      return this.adminSolanaAddress;
+    }
+    
+    // EVM-based chains
+    const evmChains = ["evm", "bsc", "base", "arbitrum", "apechain", "lisk"];
+    if (evmChains.includes(normalizedChainType)) {
+      return this.adminEvmAddress;
+    }
+    
+    // Fallback to legacy admin signer address for other chains
+    return this.adminSignerAddress;
   }
 
   // ========================================
@@ -245,6 +282,7 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
       const supportedChainTypes = [
         "evm",
         "solana",
+        "stellar",
         "bsc",
         "base",
         "arbitrum",
@@ -258,10 +296,10 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         );
       }
 
-      const crossmintWallet = await this.createWalletInternal(
-        userId,
-        chainType,
-      );
+      const crossmintWallet =
+        chainType.toLowerCase() === "stellar"
+          ? await this.createStellarWallet(userId)
+          : await this.createWalletInternal(userId, chainType);
 
       // Register wallet-to-user mapping as per requirement 4.4
       this.registerWalletUserMapping(crossmintWallet.address, userId);
@@ -336,6 +374,14 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
           error: "Transfer amount must be a positive number",
         };
       }
+
+      // Clamp to max 6 decimal places (Crossmint limit for all tokens).
+      // Stellar allows 7, but 6 is safe for all chains.
+      const maxDecimals = chain.toLowerCase() === "stellar" ? 7 : 6;
+      const clampedAmount = parseFloat(amount.toFixed(maxDecimals));
+      // Overwrite the request amount with the safely-rounded string so all
+      // downstream code (balance checks, API call) uses the same value.
+      transferRequest = { ...transferRequest, amount: clampedAmount.toFixed(maxDecimals) };
 
       // Extract userId from wallet address with enhanced error handling
       const userId = await this.extractUserIdFromWalletAddress(
@@ -487,12 +533,26 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
           result.id || result.transactionId || this.generateRandomString(16),
       };
     } catch (error: any) {
+      // Enhanced error logging for debugging
       logger.error(`Transfer failed for request:`, {
         walletAddress: transferRequest.walletAddress,
         token: transferRequest.token,
         amount: transferRequest.amount,
         error: error.message,
+        errorCode: error.code,
+        statusCode: error.response?.status,
+        responseData: error.response?.data,
+        stack: error.stack,
       });
+      
+      // Also log to console for immediate visibility
+      console.error("\n❌ TRANSFER FAILED - DETAILED ERROR:");
+      console.error("Message:", error.message);
+      console.error("Status Code:", error.response?.status);
+      console.error("Response Data:", JSON.stringify(error.response?.data, null, 2));
+      console.error("Full Error:", error);
+      console.error("========================================\n");
+      
       return {
         success: false,
         error: this.translateTransferError(error),
@@ -521,6 +581,7 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
       const supportedChainTypes = [
         "evm",
         "solana",
+        "stellar",
         "bsc",
         "base",
         "arbitrum",
@@ -782,7 +843,7 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
    */
   async listWallets(userId: string): Promise<CrossmintWallet[]> {
     const wallets: CrossmintWallet[] = [];
-    const chainTypes = ["evm", "solana"];
+    const chainTypes = ["evm", "solana", "stellar"];
 
     await Promise.all(
       chainTypes.map(async (chainType) => {
@@ -811,17 +872,30 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
     chainType: string,
   ): Promise<CrossmintWallet> {
     try {
+      const adminAddress = this.getAdminAddressForChain(chainType);
+      
+      if (!adminAddress) {
+        throw new Error(
+          `No admin address configured for chain type: ${chainType}. ` +
+          `Please set CROSSMINT_ADMIN_SOLANA_ADDRESS for Solana or CROSSMINT_ADMIN_EVM_ADDRESS for EVM chains.`
+        );
+      }
+
       const requestBody: CreateWalletRequest = {
         chainType,
         type: "smart",
         config: {
           adminSigner: {
-            type: "api-key",
-            address: this.adminSignerAddress,
+            type: "external-wallet",
+            address: adminAddress,
           },
         },
         owner: `userId:${userId}`,
       };
+
+      logger.info(
+        `Creating ${chainType} wallet for user ${userId} with admin address: ${adminAddress}`
+      );
 
       const response = await axios.post(
         `${this.baseUrl}/wallets`,
@@ -844,6 +918,45 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
       );
       throw new Error(
         `Failed to create wallet: ${error.response?.data?.message || error.message}`,
+      );
+    }
+  }
+
+  /**
+   * Create a Stellar wallet for a user using api-key signer (no external wallet address needed)
+   */
+  async createStellarWallet(userId: string): Promise<CrossmintWallet> {
+    try {
+      const requestBody = {
+        chainType: "stellar",
+        type: "smart",
+        config: {
+          adminSigner: {
+            type: "api-key",
+          },
+        },
+        owner: `userId:${userId}`,
+      };
+
+      const response = await axios.post(
+        `${this.baseUrl}/wallets`,
+        requestBody,
+        {
+          headers: {
+            "X-API-KEY": this.apiKey,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      logger.info(`Created stellar wallet for user ${userId}: ${response.data.address}`);
+      return response.data;
+    } catch (error: any) {
+      logger.error(
+        `Error creating stellar wallet for user ${userId}: ${error.response?.data?.message || error.message}`,
+      );
+      throw new Error(
+        `Failed to create stellar wallet: ${error.response?.data?.message || error.message}`,
       );
     }
   }
@@ -873,6 +986,11 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
     chain: string,
     tokens: string[] = ["usdc", "usdt"],
   ): Promise<CrossmintBalance[]> {
+    // Stellar has its own wallet and only supports USDC
+    if (chain.toLowerCase() === "stellar") {
+      return this.getWalletBalancesInternal(userId, "stellar", ["usdc"]);
+    }
+
     // Helper to request balances for a specific chain using the unified EVM wallet
     if (this.isEvmChain(chain)) {
       const chainId = "evm";
@@ -1082,7 +1200,6 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
     chainType: string,
   ): Promise<CrossmintWallet> {
     try {
-      // First try to get existing wallet
       const existingWallet = await this.getWalletByChain(userId, chainType);
 
       if (existingWallet) {
@@ -1090,9 +1207,10 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         return existingWallet;
       }
 
-      // Create new wallet if none exists
       logger.info(`Creating new ${chainType} wallet for user ${userId}`);
-      return await this.createWalletInternal(userId, chainType);
+      return chainType.toLowerCase() === "stellar"
+        ? await this.createStellarWallet(userId)
+        : await this.createWalletInternal(userId, chainType);
     } catch (error: any) {
       logger.error(
         `Error getting or creating ${chainType} wallet for user ${userId}: ${error.message}`,
@@ -1124,12 +1242,24 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
       const tokenChain = this.getTokenChainIdentifier(chainType);
       const tokenIdentifier = `${tokenChain}:${token.toLowerCase()}`;
 
+      // Get chain-specific admin address for signing
+      const adminAddress = this.getAdminAddressForChain(chainType);
+      
+      if (!adminAddress) {
+        throw new Error(
+          `No admin address configured for chain type: ${chainType}. ` +
+          `Please set CROSSMINT_ADMIN_SOLANA_ADDRESS for Solana or CROSSMINT_ADMIN_EVM_ADDRESS for EVM chains.`
+        );
+      }
+
       const response = await axios.post(
         `${this.baseUrl}/wallets/${wallet.address}/tokens/${tokenIdentifier}/transfers`,
         {
           amount,
           recipient: toAddress,
           executionRoute: "direct",
+          // Configure external wallet signer for transaction signing
+          signer: `external-wallet:${adminAddress}`,
         },
         {
           headers: {
@@ -1160,9 +1290,10 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
   getTokenChainIdentifier(chainType: string): string {
     const tokenChainMapping: { [key: string]: string } = {
       solana: "solana",
-      bsc: "bsc", // For BEP20 tokens
+      stellar: "stellar",
+      bsc: "bsc",
       arbitrum: "arbitrum",
-      base: "base", // Production Base mainnet
+      base: "base",
       hedera: "hedera",
       apechain: "apechain",
       lisk: "lisk",
@@ -1186,6 +1317,7 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
 
     const chainMapping: { [key: string]: string } = {
       solana: "solana",
+      stellar: "stellar",
       bep20: "bsc",
       base: "base",
       arbitrum: "arbitrum",
@@ -1203,13 +1335,14 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
   getSupportedAssets(chain: string): string[] {
     const supportedAssets: { [key: string]: string[] } = {
       bep20: ["usdc", "usdt"],
-      bsc: ["usdc", "usdt"], // BSC is the same as BEP20
+      bsc: ["usdc", "usdt"],
       base: ["usdc"],
       arbitrum: ["usdc", "usdt"],
       solana: ["usdc", "usdt"],
       hedera: ["usdc", "usdt"],
       apechain: ["usdc", "usdt"],
       lisk: ["usdc", "usdt"],
+      stellar: ["usdc"],
     };
 
     return supportedAssets[chain.toLowerCase()] || [];
@@ -1382,8 +1515,20 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
             ? idempotencyKey
             : this.generateRetryIdempotencyKey(idempotencyKey, attempt);
 
-        // Enhanced request with idempotency support
-        const transferPayload = {
+        // Get chain-specific admin address for signing
+        const adminAddress = this.getAdminAddressForChain(chainType);
+        
+        if (!adminAddress) {
+          throw new Error(
+            `No admin address configured for chain type: ${chainType}. ` +
+            `Please set CROSSMINT_ADMIN_SOLANA_ADDRESS for Solana or CROSSMINT_ADMIN_EVM_ADDRESS for EVM chains.`
+          );
+        }
+
+        // Enhanced request with idempotency support and external wallet signer
+        const isStellarTransfer = chainType.toLowerCase() === "stellar";
+
+        const transferPayload: Record<string, any> = {
           amount,
           recipient: toAddress,
           transactionType: "direct",
@@ -1397,6 +1542,25 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
             originalIdempotencyKey: idempotencyKey,
           },
         };
+
+        // Stellar uses api-key signer — no external wallet signer needed
+        // Other chains require the external wallet signer for approval
+        if (!isStellarTransfer) {
+          transferPayload.signer = `external-wallet:${adminAddress}`;
+        }
+
+        // NOTE: Memo commented out - switched to wallet that doesn't require memo ID
+        // Add memo for Stellar transfers (required by most exchanges/custodians)
+        // if (isStellarTransfer) {
+        //   const memoValue = process.env.STELLAR_MEMO_VALUE;
+        //   const memoType = process.env.STELLAR_MEMO_TYPE || "id";
+        //   if (memoValue) {
+        //     transferPayload.memo = {
+        //       type: memoType,
+        //       value: memoValue,
+        //     };
+        //   }
+        // }
 
         logger.info(`Executing transfer attempt ${attempt}/${maxRetries}:`, {
           userId,
@@ -1456,10 +1620,94 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         console.log("Data:", JSON.stringify(response.data, null, 2));
         console.log("========================================\n");
 
+        // Check if transaction requires approval (external wallet signing)
+        if (response.data.status === "awaiting-approval") {
+          console.log("⚠️  TRANSACTION AWAITING APPROVAL - ATTEMPTING AUTO-APPROVAL");
+          console.log("The transaction was created but needs to be signed by the external wallet.");
+          console.log("Transaction ID:", response.data.id);
+          console.log("Approvals needed:", response.data.approvals?.pending?.length || 0);
+          console.log("========================================\n");
+
+          logger.info(
+            `Transfer created and awaiting approval on attempt ${attempt}: ${amount} ${token} from wallet ${wallet.address} to ${toAddress}`,
+            {
+              transactionId: response.data.id,
+              status: response.data.status,
+              pendingApprovals: response.data.approvals?.pending?.length || 0,
+              idempotencyKey: currentIdempotencyKey,
+            },
+          );
+
+          // Attempt to auto-approve the transaction
+          try {
+            const approvalResult = await this.submitTransactionApproval(
+              wallet.address,
+              response.data.id,
+              response.data.approvals?.pending?.[0]?.message,
+              adminAddress
+            );
+            
+            console.log("✅ TRANSACTION AUTO-APPROVED SUCCESSFULLY");
+            console.log("Approval result:", JSON.stringify(approvalResult, null, 2));
+            console.log("========================================\n");
+            
+            logger.info(
+              `Transfer auto-approved successfully on attempt ${attempt}: ${amount} ${token}`,
+              {
+                transactionId: response.data.id,
+                approvalResult,
+                idempotencyKey: currentIdempotencyKey,
+              },
+            );
+            
+            // Return the original response with updated status
+            return {
+              ...response.data,
+              status: "approved",
+              approvalResult,
+            };
+          } catch (approvalError: any) {
+            console.log("❌ AUTO-APPROVAL FAILED");
+            console.log("Error:", approvalError.message);
+            console.log("========================================\n");
+            
+            logger.error(
+              `Failed to auto-approve transfer on attempt ${attempt}: ${approvalError.message}`,
+              {
+                transactionId: response.data.id,
+                error: approvalError.message,
+                idempotencyKey: currentIdempotencyKey,
+              },
+            );
+            
+            // Return error indicating approval failed
+            throw new Error(
+              `Transaction created but auto-approval failed: ${approvalError.message}. ` +
+              `Transaction ID: ${response.data.id}. Please check admin wallet configuration.`
+            );
+          }
+        }
+
+        // Check for other non-success statuses
+        if (response.data.status && response.data.status !== "completed" && response.data.status !== "confirmed") {
+          logger.warn(
+            `Transfer has unexpected status on attempt ${attempt}: ${response.data.status}`,
+            {
+              transactionId: response.data.id,
+              status: response.data.status,
+              idempotencyKey: currentIdempotencyKey,
+            },
+          );
+
+          // For now, we'll continue and let the background process handle status checking
+          // In the future, we might want to implement polling for status updates
+        }
+
         logger.info(
           `Transfer executed successfully on attempt ${attempt}: ${amount} ${token} from wallet ${wallet.address} to ${toAddress}`,
           {
             transactionId: response.data.id,
+            status: response.data.status,
             idempotencyKey: currentIdempotencyKey,
             responseStatus: response.status,
           },
@@ -1522,6 +1770,186 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
     throw new Error(
       `Failed to execute transfer after ${maxRetries} attempts: ${lastError.response?.data?.message || lastError.message}`,
     );
+  }
+
+  /**
+   * Submit transaction approval for external wallet signers
+   * Handles both EVM (using viem) and Solana (using @solana/web3.js + tweetnacl) chains
+   */
+  private async submitTransactionApproval(
+    walletAddress: string,
+    transactionId: string,
+    messageToSign: string,
+    signerAddress: string
+  ): Promise<any> {
+    try {
+      if (!messageToSign) {
+        throw new Error("No approval message found in transaction response");
+      }
+
+      // Determine if this is a Solana or EVM chain based on signer address format
+      const isSolanaChain = this.isSolanaAddress(signerAddress);
+      
+      logger.info(`Submitting transaction approval for ${isSolanaChain ? 'Solana' : 'EVM'} chain:`, {
+        walletAddress,
+        transactionId,
+        signerAddress,
+        messageLength: messageToSign.length,
+        chainType: isSolanaChain ? 'solana' : 'evm',
+      });
+
+      let signature: string;
+
+      if (isSolanaChain) {
+        // Handle Solana signing
+        signature = await this.signSolanaMessage(messageToSign, signerAddress);
+      } else {
+        // Handle EVM signing
+        signature = await this.signEvmMessage(messageToSign, signerAddress);
+      }
+
+      // Submit the approval
+      const approvalPayload = {
+        approvals: [
+          {
+            signer: `external-wallet:${signerAddress}`,
+            signature,
+          },
+        ],
+      };
+
+      const response = await axios.post(
+        `${this.baseUrl}/wallets/${walletAddress}/transactions/${transactionId}/approvals`,
+        approvalPayload,
+        {
+          headers: {
+            "X-API-KEY": this.apiKey,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      logger.info(`Transaction approval submitted successfully:`, {
+        transactionId,
+        approvalStatus: response.data.status,
+        chainType: isSolanaChain ? 'solana' : 'evm',
+      });
+
+      return response.data;
+    } catch (error: any) {
+      logger.error(`Error submitting transaction approval:`, {
+        walletAddress,
+        transactionId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Check if an address is a Solana address (base58 format, typically 32-44 characters)
+   */
+  private isSolanaAddress(address: string): boolean {
+    // Solana addresses are base58 encoded and typically 32-44 characters
+    // EVM addresses start with 0x and are 42 characters
+    return !address.startsWith('0x') && address.length >= 32 && address.length <= 44;
+  }
+
+  /**
+   * Sign message for EVM chains using viem
+   */
+  private async signEvmMessage(messageToSign: string, signerAddress: string): Promise<string> {
+    const privateKey = this.adminEvmPrivateKey;
+    
+    if (!privateKey) {
+      throw new Error(
+        `EVM private key not configured. Please set CROSSMINT_ADMIN_EVM_PRIVATE_KEY environment variable.`
+      );
+    }
+
+    try {
+      // Import viem for message signing
+      const { privateKeyToAccount } = await import('viem/accounts');
+      
+      // Create account from private key
+      const account = privateKeyToAccount(privateKey as `0x${string}`);
+      
+      // Verify the account address matches the signer address
+      if (account.address.toLowerCase() !== signerAddress.toLowerCase()) {
+        throw new Error(
+          `EVM private key address (${account.address}) does not match signer address (${signerAddress})`
+        );
+      }
+
+      // Sign the message (EVM messages are hex format)
+      const signature = await account.signMessage({
+        message: { raw: messageToSign as `0x${string}` },
+      });
+
+      logger.info(`EVM message signed successfully`, {
+        signerAddress,
+        messageLength: messageToSign.length,
+        signatureLength: signature.length,
+      });
+
+      return signature;
+    } catch (error: any) {
+      logger.error(`Error signing EVM message:`, {
+        signerAddress,
+        error: error.message,
+      });
+      throw new Error(`Failed to sign EVM message: ${error.message}`);
+    }
+  }
+
+  /**
+   * Sign message for Solana chains using @solana/web3.js + tweetnacl
+   */
+  private async signSolanaMessage(messageToSign: string, signerAddress: string): Promise<string> {
+    const privateKey = this.adminSolanaPrivateKey;
+    
+    if (!privateKey) {
+      throw new Error(
+        `Solana private key not configured. Please set CROSSMINT_ADMIN_SOLANA_PRIVATE_KEY environment variable.`
+      );
+    }
+
+    try {
+      // Import Solana dependencies
+      const { Keypair } = await import('@solana/web3.js');
+      const nacl = await import('tweetnacl');
+      const bs58 = await import('bs58');
+      
+      // Create keypair from private key (base58 format)
+      const keypair = Keypair.fromSecretKey(bs58.default.decode(privateKey));
+      
+      // Verify the keypair public key matches the signer address
+      const publicKeyBase58 = keypair.publicKey.toBase58();
+      if (publicKeyBase58 !== signerAddress) {
+        throw new Error(
+          `Solana private key address (${publicKeyBase58}) does not match signer address (${signerAddress})`
+        );
+      }
+
+      // Sign the message (Solana messages are base64 format, NOT hex like EVM)
+      const messageBytes = Buffer.from(messageToSign, "base64");
+      const sig = nacl.default.sign.detached(messageBytes, keypair.secretKey);
+      const signature = Buffer.from(sig).toString("base64");
+
+      logger.info(`Solana message signed successfully`, {
+        signerAddress,
+        messageLength: messageToSign.length,
+        signatureLength: signature.length,
+      });
+
+      return signature;
+    } catch (error: any) {
+      logger.error(`Error signing Solana message:`, {
+        signerAddress,
+        error: error.message,
+      });
+      throw new Error(`Failed to sign Solana message: ${error.message}`);
+    }
   }
 
   /**
@@ -1806,7 +2234,14 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
       errorMessage,
       errorCode,
       error,
+      responseData: error.response?.data,
     });
+    
+    // In development, include actual error for debugging
+    if (process.env.NODE_ENV === 'development' || process.env.DEBUG_TRANSFERS === 'true') {
+      return `Transfer failed: ${errorMessage}. Status: ${errorCode}. Please check logs for details.`;
+    }
+    
     return "Transfer failed due to an unexpected error. Please try again or contact support if the problem persists.";
   }
 
@@ -1815,8 +2250,9 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
    */
   private mapChainTypeToChain(chainType: string): string {
     const chainMapping: { [key: string]: string } = {
-      evm: "base", // Default EVM chain for balances
+      evm: "base",
       solana: "solana",
+      stellar: "stellar",
       bsc: "bep20",
       base: "base",
       arbitrum: "arbitrum",

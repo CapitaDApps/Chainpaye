@@ -9,6 +9,17 @@ import mongoose, { Document, Schema } from "mongoose";
 /**
  * Interface for User document
  */
+export interface IPayoutAccount {
+  payoutId: string;       // payout_id from Linkio response
+  payoutMethod: string;   // e.g. bank_transfer_gh / bank_transfer_kenya
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
+  destination: string;    // first_party | third_party
+  country: string;        // ghana | kenya
+  createdAt: Date;
+}
+
 export interface IUser extends Document {
   whatsappNumber: string;
   userId: string;
@@ -23,6 +34,12 @@ export interface IUser extends Document {
   verificationCodeExpires?: Date;
   pin?: string;
   dob?: string;
+  referralCode?: string; // Unique referral code for this user
+  referredBy?: string; // User ID of the referrer
+  referredAt?: Date; // Timestamp when user was referred
+  emailVerified: boolean;
+  linkioCustomerId?: string;
+  payoutAccounts?: IPayoutAccount[]; // Saved beneficiary payout accounts
   createdAt: Date;
   updatedAt: Date;
   comparePin(candidatePin: string): Promise<boolean>;
@@ -112,6 +129,45 @@ const UserSchema: Schema = new Schema(
     dob: {
       type: String,
     },
+    referralCode: {
+      type: String,
+      unique: true,
+      sparse: true, // Allows multiple null values, unique only when set
+      trim: true,
+      minlength: 6,
+      maxlength: 12,
+    },
+    referredBy: {
+      type: String,
+      trim: true,
+    },
+    referredAt: {
+      type: Date,
+    },
+    emailVerified: {
+      type: Boolean,
+      default: false,
+    },
+    linkioCustomerId: {
+      type: String,
+      trim: true,
+      sparse: true,
+    },
+    payoutAccounts: {
+      type: [
+        {
+          payoutId: { type: String, required: true },
+          payoutMethod: { type: String, required: true },
+          bankName: { type: String, required: true },
+          accountNumber: { type: String, required: true },
+          accountName: { type: String, required: true },
+          destination: { type: String, required: true },
+          country: { type: String, required: true },
+          createdAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+    },
   },
   {
     timestamps: true, // Automatically add createdAt and updatedAt
@@ -123,6 +179,8 @@ const UserSchema: Schema = new Schema(
  */
 UserSchema.index({ whatsappNumber: 1 });
 UserSchema.index({ email: 1 });
+UserSchema.index({ referralCode: 1 });
+UserSchema.index({ referredBy: 1 });
 /**
  * Pre-save middleware to hash PIN
  */

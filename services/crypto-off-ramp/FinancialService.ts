@@ -2,9 +2,9 @@
  * FinancialService - Handles fee calculations and currency conversions for crypto off-ramp
  *
  * This service implements the financial calculations required for the off-ramp workflow:
- * - Chainpaye fee calculation (1.5% of amount)
- * - DexPay fee calculation ($0.2 converted to NGN)
- * - USD conversion logic (totalInUsd = enteredAmount / nairaRate)
+ * - Chainpaye fee calculation (flat $0.75 USD)
+ * - Spread application (60 NGN reduction on exchange rate)
+ * - USD conversion logic (totalInUsd = enteredAmount / spreadRate + flatFee)
  *
  * Requirements: 7.4, 7.5, 8.1
  */
@@ -28,50 +28,67 @@ export interface FeeBreakdown {
 }
 
 export class FinancialService implements IFinancialService {
-  // Constants as defined in requirements
-  private static readonly CHAINPAYE_FEE_RATE = 0.015; // 1.5%
-  private static readonly DEXPAY_FEE_USD = 0.2; // $0.2
+  // Updated constants - flat fee instead of percentage
+  private static readonly CHAINPAYE_FLAT_FEE_USD = parseFloat(
+    process.env.OFFRAMP_FLAT_FEE_USD || "0.75"
+  ); // $0.75 flat fee (changed from 1.5%)
+  private static readonly SPREAD_NGN = parseFloat(
+    process.env.OFFRAMP_SPREAD_NGN || "60"
+  ); // 60 NGN spread on exchange rate (configurable via env)
 
   /**
-   * Calculate Chainpaye fee (1.5% of amount)
-   * @param amount - The transaction amount in the original currency
-   * @returns The Chainpaye fee amount
+   * Apply spread to the exchange rate from DexPay
+   * This is the rate we SHOW to users (worse rate)
+   * @param dexpayRate - The rate from DexPay
+   * @returns The rate with spread applied (reduced by SPREAD_NGN)
    */
-  calculateChainpayeFee(amount: number): number {
-    if (amount < 0) {
-      throw new Error("Amount cannot be negative");
+  applySpreadToRate(dexpayRate: number): number {
+    if (dexpayRate <= 0) {
+      throw new Error("DexPay rate must be positive");
     }
-    return amount * FinancialService.CHAINPAYE_FEE_RATE;
+    const spreadRate = dexpayRate - FinancialService.SPREAD_NGN;
+    if (spreadRate <= 0) {
+      throw new Error("Spread results in invalid rate");
+    }
+    return spreadRate;
   }
 
   /**
-   * Calculate DexPay fee ($0.2 converted to NGN)
+   * Calculate Chainpaye fee (flat $0.75 converted to NGN for display)
+   * @param dexpayRate - The ORIGINAL rate from DexPay
+   * @returns The Chainpaye fee in NGN
+   */
+  calculateChainpayeFee(dexpayRate: number): number {
+    if (dexpayRate <= 0) {
+      throw new Error("DexPay rate must be positive");
+    }
+    // Convert flat USD fee to NGN using spread rate for display
+    const spreadRate = this.applySpreadToRate(dexpayRate);
+    return FinancialService.CHAINPAYE_FLAT_FEE_USD * spreadRate;
+  }
+
+  /**
+   * Calculate DexPay fee (now $0 - no separate fee)
    * @param nairaRate - The current NGN/USD exchange rate
-   * @returns The DexPay fee in NGN
+   * @returns The DexPay fee in NGN (always 0 now)
    */
   calculateDexpayFee(nairaRate: number): number {
-    if (nairaRate <= 0) {
-      throw new Error("Naira rate must be positive");
-    }
-    return FinancialService.DEXPAY_FEE_USD * nairaRate;
+    return 0; // No separate DexPay fee
   }
 
   /**
-   * Calculate total fees (Chainpaye + DexPay in NGN)
-   * @param amount - The transaction amount
-   * @param nairaRate - The current NGN/USD exchange rate
+   * Calculate total fees (just the flat fee in NGN)
+   * @param dexpayRate - The ORIGINAL rate from DexPay
    * @returns The total fees in NGN
    */
-  calculateTotalFees(amount: number, nairaRate: number): number {
-    const chainpayeFee = this.calculateChainpayeFee(amount);
-    const dexpayFee = this.calculateDexpayFee(nairaRate);
-    return chainpayeFee + dexpayFee;
+  calculateTotalFees(dexpayRate: number): number {
+    return this.calculateChainpayeFee(dexpayRate);
   }
 
   /**
    * Convert amount to USD using the formula: totalInUsd = enteredAmount / nairaRate
    * @param amountNgn - The amount in Nigerian Naira
-   * @param nairaRate - The current NGN/USD exchange rate
+   * @param nairaRate - The NGN/USD exchange rate (with spread applied)
    * @returns The equivalent amount in USD
    */
   convertToUsd(amountNgn: number, nairaRate: number): number {
@@ -86,55 +103,64 @@ export class FinancialService implements IFinancialService {
 
   /**
    * Perform comprehensive financial calculations for a transaction
-   * @param amount - The transaction amount in NGN
-   * @param nairaRate - The current NGN/USD exchange rate
+   * @param amount - The transaction amount in NGN (what user wants to receive)
+   * @param dexpayRate - The ORIGINAL rate from DexPay (before spread)
    * @returns Complete financial calculation breakdown
    */
   calculateTransactionFinancials(
     amount: number,
-    nairaRate: number,
+    dexpayRate: number,
   ): FinancialCalculation {
     if (amount < 0) {
       throw new Error("Amount cannot be negative");
     }
-    if (nairaRate <= 0) {
-      throw new Error("Naira rate must be positive");
+    if (dexpayRate <= 0) {
+      throw new Error("DexPay rate must be positive");
     }
 
-    const chainpayeFee = this.calculateChainpayeFee(amount);
-    const dexpayFee = this.calculateDexpayFee(nairaRate);
-    const totalFees = chainpayeFee + dexpayFee;
-    const totalInUsd = this.convertToUsd(amount, nairaRate);
-    const fiatAmount = amount; // Amount in NGN
+    // Apply spread to get user-facing rate
+    const spreadRate = this.applySpreadToRate(dexpayRate);
+    
+    // Calculate fees for display (in NGN)
+    const chainpayeFee = this.calculateChainpayeFee(dexpayRate);
+    const dexpayFee = 0;
+    const totalFees = chainpayeFee;
+
+    // Calculate USD needed at spread rate
+    const usdAtSpreadRate = this.convertToUsd(amount, spreadRate);
+    
+    // Add flat fee to get total USD to deduct from wallet
+    const totalInUsd = usdAtSpreadRate + FinancialService.CHAINPAYE_FLAT_FEE_USD;
 
     return {
-      chainpayeFee,
-      dexpayFee,
-      totalFees,
-      totalInUsd,
-      fiatAmount,
+      chainpayeFee, // In NGN (for display)
+      dexpayFee, // 0
+      totalFees, // In NGN (for display)
+      totalInUsd, // Total USD to deduct from user's wallet
+      fiatAmount: amount, // Original NGN amount
     };
   }
 
   /**
    * Get detailed fee breakdown for transparency
    * @param amount - The transaction amount in NGN
-   * @param nairaRate - The current NGN/USD exchange rate
+   * @param dexpayRate - The ORIGINAL rate from DexPay
    * @returns Detailed breakdown of all fees
    */
-  getFeeBreakdown(amount: number, nairaRate: number): FeeBreakdown {
+  getFeeBreakdown(amount: number, dexpayRate: number): FeeBreakdown {
     if (amount < 0) {
       throw new Error("Amount cannot be negative");
     }
-    if (nairaRate <= 0) {
-      throw new Error("Naira rate must be positive");
+    if (dexpayRate <= 0) {
+      throw new Error("DexPay rate must be positive");
     }
 
-    const chainpayeFee = this.calculateChainpayeFee(amount);
-    const dexpayFeeUsd = FinancialService.DEXPAY_FEE_USD;
-    const dexpayFeeNgn = this.calculateDexpayFee(nairaRate);
-    const totalFeesNgn = chainpayeFee + dexpayFeeNgn;
-    const totalFeesUsd = this.convertToUsd(totalFeesNgn, nairaRate);
+    const spreadRate = this.applySpreadToRate(dexpayRate);
+    const chainpayeFee = this.calculateChainpayeFee(dexpayRate);
+    const dexpayFeeUsd = 0;
+    const dexpayFeeNgn = 0;
+    const totalFeesNgn = chainpayeFee;
+    const totalFeesUsd = FinancialService.CHAINPAYE_FLAT_FEE_USD;
 
     return {
       chainpayeFee,
@@ -148,19 +174,20 @@ export class FinancialService implements IFinancialService {
   /**
    * Calculate the total amount including fees
    * @param baseAmount - The base transaction amount
-   * @param nairaRate - The current NGN/USD exchange rate
-   * @returns The total amount including all fees
+   * @param dexpayRate - The ORIGINAL rate from DexPay
+   * @returns The total amount in USD to deduct from wallet
    */
-  calculateTotalWithFees(baseAmount: number, nairaRate: number): number {
+  calculateTotalWithFees(baseAmount: number, dexpayRate: number): number {
     if (baseAmount < 0) {
       throw new Error("Base amount cannot be negative");
     }
-    if (nairaRate <= 0) {
-      throw new Error("Naira rate must be positive");
+    if (dexpayRate <= 0) {
+      throw new Error("DexPay rate must be positive");
     }
 
-    const totalFees = this.calculateTotalFees(baseAmount, nairaRate);
-    return baseAmount + totalFees;
+    const spreadRate = this.applySpreadToRate(dexpayRate);
+    const baseInUsd = this.convertToUsd(baseAmount, spreadRate);
+    return baseInUsd + FinancialService.CHAINPAYE_FLAT_FEE_USD;
   }
 
   /**
@@ -212,23 +239,22 @@ export class FinancialService implements IFinancialService {
    * Check if a wallet balance is sufficient for a transaction including fees
    * @param walletBalanceUsd - The wallet balance in USD
    * @param transactionAmountNgn - The transaction amount in NGN
-   * @param nairaRate - The current NGN/USD exchange rate
+   * @param dexpayRate - The ORIGINAL rate from DexPay
    * @returns True if balance is sufficient, false otherwise
    */
   isSufficientBalance(
     walletBalanceUsd: number,
     transactionAmountNgn: number,
-    nairaRate: number,
+    dexpayRate: number,
   ): boolean {
-    if (walletBalanceUsd < 0 || transactionAmountNgn < 0 || nairaRate <= 0) {
+    if (walletBalanceUsd < 0 || transactionAmountNgn < 0 || dexpayRate <= 0) {
       return false;
     }
 
-    const totalWithFees = this.calculateTotalWithFees(
+    const totalRequiredUsd = this.calculateTotalWithFees(
       transactionAmountNgn,
-      nairaRate,
+      dexpayRate,
     );
-    const totalRequiredUsd = this.convertToUsd(totalWithFees, nairaRate);
 
     return walletBalanceUsd >= totalRequiredUsd;
   }
@@ -253,11 +279,25 @@ export class FinancialService implements IFinancialService {
    * Get the current fee rates for transparency
    * @returns Object containing current fee rates
    */
-  getFeeRates(): { chainpayeRate: number; dexpayFeeUsd: number } {
+  getFeeRates(): { chainpayeFlatFeeUsd: number; spreadNgn: number } {
     return {
-      chainpayeRate: FinancialService.CHAINPAYE_FEE_RATE,
-      dexpayFeeUsd: FinancialService.DEXPAY_FEE_USD,
+      chainpayeFlatFeeUsd: FinancialService.CHAINPAYE_FLAT_FEE_USD,
+      spreadNgn: FinancialService.SPREAD_NGN,
     };
+  }
+
+  /**
+   * Get the spread amount
+   */
+  getSpreadAmount(): number {
+    return FinancialService.SPREAD_NGN;
+  }
+
+  /**
+   * Get the user-facing rate (with spread applied)
+   */
+  getUserFacingRate(dexpayRate: number): number {
+    return this.applySpreadToRate(dexpayRate);
   }
 }
 

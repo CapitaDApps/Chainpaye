@@ -29,6 +29,7 @@ export enum TransactionType {
   DIRECT_TRANSFER = "direct_transfer",
   CONVERSION = "conversion",
   OFF_RAMP = "off_ramp",
+  ON_RAMP = "on_ramp",
 }
 
 /**

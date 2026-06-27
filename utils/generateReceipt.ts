@@ -98,19 +98,27 @@ function mapTransactionStatus(
 }
 
 /**
- * Format date for receipt
+ * Format date for receipt in the user's local timezone
+ * Output: "Thursday, Mar 26, 2026 at 08:35 am"
  */
-function formatDate(date: Date): string {
-  const options: Intl.DateTimeFormatOptions = {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  };
-  return new Date(date).toLocaleDateString("en-US", options);
+function formatDate(date: Date, timeZone = "UTC"): string {
+  const d = new Date(date);
+  const weekday = d.toLocaleDateString("en-US", { weekday: "long", timeZone });
+  const datePart = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone });
+  const timePart = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone }).toLowerCase();
+  return `${weekday}, ${datePart} at ${timePart}`;
 }
+
+// Map country codes to IANA timezone identifiers
+const COUNTRY_TIMEZONE_MAP: Record<string, string> = {
+  NG: "Africa/Lagos",
+  GH: "Africa/Accra",
+  KE: "Africa/Nairobi",
+  ZA: "Africa/Johannesburg",
+  GB: "Europe/London",
+  US: "America/New_York",
+  CA: "America/Toronto",
+};
 
 /**
  * Format transaction data for receipt generation based on project Transaction model
@@ -121,7 +129,8 @@ export async function formatTransactionData(
   counterpartyUser?: IUser
 ): Promise<ReceiptData> {
   const status = mapTransactionStatus(transaction.status);
-  const transactionDate = formatDate(transaction.createdAt);
+  const timeZone = COUNTRY_TIMEZONE_MAP[user.country] || "UTC";
+  const transactionDate = formatDate(transaction.createdAt, timeZone);
 
   // Prepare additional fields
   const fees = transaction.fees
@@ -320,13 +329,13 @@ export async function generateReceipt(data: ReceiptData): Promise<string> {
     const page = await browser.newPage();
 
     // Read logo images and convert to base64
-    const logoPath = path.join(__dirname, "../public/logo.jpg");
+    const logoPath = path.join(__dirname, "../public/logo.png");
     const logoIconPath = path.join(__dirname, "../public/logo-icon.jpg");
 
     const logoBuffer = await fs.readFile(logoPath);
     const logoIconBuffer = await fs.readFile(logoIconPath);
 
-    const logoBase64 = `data:image/jpeg;base64,${logoBuffer.toString(
+    const logoBase64 = `data:image/png;base64,${logoBuffer.toString(
       "base64"
     )}`;
     const logoIconBase64 = `data:image/jpeg;base64,${logoIconBuffer.toString(
@@ -350,28 +359,36 @@ export async function generateReceipt(data: ReceiptData): Promise<string> {
 
     // Replace image src attributes with base64 data URIs
     const htmlWithImages = html
-      .replace('src="/logo.jpg"', `src="${logoBase64}"`)
-      .replace('src="/logo-icon.jpg"', `src="${logoIconBase64}"`);
+      .replace(/src="logo\.png"/g, `src="${logoBase64}"`)
+      .replace(/src="logo\.jpg"/g, `src="${logoBase64}"`)
+      .replace(/src="logo-icon\.jpg"/g, `src="${logoIconBase64}"`)
+      .replace(/url\('logo\.png'\)/g, `url('${logoBase64}')`);
 
     // Set content and wait for fonts to load for consistent rendering
-    await page.setContent(htmlWithImages, { waitUntil: "networkidle0" });
+    await page.setContent(htmlWithImages, { 
+      waitUntil: "domcontentloaded",
+      timeout: 15000 
+    });
+
+    // Wait a bit for rendering to complete
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Important: Set viewport size to ensure the receipt renders fully within the view
     await page.setViewport({
       width: 600,
-      height: 1000,
+      height: 1200, // Increased height to capture complete receipt
       deviceScaleFactor: 2,
     });
 
-    // Select the receipt element itself to avoid taking a screenshot of the whole body background
-    const receiptElement = await page.$(".receipt-container");
+    // Take screenshot of the entire screenshot-wrapper to capture complete receipt
+    const screenshotElement = await page.$(".screenshot-wrapper");
 
-    if (!receiptElement) {
-      throw new Error("Receipt container not found in template");
+    if (!screenshotElement) {
+      throw new Error("Screenshot wrapper not found in template");
     }
 
-    // Take screenshot of just the receipt element with transparent background and return as base64
-    const result = await receiptElement.screenshot({
+    // Take screenshot of the wrapper element to capture the complete receipt including success icon
+    const result = await screenshotElement.screenshot({
       omitBackground: true, // ensures the jagged edge doesn't have white boxes behind it
       encoding: "base64",
     });

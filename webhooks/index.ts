@@ -6,8 +6,11 @@ import "../config/init";
 import { userService, whatsappBusinessService } from "../services";
 import { redisClient } from "../services/redis";
 import { userRateLimiter, verifyWebhookSignature } from "./middleware";
+import { shouldGateEmailVerification } from "./emailVerificationGuard";
 import flowRouter from "./route/route";
 import { CustomReq } from "./types/request.type";
+
+export { shouldGateEmailVerification };
 
 export const app: Express = express();
 app.use(express.static("public"));
@@ -18,7 +21,7 @@ app.use(
       directives: {
         defaultSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        scriptSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", "data:", "https:"],
       },
     },
@@ -172,6 +175,32 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
 
           if (!isRegistered) {
             await replyingMessage(message.id);
+            
+            // Check if this is a "start [referral_code]" command
+            if (message.type === "text" && message.text.body) {
+              const messageText = message.text.body.trim();
+              const startMatch = messageText.match(/^start\s+([A-Z0-9]+)$/i);
+              
+              if (startMatch) {
+                // Process the start command first and wait for it to complete
+                const phone = message.from.startsWith("+")
+                  ? message.from
+                  : `+${message.from}`;
+                
+                console.log("DEBUG: Processing start command for new user:", phone);
+                await commandRouteHandler(phone, messageText);
+                
+                console.log("DEBUG: Start command processed, waiting 1 second before sending flow");
+                // Wait a moment to ensure Redis storage completes
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                console.log("DEBUG: Sending registration flow");
+                // Then send registration flow
+                whatsappBusinessService.sendIntroMessageByFlowId(message.from);
+                return res.sendStatus(200);
+              }
+            }
+            
             // New user or incomplete profile - send registration flow
             whatsappBusinessService.sendIntroMessageByFlowId(message.from);
           } else {
@@ -179,17 +208,129 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
               message,
               contact,
             });
+
+            // Guard: email verification gate
+            // Must run before any command routing for KYC-verified users
+            const phone = message.from.startsWith("+")
+              ? message.from
+              : `+${message.from}`;
+
+            if (user && shouldGateEmailVerification(user)) {
+              await whatsappBusinessService.sendEmailVerificationFlowById(phone);
+              return res.sendStatus(200);
+            }
+
             // User has completed registration
             // Handle text messages
             if (message.type == "text" && message.text.body) {
               await replyingMessage(message.id);
 
-              // Nigerian user without KYC - prompt for verification but still allow basic access
-              // They can still use the app, but some features may be limited
-              const phone = message.from.startsWith("+")
-                ? message.from
-                : `+${message.from}`;
-              await commandRouteHandler(phone, message.text.body);
+              // Check if user has pending image payment (sent image without caption)
+              const pendingImagePayment = await redisClient.get(`image_payment_pending:${phone}`);
+              
+              if (pendingImagePayment) {
+                // User previously sent an image without caption, now they're providing the amount
+                const { ImagePaymentService } = await import("../services/ImagePaymentService");
+                const imagePaymentService = new ImagePaymentService();
+                
+                const bankDetails = JSON.parse(pendingImagePayment);
+                const caption = message.text.body;
+                
+                // Try to parse amount from their message
+                const amount = imagePaymentService.parseAmountFromCaption(caption);
+                
+                if (amount) {
+                  // Clear the pending payment
+                  await redisClient.del(`image_payment_pending:${phone}`);
+                  
+                  // Combine bank details with amount and launch flow
+                  const result = {
+                    ...bankDetails,
+                    amount,
+                  };
+                  
+                  await whatsappBusinessService.sendImagePaymentConfirmFlow(phone, result);
+                } else {
+                  // Amount not found, ask again
+                  await whatsappBusinessService.sendNormalMessage(
+                    "❌ Could not find an amount in your message.\n\n" +
+                    "💬 Please reply with the amount you want to send.\n" +
+                    "Example: *send 5000* or just *5000*",
+                    message.from,
+                  );
+                }
+              } else {
+                // Normal text message - route to command handler
+                // Nigerian user without KYC - prompt for verification but still allow basic access
+                // They can still use the app, but some features may be limited
+                await commandRouteHandler(phone, message.text.body);
+              }
+            }
+
+            // Handle image messages with a caption (image payment feature)
+            if (message.type === "image" && message.image) {
+              await replyingMessage(message.id);
+              const caption: string = message.image.caption || "";
+              const mediaId: string = message.image.id;
+
+              if (caption.trim()) {
+                // Lazy import to avoid circular deps
+                const { ImagePaymentService } = await import("../services/ImagePaymentService");
+                const imagePaymentService = new ImagePaymentService();
+
+                await whatsappBusinessService.sendNormalMessage(
+                  "🔍 Scanning your image for payment details...",
+                  message.from,
+                );
+
+                const result = await imagePaymentService.processPaymentImage(mediaId, caption);
+
+                if ("error" in result) {
+                  await whatsappBusinessService.sendNormalMessage(
+                    `❌ ${result.error}`,
+                    message.from,
+                  );
+                } else {
+                  await whatsappBusinessService.sendImagePaymentConfirmFlow(phone, result);
+                }
+              } else {
+                // No caption - extract bank details and wait for amount
+                const { ImagePaymentService } = await import("../services/ImagePaymentService");
+                const imagePaymentService = new ImagePaymentService();
+
+                await whatsappBusinessService.sendNormalMessage(
+                  "🔍 Scanning your image for payment details...",
+                  message.from,
+                );
+
+                // Extract bank details without amount
+                const extractResult = await imagePaymentService.extractBankDetailsFromImage(mediaId);
+
+                if ("error" in extractResult) {
+                  await whatsappBusinessService.sendNormalMessage(
+                    `❌ ${extractResult.error}`,
+                    message.from,
+                  );
+                } else {
+                  // Store bank details in Redis temporarily (30 minutes)
+                  await redisClient.set(
+                    `image_payment_pending:${phone}`,
+                    JSON.stringify(extractResult),
+                    "EX",
+                    1800
+                  );
+
+                  await whatsappBusinessService.sendNormalMessage(
+                    `✅ *Bank Details Detected*\n\n` +
+                    `🏦 *Bank:* ${extractResult.bankName}\n` +
+                    `🔢 *Account:* ${extractResult.accountNumber}\n` +
+                    `👤 *Name:* ${extractResult.accountName}\n\n` +
+                    `💬 *Reply with the amount you want to send*\n` +
+                    `Example: *send 5000* or just *5000*`,
+                    message.from,
+                  );
+                }
+              }
             }
 
             if (message.type == "button") {
@@ -212,9 +353,16 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
                   : `+${message.from}`;
 
                 const commandByMenuId: Record<string, string> = {
+                  other_menu_ngn_deposit: "deposit ngn",
+                  other_menu_USD_deposit: "deposit usd",
+                  other_menu_spend_crypto: "spend crypto",
+                  other_menu_wallets: "wallets",
+                  other_menu_withdraw: "withdraw",
+                  other_menu_referral: "referral",
                   other_menu_payment_link: "payment link",
                   other_menu_transaction_history: "transaction history",
                   other_menu_support: "support",
+                  other_menu_reset_pin: "reset pin",
                 };
 
                 const selectedCommand = selectedMenuId
@@ -281,6 +429,12 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
                     message.from,
                   );
                 }
+
+                // Handle email verification completion
+                if (responseJson.type === "email-verification-complete") {
+                  await replyingMessage(message.id);
+                  // Confirmation message and menu are sent by the flow service via setImmediate
+                }
               }
             }
           }
@@ -295,3 +449,42 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
 
 // Apply rate limiting to flow routes (user-facing endpoints)
 app.use("/flow", userRateLimiter, flowRouter);
+
+// Transaction API routes
+import transactionRoutes from "../routes/transactionRoutes";
+app.use("/api/transactions", transactionRoutes);
+
+// Reset PIN page
+app.get("/reset-pin", (req, res) => {
+  res.sendFile("reset-pin.html", { root: "public" });
+});
+
+// Reset PIN route
+import resetPinRoute from "../routes/resetPin";
+app.use("/api/reset-pin", resetPinRoute);
+
+// Admin API routes
+import adminWithdrawalRoutes from "../routes/adminWithdrawal";
+import adminUserRoutes from "../routes/adminUser";
+import { getOverview } from "../controllers/adminOverviewController";
+import { getLeaderboard } from "../controllers/adminLeaderboardController";
+import { getOfframpTransactions } from "../controllers/adminOfframpController";
+import { getAdminTransactionHistory, getTransactionDetails } from "../controllers/transactionController";
+import { adminLogin, adminLogout, requireAdminAuth } from "../controllers/adminAuthController";
+import { Router as TxRouter } from "express";
+
+// Public auth endpoints
+app.post("/api/admin/login", adminLogin);
+app.post("/api/admin/logout", requireAdminAuth, adminLogout);
+
+// All admin routes below require auth
+app.use("/api/admin/referral-withdrawals", requireAdminAuth, adminWithdrawalRoutes);
+app.use("/api/admin/users", requireAdminAuth, adminUserRoutes);
+app.get("/api/admin/overview", requireAdminAuth, getOverview);
+app.get("/api/admin/leaderboard", requireAdminAuth, getLeaderboard);
+app.get("/api/admin/offramp", requireAdminAuth, getOfframpTransactions);
+
+const adminTxRouter = TxRouter();
+adminTxRouter.get("/", getAdminTransactionHistory);
+adminTxRouter.get("/:referenceId", getTransactionDetails);
+app.use("/api/admin/transactions", requireAdminAuth, adminTxRouter);

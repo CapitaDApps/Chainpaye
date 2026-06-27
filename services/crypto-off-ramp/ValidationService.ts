@@ -20,7 +20,7 @@ export class ValidationService implements IValidationService {
     SupportedAsset,
     SupportedChain[]
   > = {
-    USDC: ["bep20", "base", "arbitrum", "solana"],
+    USDC: ["bep20", "base", "arbitrum", "solana", "stellar"],
     USDT: ["bep20", "solana"],
   };
 
@@ -30,6 +30,30 @@ export class ValidationService implements IValidationService {
   // Maximum transaction limits
   private static readonly MAX_TRANSACTION_USD = 50000;
   private static readonly MIN_TRANSACTION_USD = 1;
+  
+  // Minimum offramp amount in NGN (configurable via env)
+  private static getMinOfframpAmountNgn(): number {
+    return parseFloat(process.env.OFFRAMP_MIN_AMOUNT_NGN || "5000");
+  }
+  
+  // Maximum offramp amount in NGN (configurable via env)
+  private static getMaxOfframpAmountNgn(): number {
+    return parseFloat(process.env.OFFRAMP_MAX_AMOUNT_NGN || "10000000");
+  }
+  
+  /**
+   * Public method to get minimum offramp amount
+   */
+  getMinOfframpAmountNgn(): number {
+    return ValidationService.getMinOfframpAmountNgn();
+  }
+  
+  /**
+   * Public method to get maximum offramp amount
+   */
+  getMaxOfframpAmountNgn(): number {
+    return ValidationService.getMaxOfframpAmountNgn();
+  }
 
   /**
    * Validates asset-chain combination
@@ -407,6 +431,13 @@ export class ValidationService implements IValidationService {
         // Hedera addresses are in format 0.0.xxxxx
         if (!/^0\.0\.\d+$/.test(cleanAddress)) {
           errors.push("Invalid Hedera wallet address format");
+        }
+        break;
+
+      case "stellar":
+        // Stellar addresses start with G and are 56 characters (base32)
+        if (!/^G[A-Z2-7]{55}$/.test(cleanAddress)) {
+          errors.push("Invalid Stellar wallet address format");
         }
         break;
 

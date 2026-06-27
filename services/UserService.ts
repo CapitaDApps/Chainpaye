@@ -76,64 +76,70 @@ export class UserService {
     return { wallet, user };
   }
 
-  async createUser(data: CreateUserType) {
-    const user = await User.findOne({ whatsappNumber: data.whatsappNumber });
+  async createUser(data: CreateUserType): Promise<{ userId: string; whatsappNumber: string; fullName: string }> {
+    const existingUser = await User.findOne({ whatsappNumber: data.whatsappNumber });
 
-    if (!user) {
-      const userId = this.generateUserId();
+    if (existingUser) {
+      // If user already exists, return existing user data
+      return { userId: existingUser.userId, whatsappNumber: existingUser.whatsappNumber, fullName: existingUser.fullName };
+    }
 
-      // Extract country from phone number if not provided
-      const extractedCountry = getCountryCodeFromPhoneNumber(
-        data.whatsappNumber,
+    const userId = this.generateUserId();
+
+    // Extract country from phone number if not provided
+    const extractedCountry = getCountryCodeFromPhoneNumber(
+      data.whatsappNumber,
+    );
+
+    if (!extractedCountry) {
+      throw new Error(
+        `Could not determine country for phone number: ${data.whatsappNumber}`,
       );
+    }
 
-      if (!extractedCountry) {
-        throw new Error(
-          `Could not determine country for phone number: ${data.whatsappNumber}`,
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        const pin = await argon2.hash(data.pin);
+        await User.create(
+          [
+            {
+              whatsappNumber: data.whatsappNumber,
+
+              country: extractedCountry,
+              pin,
+              userId,
+              fullName: data.fullName,
+            },
+          ],
+          { session },
+        );
+
+        await walletService.addWallet(
+          {
+            userId,
+            country: extractedCountry,
+          },
+          session,
+        );
+      });
+
+      try {
+        await walletService.ensureFiatVirtualWallets(userId, data.fullName);
+      } catch (walletProvisionError) {
+        console.error(
+          "Error creating fiat virtual wallets during user creation",
+          walletProvisionError,
         );
       }
 
-      const session = await mongoose.startSession();
-      try {
-        await session.withTransaction(async () => {
-          const pin = await argon2.hash(data.pin);
-          await User.create(
-            [
-              {
-                whatsappNumber: data.whatsappNumber,
-
-                country: extractedCountry,
-                pin,
-                userId,
-                fullName: data.fullName,
-              },
-            ],
-            { session },
-          );
-
-          await walletService.addWallet(
-            {
-              userId,
-              country: extractedCountry,
-            },
-            session,
-          );
-        });
-
-        try {
-          await walletService.ensureFiatVirtualWallets(userId, data.fullName);
-        } catch (walletProvisionError) {
-          console.error(
-            "Error creating fiat virtual wallets during user creation",
-            walletProvisionError,
-          );
-        }
-      } catch (error) {
-        console.log("Error creating user", error);
-        throw error;
-      } finally {
-        await session.endSession();
-      }
+      // Return the created user data
+      return { userId, whatsappNumber: data.whatsappNumber, fullName: data.fullName };
+    } catch (error) {
+      console.log("Error creating user", error);
+      throw error;
+    } finally {
+      await session.endSession();
     }
   }
 

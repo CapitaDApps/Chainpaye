@@ -404,6 +404,46 @@ const COMMANDS: Record<string, CommandConfig> = {
   },
 
   // ============================================================
+  // USD DEPOSIT
+  // Deposit USD via bank transfer
+  // ============================================================
+  usdDeposit: {
+    triggers: [
+      // Slash commands
+      "/usddeposit",
+      "/depositusd",
+
+      // USD deposit phrases
+      "deposit usd",
+      "usd deposit",
+      "deposit USD",
+      "USD deposit",
+      "deposit dollar",
+      "dollar deposit",
+      "deposit dollars",
+      "dollars deposit",
+
+      // Bank transfer USD
+      "bank transfer usd",
+      "usd bank transfer",
+      "wire transfer usd",
+      "usd wire transfer",
+
+      // Natural language
+      "i want to deposit usd",
+      "i want to deposit USD",
+      "i want to deposit dollars",
+      "deposit us dollars",
+      "add usd",
+      "add USD",
+      "fund with usd",
+      "fund with USD",
+    ],
+    description: "Deposit USD to your wallet via bank transfer",
+    priority: 7, // Higher priority than regular deposit
+  },
+
+  // ============================================================
   // PAYMENT LINKS
   // Create links to receive payments
   // ============================================================
@@ -512,22 +552,24 @@ const COMMANDS: Record<string, CommandConfig> = {
   },
 
   // ============================================================
-  // OFFRAMP / CRYPTO TO FIAT
+  // SPEND CRYPTO / CRYPTO TO FIAT
   // Convert crypto to fiat currency
   // ============================================================
   offramp: {
     triggers: [
       // Slash commands
-      "/offramp",
+      "/spendcrypto",
+      "/spend",
       "/sellcrypto",
       "/cryptosell",
 
-      // Offramp terms
-      "off ramp",
-      "offramp",
-      "off-ramp",
-      "crypto offramp",
-      "crypto off ramp",
+      // Spend crypto terms
+      "spend crypto",
+      "spend my crypto",
+      "spend cryptocurrency",
+      "crypto spend",
+      "use crypto",
+      "use my crypto",
 
       // Sell crypto
       "sell crypto",
@@ -568,13 +610,15 @@ const COMMANDS: Record<string, CommandConfig> = {
       "sell crypto for cash",
       "i want to sell crypto",
       "i want to sell my crypto",
+      "i want to spend crypto",
+      "i want to spend my crypto",
       "convert my crypto",
       "turn crypto to cash",
       "change crypto to cash",
       "liquidate crypto",
     ],
     description:
-      "Offramp crypto to fiat and receive it in your chainpaye wallet",
+      "Spend your crypto and receive fiat in your chainpaye wallet",
     priority: 4,
   },
 
@@ -696,6 +740,165 @@ const COMMANDS: Record<string, CommandConfig> = {
       "enable bank withdrawal",
     ],
     description: "Complete KYC/BVN verification to unlock all features",
+    priority: 5,
+  },
+
+  // ============================================================
+  // SIGNUP (for existing users who try to signup again)
+  // ============================================================
+  signup: {
+    triggers: [
+      // Signup attempts
+      "signup",
+      "sign up",
+      "register",
+      "create account",
+      "new account",
+      "join",
+      "get started",
+      "start account",
+      "open account",
+    ],
+    description: "Handle signup attempts from existing users",
+    priority: 8,
+  },
+
+  // ============================================================
+  // BUY CRYPTO / ONRAMP
+  // User wants to buy USDC or USDT with NGN
+  // ============================================================
+  buyCrypto: {
+    triggers: [
+      "/buycrypto",
+      "buy crypto",
+      "buy usdc",
+      "buy usdt",
+      "buy stablecoin",
+      "buy stablecoins",
+      "purchase crypto",
+      "purchase usdc",
+      "purchase usdt",
+      "onramp",
+      "on ramp",
+      "crypto onramp",
+      "i want to buy crypto",
+      "i want to buy usdc",
+      "i want to buy usdt",
+    ],
+    description: "Buy USDC or USDT with NGN via DexPay",
+    priority: 5,
+  },
+
+  // ============================================================
+  // REFERRAL SYSTEM
+  // View referral dashboard, earnings, and leaderboard
+  // ============================================================
+  referral: {
+    triggers: [
+      // Slash commands
+      "/referral",
+      "/referrals",
+      "/refer",
+      "/earnings",
+      "/dashboard",
+
+      // Referral terms
+      "referral",
+      "referrals",
+      "my referral",
+      "my referrals",
+      "referral code",
+      "my referral code",
+      "referral link",
+      "my referral link",
+      "refer",
+      "refer friend",
+      "refer a friend",
+
+      // Dashboard
+      "dashboard",
+      "referral dashboard",
+      "my dashboard",
+      "show dashboard",
+      "view dashboard",
+
+      // Earnings
+      "earnings",
+      "my earnings",
+      "referral earnings",
+      "how much have i earned",
+      "how much did i earn",
+      "check earnings",
+      "view earnings",
+      "show earnings",
+
+      // Leaderboard
+      "leaderboard",
+      "top earners",
+      "rankings",
+      "my rank",
+      "my ranking",
+
+      // Natural language
+      "how do i refer",
+      "how can i refer",
+      "invite friends",
+      "earn rewards",
+      "earn money",
+      "make money",
+      "passive income",
+    ],
+    description: "View your referral dashboard and earnings",
+    priority: 4,
+  },
+  // ============================================================
+  // RESET PIN
+  // User wants to reset their PIN via email
+  // ============================================================
+  resetPin: {
+    triggers: [
+      "/resetpin",
+      "reset pin",
+      "reset my pin",
+      "forgot pin",
+      "forgot my pin",
+      "change pin",
+      "change my pin",
+      "i forgot my pin",
+      "i forgot pin",
+    ],
+    description: "Reset your PIN via email",
+    priority: 9,
+  },
+  // ============================================================
+  // ADD BENEFICIARY
+  // User wants to add a bank account beneficiary
+  // ============================================================
+  addBeneficiary: {
+    triggers: [
+      "/addbeneficiary",
+      "add beneficiary",
+      "add a beneficiary",
+      "new beneficiary",
+      "save beneficiary",
+      "add bank account",
+      "add payout account",
+    ],
+    description: "Add a bank account beneficiary for Ghana or Kenya payouts",
+    priority: 5,
+  },
+  viewBeneficiaries: {
+    triggers: [
+      "/beneficiaries",
+      "beneficiaries",
+      "my beneficiaries",
+      "view beneficiaries",
+      "show beneficiaries",
+      "list beneficiaries",
+      "saved accounts",
+      "my saved accounts",
+    ],
+    description: "View your saved beneficiary accounts",
     priority: 5,
   },
 };

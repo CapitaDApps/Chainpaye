@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChainPaye Admin — Login</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Inter',sans-serif;background:linear-gradient(135deg,#1e1557 0%,#2d1f8a 50%,#3b2aad 100%);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1rem}
+.card{background:#fff;border-radius:16px;padding:2.5rem 2rem;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.logo{display:flex;align-items:center;gap:.75rem;margin-bottom:2rem;justify-content:center}
+.logo img{width:42px;height:42px;border-radius:10px;object-fit:cover}
+.logo-text{font-size:1.3rem;font-weight:700;color:#1e1557;letter-spacing:-.02em}
+.logo-text span{color:#7c6ef5}
+h2{font-size:1.1rem;font-weight:600;color:#111827;margin-bottom:.35rem;text-align:center}
+.subtitle{font-size:.85rem;color:#6b7280;text-align:center;margin-bottom:1.75rem}
+.form-group{margin-bottom:1.1rem}
+label{display:block;font-size:.82rem;font-weight:600;color:#374151;margin-bottom:.4rem}
+input{width:100%;padding:.7rem .9rem;border:1.5px solid #e5e7eb;border-radius:8px;font-size:.9rem;outline:none;transition:border-color .15s;color:#111827}
+input:focus{border-color:#5b4fcf}
+.btn{width:100%;padding:.75rem;background:linear-gradient(135deg,#5b4fcf,#7c6ef5);color:#fff;border:none;border-radius:8px;font-size:.95rem;font-weight:600;cursor:pointer;margin-top:.5rem;transition:opacity .2s}
+.btn:hover{opacity:.9}
+.btn:disabled{opacity:.6;cursor:not-allowed}
+.error{background:#fee2e2;color:#dc2626;border-radius:8px;padding:.65rem .9rem;font-size:.83rem;margin-bottom:1rem;display:none}
+.error.show{display:block}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <img src="/logo-icon.jpg" alt="ChainPaye" />
+    <span class="logo-text">Chain<span>Paye</span></span>
+  </div>
+  <h2>Admin Dashboard</h2>
+  <p class="subtitle">Sign in to continue</p>
+  <div class="error" id="errorMsg"></div>
+  <form id="loginForm">
+    <div class="form-group">
+      <label for="email">Email</label>
+      <input type="email" id="email" placeholder="admin@chainpaye.com" required autocomplete="username" />
+    </div>
+    <div class="form-group">
+      <label for="password">Password</label>
+      <input type="password" id="password" placeholder="••••••••" required autocomplete="current-password" />
+    </div>
+    <button type="submit" class="btn" id="submitBtn">Sign In</button>
+  </form>
+</div>
+<script>
+  // If already logged in, redirect
+  if (localStorage.getItem('adminToken')) {
+    window.location.href = '/admin-withdrawal-dashboard.html';
+  }
+
+  document.getElementById('loginForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('submitBtn');
+    const errEl = document.getElementById('errorMsg');
+    errEl.classList.remove('show');
+    btn.disabled = true;
+    btn.textContent = 'Signing in…';
+
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: document.getElementById('email').value,
+          password: document.getElementById('password').value
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        localStorage.setItem('adminToken', data.token);
+        window.location.href = '/admin-withdrawal-dashboard.html';
+      } else {
+        errEl.textContent = data.error || 'Invalid credentials';
+        errEl.classList.add('show');
+      }
+    } catch(err) {
+      errEl.textContent = 'Connection error. Please try again.';
+      errEl.classList.add('show');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Sign In';
+    }
+  });
+</script>
+</body>
+</html>

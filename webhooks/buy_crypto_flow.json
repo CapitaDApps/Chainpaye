@@ -1,0 +1,110 @@
+{
+  "version": "7.2",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "BUY_CRYPTO_FORM": ["RETURN_TO_CHAT"],
+    "RETURN_TO_CHAT": []
+  },
+  "screens": [
+    {
+      "id": "BUY_CRYPTO_FORM",
+      "title": "Buy Crypto",
+      "data": {
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Buy USDC / USDT"
+          },
+          {
+            "type": "TextBody",
+            "text": "Enter the NGN amount you want to spend and select the asset and network."
+          },
+          {
+            "type": "Form",
+            "name": "buy_crypto_form",
+            "children": [
+              {
+                "type": "TextInput",
+                "label": "Amount (NGN)",
+                "name": "fiatAmount",
+                "required": true,
+                "input-type": "number",
+                "helper-text": "Enter the NGN amount you want to spend"
+              },
+              {
+                "type": "Dropdown",
+                "label": "Asset",
+                "name": "asset",
+                "required": true,
+                "data-source": [
+                  { "id": "USDC", "title": "USDC" },
+                  { "id": "USDT", "title": "USDT" }
+                ]
+              },
+              {
+                "type": "Dropdown",
+                "label": "Chain / Network",
+                "name": "chain",
+                "required": true,
+                "data-source": [
+                  { "id": "BSC", "title": "BSC (BNB Smart Chain)" },
+                  { "id": "SOL", "title": "SOL (Solana)" },
+                  { "id": "BASE", "title": "BASE" },
+                  { "id": "ARBITRUM", "title": "ARBITRUM" }
+                ],
+                "helper-text": "USDT is available on BSC and SOL only"
+              },
+              {
+                "type": "Footer",
+                "label": "Proceed",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "fiatAmount": "${form.fiatAmount}",
+                    "asset": "${form.asset}",
+                    "chain": "${form.chain}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "RETURN_TO_CHAT",
+      "title": "Return to Chat",
+      "terminal": true,
+      "success": true,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Almost there!"
+          },
+          {
+            "type": "TextBody",
+            "text": "Return to the chat for further instructions. You will receive the bank transfer details shortly."
+          },
+          {
+            "type": "Footer",
+            "label": "Done",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {}
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

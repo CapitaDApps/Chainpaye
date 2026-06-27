@@ -7,6 +7,10 @@ export { handleTopUp } from "./topUpHandler";
 export { handleTransactionHistory } from "./transactionHandler";
 export { handleTransfer } from "./transferHandler";
 export { handleWithdrawal } from "./withdrawalHandler";
+export { handleStartCommand } from "./startCommandHandler";
+export { handleReferralCommand, handleWithdrawCommand, handleReferralHistoryCommand } from "./referralHandler";
+export { handleUsdDeposit } from "./usdDepositHandler";
+export { handleAddBeneficiary, handleViewBeneficiaries } from "./addBeneficiaryHandler";
 
 export {
   handleAccountConfirmation,
