@@ -280,7 +280,6 @@ export interface IDexPayService {
   getCurrentRates(
     asset: string,
     chain: string,
-    amount?: number,
   ): Promise<ExchangeRate>;
   createQuote(quoteRequest: QuoteRequest): Promise<Quote>;
   finalizeQuote(quoteId: string): Promise<QuoteResult>;
@@ -339,7 +338,6 @@ export interface IBankingManager {
   getCurrentRates(
     asset: string,
     chain: string,
-    amount?: number,
   ): Promise<ExchangeRate>;
   validateBankDetails(
     bankCode: string,

@@ -375,6 +375,14 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         };
       }
 
+      // Clamp to max 6 decimal places (Crossmint limit for all tokens).
+      // Stellar allows 7, but 6 is safe for all chains.
+      const maxDecimals = chain.toLowerCase() === "stellar" ? 7 : 6;
+      const clampedAmount = parseFloat(amount.toFixed(maxDecimals));
+      // Overwrite the request amount with the safely-rounded string so all
+      // downstream code (balance checks, API call) uses the same value.
+      transferRequest = { ...transferRequest, amount: clampedAmount.toFixed(maxDecimals) };
+
       // Extract userId from wallet address with enhanced error handling
       const userId = await this.extractUserIdFromWalletAddress(
         transferRequest.walletAddress,

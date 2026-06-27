@@ -653,31 +653,9 @@ What would you like to sell?`;
     network: NormalizedNetworkType,
     address: string,
   ) {
-    // Message 1: Send the deposit address
-    // await this.sendNormalMessage(address, to);
-
-    // Fetch banks for the offramp flow
-    let banks: { id: string; title: string }[] = [
-      { id: "000014", title: "Access Bank" },
-      { id: "000013", title: "GTBank" },
-      { id: "000015", title: "Zenith Bank" },
-      { id: "999992", title: "Opay" },
-      { id: "090267", title: "Kuda Bank" },
-    ];
-
-    try {
-      const dexPayBanks = await dexPayService.getBanks();
-      if (dexPayBanks && dexPayBanks.length > 0) {
-        banks = dexPayBanks.map((b) => ({ id: b.code, title: b.name }));
-      }
-      console.log("DEBUG: Fetched banks for offramp:", banks.length);
-    } catch (error) {
-      console.error("DEBUG: Error fetching banks, using fallback:", error);
-    }
-
-    // Start the flow with banks data
+    // Start the flow at the currency selection screen
     const cryptoTopUpFlowId = WHATSAPP_CONFIG.FLOW_IDS.OFFRAMP;
-    const cryptoTopUpScreenId = "OFFRAMP_DETAILS";
+    const cryptoTopUpScreenId = "SELECT_CURRENCY";
 
     await this.sendTextOnlyFlowWithDataById(
       to,
@@ -689,7 +667,8 @@ What would you like to sell?`;
         cta: "Spend crypto",
       },
       {
-        banks: banks,
+        has_error: false,
+        error_message: "",
       },
     );
 

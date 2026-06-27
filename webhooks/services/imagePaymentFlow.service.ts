@@ -164,7 +164,7 @@ export async function getImagePaymentFlowScreen(decryptedBody: {
       
       try {
         const ngnAmount = parseFloat(amount);
-        const rateData = await dexPayService.getCurrentRates(rateQueryAsset, rateQueryChain, ngnAmount);
+        const rateData = await dexPayService.getCurrentRates(rateQueryAsset, rateQueryChain);
         
         if (!rateData || !rateData.rate || rateData.rate <= 0) {
           return {
@@ -433,7 +433,6 @@ export async function getImagePaymentFlowScreen(decryptedBody: {
           const rateData = await dexPayService.getCurrentRates(
             isStellar ? dexPayQuoteAsset : (asset || "USDC"),
             dexPayQuoteChain,
-            ngnAmount
           );
           const nairaRate = rateData.rate;
 
@@ -511,14 +510,14 @@ export async function getImagePaymentFlowScreen(decryptedBody: {
           // Round amount to appropriate decimal places based on chain
           // Stellar USDC supports max 7 decimals, others typically support more
           const decimals = isStellar ? 7 : 6;
-          const roundedAmount = parseFloat(totalCryptoRequired.toFixed(decimals));
+          const roundedAmount = totalCryptoRequired.toFixed(decimals);
 
           // Transfer crypto to main wallet
           const transferResult = await crossmintService.transferTokens({
             walletAddress: wallet.address,
             token: `${crossmintChain}:${normalizedAsset.toLowerCase()}`,
             recipient: receivingAddress,
-            amount: roundedAmount.toString(),
+            amount: roundedAmount,
             idempotencyKey: transferIdempotencyKey,
           });
 

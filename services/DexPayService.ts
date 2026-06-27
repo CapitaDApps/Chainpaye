@@ -290,21 +290,21 @@ export class DexPayService implements IBankingManager, IDexPayService {
   async getCurrentRates(
     asset: string,
     chain: string,
-    amount: number = 1000,
   ): Promise<ExchangeRate> {
+    const FIAT_AMOUNT = 10000; // Always use 10000 NGN for rate queries
     try {
       // DexPay API format: /rate/{asset}?fiatAmount=X&chain=Y
       const assetUpper = asset.toUpperCase();
       const mappedChain = this.mapChainForDexPay(chain);
 
       logger.info(
-        `Fetching rates from DexPay for ${assetUpper} on ${mappedChain} using fiatAmount=${amount}`,
+        `Fetching rates from DexPay for ${assetUpper} on ${mappedChain} using fiatAmount=${FIAT_AMOUNT}`,
       );
 
       const response = await axios.get(`${this.baseUrl}/rate/${assetUpper}`, {
         headers: this.getHeaders(),
         params: {
-          fiatAmount: amount, // Use provided amount or default to 1000 NGN
+          fiatAmount: FIAT_AMOUNT,
           chain: mappedChain,
         },
       });

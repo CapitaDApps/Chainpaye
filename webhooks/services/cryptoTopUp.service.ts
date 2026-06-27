@@ -49,6 +49,64 @@ const FALLBACK_BANKS: Bank[] = [
   { id: "090267", title: "Kuda Bank" },
 ];
 
+const PCXPAY_API_KEY = "pcx_prod_WGQFlAodEzlhFJoNcF5O4dIBuvlob09VehIwolsaajU";
+const PCXPAY_BASE_URL = "https://prod-api.pcxpay.com";
+const PCXPAY_ORG_ID = "3ed1170a-0151-4e9f-825b-16470b88ab62";
+
+/**
+ * Fetch mobile money networks from PCXPay for a given country code.
+ * Returns an array of { id, title } suitable for WhatsApp Flow dropdowns.
+ */
+async function fetchPcxPayNetworks(
+  countryCode: string,
+): Promise<{ id: string; title: string }[]> {
+  const axios = (await import("axios")).default;
+  const response = await axios.post(
+    `${PCXPAY_BASE_URL}/v1/externals/networks`,
+    { country_code: countryCode },
+    {
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": PCXPAY_API_KEY,
+        Authorization: "None",
+      },
+    },
+  );
+
+  const networks: any[] = response.data?.networks ?? [];
+  if (!networks.length) {
+    throw new Error(`No networks returned for country code ${countryCode}`);
+  }
+
+  return networks.map((n: any) => ({
+    id: String(n.code ?? n.id),
+    title: String(n.name),
+  }));
+}
+
+/**
+ * Fetch the live USD → {toCurrency} exchange rate from PCXPay.
+ * Returns the rate as a number (e.g. 1402.0 for RWF, 16.16 for ZAR).
+ */
+async function fetchPcxPayUsdRate(toCurrency: string): Promise<number> {
+  const axios = (await import("axios")).default;
+  const response = await axios.get(
+    `${PCXPAY_BASE_URL}/v1/organizations/admin/exchange-rate?fromCurrency=USD&toCurrency=${toCurrency}&orgId=${PCXPAY_ORG_ID}`,
+    {
+      headers: {
+        "x-api-key": PCXPAY_API_KEY,
+        Authorization: "None",
+      },
+    },
+  );
+
+  const rate = response.data?.data?.rate;
+  if (!rate || isNaN(Number(rate))) {
+    throw new Error(`Invalid rate response from PCXPay for ${toCurrency}`);
+  }
+  return Number(rate);
+}
+
 /**
  * Process DexPay quote and completion in background after transfer succeeds
  * This allows us to return success screen immediately without waiting
@@ -226,7 +284,6 @@ export async function processOfframpInBackground(
       const rateData = await dexPayService.getCurrentRates(
         normalizedAsset,
         dexPayChain,
-        ngnAmount,
       );
       const exchangeRate = rateData.rate;
       const sellAmountUsd = ngnAmount / exchangeRate;
@@ -300,6 +357,183 @@ export async function processOfframpInBackground(
   }
 }
 
+/**
+ * Process PCXPay RWF mobile money payout in background after crypto transfer succeeds.
+ * rwfFiatAmount — the RWF amount the user entered (e.g. "13500")
+ * cryptoCostUsd — the USD equivalent of crypto sold (for notification display)
+ */
+async function processRwfPayoutInBackground(
+  userId: string,
+  phone: string,
+  networkCode: string,
+  recipientPhone: string,
+  rwfFiatAmount: string,
+  cryptoCostUsd: string,
+  networkName: string,
+  idempotencyKey: string,
+): Promise<void> {
+  try {
+    const axios = (await import("axios")).default;
+
+    logger.info("[OFFRAMP-RWF-BG] Waiting 20s for crypto settlement...");
+    await new Promise((resolve) => setTimeout(resolve, 20000));
+
+    const rwfNumeric = parseFloat(rwfFiatAmount.replace(/,/g, ""));
+    logger.info(`[OFFRAMP-RWF-BG] Initiating PCXPay payout: RWF ${rwfNumeric} to ${recipientPhone} via ${networkCode}`);
+
+    const payoutResponse = await axios.post(
+      `${PCXPAY_BASE_URL}/v1/externals/payout`,
+      {
+        network_code: networkCode,
+        phone_number: recipientPhone,
+        amount: rwfNumeric,
+        currency: "RWF",
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": PCXPAY_API_KEY,
+          Authorization: "None",
+        },
+      },
+    );
+
+    const payoutData = payoutResponse.data;
+    logger.info("[OFFRAMP-RWF-BG] PCXPay payout response: " + JSON.stringify(payoutData, null, 2));
+
+    // Update idempotency to completed
+    await redisClient.set(
+      idempotencyKey,
+      JSON.stringify({ status: "completed", userId, payoutData, completedAt: new Date().toISOString() }),
+      "EX",
+      300,
+    );
+
+    // Notify the user
+    const { whatsappBusinessService } = await import("../../services");
+    await whatsappBusinessService.sendNormalMessage(
+      `✅ *Withdrawal Successful!*\n\n` +
+      `🇷🇼 *Rwanda (RWF) Payout*\n\n` +
+      `📱 Mobile Number: ${recipientPhone}\n` +
+      `🏦 Network: ${networkName}\n` +
+      `💰 Amount: RWF ${rwfFiatAmount}\n` +
+      `💵 Crypto Sold: ~$${parseFloat(cryptoCostUsd).toFixed(4)}\n\n` +
+      `The funds will arrive on your mobile money wallet shortly.`,
+      phone,
+    );
+
+    logger.info("[OFFRAMP-RWF-BG] Background payout completed successfully.");
+  } catch (error) {
+    logger.error("[OFFRAMP-RWF-BG] Background payout failed: " + (error as Error).message);
+
+    // Mark as failed in idempotency
+    await redisClient.set(
+      idempotencyKey,
+      JSON.stringify({ status: "failed", userId, error: (error as Error).message, failedAt: new Date().toISOString() }),
+      "EX",
+      300,
+    );
+
+    // Notify user of failure
+    try {
+      const { whatsappBusinessService } = await import("../../services");
+      await whatsappBusinessService.sendNormalMessage(
+        `❌ *Payout Failed*\n\nYour RWF mobile money payout could not be completed.\n\nPlease contact support and quote reference: ${idempotencyKey.slice(-12)}`,
+        phone,
+      );
+    } catch { /* swallow notification errors */ }
+  }
+}
+
+/**
+ * Process PCXPay ZAR bank transfer payout in background after crypto transfer succeeds.
+ * zarFiatAmount — the ZAR amount the user entered (e.g. "1000")
+ * cryptoCostUsd — the USD equivalent of crypto sold (for notification display)
+ */
+async function processZarPayoutInBackground(
+  userId: string,
+  phone: string,
+  bankCode: string,
+  accountNumber: string,
+  accountName: string,
+  zarFiatAmount: string,
+  cryptoCostUsd: string,
+  bankName: string,
+  idempotencyKey: string,
+): Promise<void> {
+  try {
+    const axios = (await import("axios")).default;
+
+    logger.info("[OFFRAMP-ZAR-BG] Waiting 20s for crypto settlement...");
+    await new Promise((resolve) => setTimeout(resolve, 20000));
+
+    const zarNumeric = parseFloat(zarFiatAmount.replace(/,/g, ""));
+    logger.info(`[OFFRAMP-ZAR-BG] Initiating PCXPay ZAR payout: ZAR ${zarNumeric} to ${accountNumber} at ${bankCode}`);
+
+    const payoutResponse = await axios.post(
+      `${PCXPAY_BASE_URL}/v1/externals/payout`,
+      {
+        bank_code: bankCode,
+        account_number: accountNumber,
+        account_name: accountName,
+        amount: zarNumeric,
+        currency: "ZAR",
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": PCXPAY_API_KEY,
+          Authorization: "None",
+        },
+      },
+    );
+
+    const payoutData = payoutResponse.data;
+    logger.info("[OFFRAMP-ZAR-BG] PCXPay payout response: " + JSON.stringify(payoutData, null, 2));
+
+    // Update idempotency to completed
+    await redisClient.set(
+      idempotencyKey,
+      JSON.stringify({ status: "completed", userId, payoutData, completedAt: new Date().toISOString() }),
+      "EX",
+      300,
+    );
+
+    // Notify the user
+    const { whatsappBusinessService } = await import("../../services");
+    await whatsappBusinessService.sendNormalMessage(
+      `✅ *Withdrawal Successful!*\n\n` +
+      `🇿🇦 *South Africa (ZAR) Payout*\n\n` +
+      `🏦 Bank: ${bankName}\n` +
+      `🔢 Account: ${accountNumber}\n` +
+      `👤 Name: ${accountName}\n` +
+      `💰 Amount: ZAR ${zarFiatAmount}\n` +
+      `💵 Crypto Sold: ~$${parseFloat(cryptoCostUsd).toFixed(4)}\n\n` +
+      `The funds will arrive in your bank account shortly.`,
+      phone,
+    );
+
+    logger.info("[OFFRAMP-ZAR-BG] Background payout completed successfully.");
+  } catch (error) {
+    logger.error("[OFFRAMP-ZAR-BG] Background payout failed: " + (error as Error).message);
+
+    await redisClient.set(
+      idempotencyKey,
+      JSON.stringify({ status: "failed", userId, error: (error as Error).message, failedAt: new Date().toISOString() }),
+      "EX",
+      300,
+    );
+
+    try {
+      const { whatsappBusinessService } = await import("../../services");
+      await whatsappBusinessService.sendNormalMessage(
+        `❌ *Payout Failed*\n\nYour ZAR bank transfer could not be completed.\n\nPlease contact support and quote reference: ${idempotencyKey.slice(-12)}`,
+        phone,
+      );
+    } catch { /* swallow notification errors */ }
+  }
+}
+
 export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
   const { screen, data: rawData, action, flow_token } = decryptedBody;
   const data = rawData as OfframpData;
@@ -329,87 +563,22 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
 
   // handle initial request when opening the flow
   if (action === "INIT") {
-    // Fetch banks from backend with fallback
-    let banks = FALLBACK_BANKS;
-    try {
-      const dexPayBanks = await dexPayService.getBanks();
-      if (dexPayBanks && dexPayBanks.length > 0) {
-        banks = dexPayBanks.map((b) => ({ id: b.code, title: b.name }));
-      }
-      logger.info("DEBUG: Fetched banks from DexPay API: " + banks.length);
-    } catch (error) {
-      logger.error(
-        "DEBUG: Error fetching banks, using fallback: " +
-          (error as Error).message,
-      );
-    }
-
-    // Check if there's prefilled data from image payment flow
-    const imagePaymentKey = `offramp:image_payment:${phone}`;
-    const imagePaymentData = await redisClient.get(imagePaymentKey);
-    
-    let responseData: any = { banks, hasPrefillData: false };
-
-    if (imagePaymentData) {
-      try {
-        const prefillData = JSON.parse(imagePaymentData);
-        
-        // Find matching bank from the list
-        let matchedBankCode = prefillData.bankCode;
-        const matchedBank = banks.find(
-          (b) =>
-            b.id === prefillData.bankCode ||
-            b.title.toLowerCase().includes(prefillData.bankName.toLowerCase()) ||
-            prefillData.bankName.toLowerCase().includes(b.title.toLowerCase())
-        );
-
-        if (matchedBank) {
-          matchedBankCode = matchedBank.id;
-        }
-
-        // Add prefilled data to response
-        responseData = {
-          banks,
-          prefilledAmount: prefillData.amount.toString(),
-          prefilledBankCode: matchedBankCode,
-          prefilledBankName: matchedBank ? matchedBank.title : prefillData.bankName,
-          prefilledAccountNumber: prefillData.accountNumber,
-          hasPrefillData: true,
-        };
-
-        logger.info(`[OFFRAMP-INIT] Prefilled data from image payment: amount=${prefillData.amount}, bank=${matchedBank ? matchedBank.title : prefillData.bankName}, account=${prefillData.accountNumber}`);
-        
-        // Clean up the Redis key after reading to prevent reuse
-        await redisClient.del(imagePaymentKey);
-        logger.info(`[OFFRAMP-INIT] Cleaned up prefill data from Redis`);
-      } catch (error) {
-        logger.error("Error parsing image payment prefill data: " + (error as Error).message);
-      }
-    }
-
+    // Always open at the currency selection screen
     return {
-      screen: "OFFRAMP_DETAILS",
-      data: responseData,
+      screen: "SELECT_CURRENCY",
+      data: {
+        has_error: false,
+        error_message: "",
+      },
     };
   }
 
   if (action === "data_exchange") {
     if (!userPhone) {
-      // Fetch banks again for error screen
-      let banks = FALLBACK_BANKS;
-      try {
-        const dexPayBanks = await dexPayService.getBanks();
-        if (dexPayBanks && dexPayBanks.length > 0) {
-          banks = dexPayBanks.map((b) => ({ id: b.code, title: b.name }));
-        }
-      } catch {
-        // Use fallback
-      }
-
       return {
-        screen: "OFFRAMP_DETAILS",
+        screen: "SELECT_CURRENCY",
         data: {
-          banks: banks,
+          has_error: true,
           error_message: "Session expired. Please restart the flow.",
         },
       };
@@ -417,6 +586,159 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
 
     // handle the request based on the current screen
     switch (screen) {
+      case "SELECT_CURRENCY": {
+        const { payout_country } = data as { payout_country?: string };
+
+        if (!payout_country) {
+          return {
+            screen: "SELECT_CURRENCY",
+            data: {
+              has_error: true,
+              error_message: "Please select a payout country.",
+            },
+          };
+        }
+
+        // Map currency codes to display names
+        const countryNames: Record<string, string> = {
+          NGN: "Nigeria",
+          KES: "Kenya",
+          ZAR: "South Africa",
+          RWF: "Rwanda",
+          UGX: "Uganda",
+          MWK: "Malawi",
+          TZS: "Tanzania",
+        };
+
+        // NGN — fully supported via DexPay
+        if (payout_country === "NGN") {
+          // Fetch Nigerian banks and proceed to the offramp details screen
+          let banks = FALLBACK_BANKS;
+          try {
+            const dexPayBanks = await dexPayService.getBanks();
+            if (dexPayBanks && dexPayBanks.length > 0) {
+              banks = dexPayBanks.map((b) => ({ id: b.code, title: b.name }));
+            }
+            logger.info("[OFFRAMP] Fetched NGN banks: " + banks.length);
+          } catch (error) {
+            logger.error(
+              "[OFFRAMP] Error fetching banks, using fallback: " +
+                (error as Error).message,
+            );
+          }
+
+          // Check for prefilled data from image payment flow
+          const imagePaymentKey = `offramp:image_payment:${phone}`;
+          const imagePaymentData = await redisClient.get(imagePaymentKey);
+
+          let responseData: any = { banks, hasPrefillData: false };
+
+          if (imagePaymentData) {
+            try {
+              const prefillData = JSON.parse(imagePaymentData);
+
+              const matchedBank = banks.find(
+                (b) =>
+                  b.id === prefillData.bankCode ||
+                  b.title.toLowerCase().includes(prefillData.bankName.toLowerCase()) ||
+                  prefillData.bankName.toLowerCase().includes(b.title.toLowerCase()),
+              );
+              const matchedBankCode = matchedBank ? matchedBank.id : prefillData.bankCode;
+
+              responseData = {
+                banks,
+                prefilledAmount: prefillData.amount.toString(),
+                prefilledBankCode: matchedBankCode,
+                prefilledBankName: matchedBank ? matchedBank.title : prefillData.bankName,
+                prefilledAccountNumber: prefillData.accountNumber,
+                hasPrefillData: true,
+              };
+
+              logger.info(
+                `[OFFRAMP] Prefilled from image payment: amount=${prefillData.amount}, bank=${responseData.prefilledBankName}, account=${prefillData.accountNumber}`,
+              );
+
+              await redisClient.del(imagePaymentKey);
+            } catch (error) {
+              logger.error(
+                "[OFFRAMP] Error parsing image payment prefill data: " +
+                  (error as Error).message,
+              );
+            }
+          }
+
+          return {
+            screen: "OFFRAMP_DETAILS",
+            data: responseData,
+          };
+        }
+
+        // RWF — Rwanda via PCXPay mobile money
+        if (payout_country === "RWF") {
+          let networks: { id: string; title: string }[] = [];
+          try {
+            networks = await fetchPcxPayNetworks("RW");
+            logger.info(`[OFFRAMP-RWF] Fetched ${networks.length} networks from PCXPay`);
+          } catch (error) {
+            logger.error("[OFFRAMP-RWF] Failed to fetch networks: " + (error as Error).message);
+            return {
+              screen: "SELECT_CURRENCY",
+              data: {
+                has_error: true,
+                error_message: "Could not load Rwanda networks. Please try again.",
+              },
+            };
+          }
+
+          return {
+            screen: "RWF_DETAILS",
+            data: {
+              networks,
+              has_error: false,
+              error_message: "",
+            },
+          };
+        }
+
+        // ZAR — South Africa via PCXPay bank transfer
+        if (payout_country === "ZAR") {
+          let banks: { id: string; title: string }[] = [];
+          try {
+            banks = await fetchPcxPayNetworks("ZA");
+            logger.info(`[OFFRAMP-ZAR] Fetched ${banks.length} banks from PCXPay`);
+          } catch (error) {
+            logger.error("[OFFRAMP-ZAR] Failed to fetch banks: " + (error as Error).message);
+            return {
+              screen: "SELECT_CURRENCY",
+              data: {
+                has_error: true,
+                error_message: "Could not load South Africa banks. Please try again.",
+              },
+            };
+          }
+
+          return {
+            screen: "ZAR_DETAILS",
+            data: {
+              banks,
+              has_error: false,
+              error_message: "",
+            },
+          };
+        }
+
+        // All other currencies — show coming soon screen
+        const countryName = countryNames[payout_country] || payout_country;
+        logger.info(`[OFFRAMP] ${countryName} (${payout_country}) selected — routing to COMING_SOON`);
+
+        return {
+          screen: "COMING_SOON",
+          data: {
+            country_name: countryName,
+            currency_code: payout_country,
+          },
+        };
+      }
       case "OFFRAMP_DETAILS": {
         const { currency, network, sell_amount, bank_code, account_number } =
           data;
@@ -646,7 +968,6 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           const rateData = await dexPayService.getCurrentRates(
             rateQueryAsset,
             rateQueryChain,
-            ngnAmount,
           );
           if (rateData && rateData.rate > 0) {
             // Apply spread to the rate (user sees worse rate) - configurable via env
@@ -942,7 +1263,6 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             const rateData = await dexPayService.getCurrentRates(
               isStellar ? dexPayQuoteAsset : currency,
               dexPayQuoteChain,
-              ngnAmount,
             );
 
             nairaRate = rateData.rate;
@@ -1201,13 +1521,13 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           // Round amount to appropriate decimal places based on chain
           // Stellar USDC supports max 7 decimals, others typically support 6
           const decimals = isStellar ? 7 : 6;
-          const roundedAmount = parseFloat(totalCryptoRequired.toFixed(decimals));
+          const roundedAmount = totalCryptoRequired.toFixed(decimals);
 
           const transferResult = await crossmintService.transferTokens({
             walletAddress: wallet.address,
             token: `${crossmintChain}:${normalizedAsset.toLowerCase()}`,
             recipient: receivingAddress,
-            amount: roundedAmount.toString(),
+            amount: roundedAmount,
             idempotencyKey: transferIdempotencyKey,
           });
 
@@ -1375,6 +1695,639 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
       case "OFFRAMP_INPUT":
         // ... implementation if needed ...
         break;
+
+      // ─────────────────────────────────────────────────────────────
+      // RWF SCREENS — Rwanda mobile money via PCXPay
+      // ─────────────────────────────────────────────────────────────
+
+      case "RWF_DETAILS": {
+        const {
+          crypto_asset,
+          crypto_network,
+          network_code,
+          phone_number,
+          sell_amount: rwfSellAmount,
+        } = data as {
+          crypto_asset?: string;
+          crypto_network?: string;
+          network_code?: string;
+          phone_number?: string;
+          sell_amount?: string;
+        };
+
+        // Basic validation
+        if (!crypto_asset || !crypto_network || !network_code || !phone_number || !rwfSellAmount) {
+          let networks: { id: string; title: string }[] = [];
+          try { networks = await fetchPcxPayNetworks("RW"); } catch { /* use empty */ }
+          return {
+            screen: "RWF_DETAILS",
+            data: { networks, has_error: true, error_message: "Please fill in all required fields." },
+          };
+        }
+
+        const rwfInputAmount = parseFloat(rwfSellAmount);
+        if (isNaN(rwfInputAmount) || rwfInputAmount < 5000) {
+          let networks: { id: string; title: string }[] = [];
+          try { networks = await fetchPcxPayNetworks("RW"); } catch { /* use empty */ }
+          return {
+            screen: "RWF_DETAILS",
+            data: { networks, has_error: true, error_message: "Minimum withdrawal amount is RWF 5,000." },
+          };
+        }
+
+        // Validate asset + chain combination
+        const rwfAsset = crypto_asset.toUpperCase();
+        const rwfChainKey = crypto_network.toLowerCase();
+        // USDC: BASE, ERC20, POLYGON, OPTIMISM, ARBITRUM, SOL, AVALANCHE
+        // USDT: ERC20, POLYGON, SOL, AVALANCHE
+        const rwfUsdcChains = ["base", "erc20", "polygon", "optimism", "arbitrum", "sol", "solana", "avalanche"];
+        const rwfUsdtChains = ["erc20", "polygon", "sol", "solana", "avalanche"];
+        const supportedRwf =
+          (rwfAsset === "USDC" && rwfUsdcChains.includes(rwfChainKey)) ||
+          (rwfAsset === "USDT" && rwfUsdtChains.includes(rwfChainKey));
+
+        if (!supportedRwf) {
+          let networks: { id: string; title: string }[] = [];
+          try { networks = await fetchPcxPayNetworks("RW"); } catch { /* use empty */ }
+          return {
+            screen: "RWF_DETAILS",
+            data: {
+              networks,
+              has_error: true,
+              error_message: `${rwfAsset} is not supported on ${crypto_network}. USDC: BASE/ERC20/POLYGON/OPTIMISM/ARBITRUM/SOL/AVALANCHE. USDT: ERC20/POLYGON/SOL/AVALANCHE`,
+            },
+          };
+        }
+
+        // Fetch live USD→RWF rate from PCXPay
+        let rwfRate: number;
+        try {
+          rwfRate = await fetchPcxPayUsdRate("RWF");
+          logger.info(`[OFFRAMP-RWF] Live rate: 1 USD = ${rwfRate} RWF`);
+        } catch (rateError) {
+          logger.error("[OFFRAMP-RWF] Rate fetch failed: " + (rateError as Error).message);
+          let networks: { id: string; title: string }[] = [];
+          try { networks = await fetchPcxPayNetworks("RW"); } catch { /* use empty */ }
+          return {
+            screen: "RWF_DETAILS",
+            data: { networks, has_error: true, error_message: "Could not fetch current exchange rate. Please try again." },
+          };
+        }
+
+        // RWF amount is what the user entered — derive USD crypto cost
+        const cryptoCostUsd = rwfInputAmount / rwfRate;
+        const formattedCryptoCost = cryptoCostUsd.toFixed(6).replace(/\.?0+$/, "") || "0.00";
+
+        // Resolve network name from code
+        let networkName = network_code;
+        try {
+          const allNetworks = await fetchPcxPayNetworks("RW");
+          const found = allNetworks.find((n) => n.id === network_code);
+          if (found) networkName = found.title;
+        } catch { /* keep code as name */ }
+
+        return {
+          screen: "RWF_REVIEW",
+          data: {
+            crypto_asset: rwfAsset,
+            crypto_network: crypto_network.toUpperCase(),
+            network_code,
+            network_name: networkName,
+            phone_number,
+            sell_amount: rwfInputAmount.toLocaleString("en-RW", { maximumFractionDigits: 0 }),
+            crypto_cost: formattedCryptoCost,
+            rate: rwfRate.toLocaleString("en-RW", { maximumFractionDigits: 0 }),
+            has_error: false,
+            error_message: "",
+          },
+        };
+      }
+
+      case "RWF_REVIEW": {
+        const {
+          crypto_asset: rwfReviewAsset,
+          crypto_network: rwfReviewNetwork,
+          network_code: rwfReviewNetworkCode,
+          network_name: rwfReviewNetworkName,
+          phone_number: rwfReviewPhone,
+          sell_amount: rwfReviewSellAmount,
+          crypto_cost: rwfReviewCryptoCost,
+        } = data as Record<string, string | undefined>;
+
+        const flatFeeUsd = parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75");
+        const cryptoCostNum = parseFloat(rwfReviewCryptoCost || "0");
+        const totalCrypto = (cryptoCostNum + flatFeeUsd).toFixed(6).replace(/\.?0+$/, "") || "0.00";
+
+        return {
+          screen: "RWF_AUTHORIZE",
+          data: {
+            crypto_asset: rwfReviewAsset || "USDC",
+            crypto_network: rwfReviewNetwork || "",
+            network_code: rwfReviewNetworkCode || "",
+            network_name: rwfReviewNetworkName || "",
+            phone_number: rwfReviewPhone || "",
+            sell_amount: rwfReviewSellAmount || "0",
+            crypto_cost: rwfReviewCryptoCost || "0",
+            total_crypto_usd: totalCrypto,
+            has_error: false,
+            error_message: "",
+          },
+        };
+      }
+
+      case "RWF_AUTHORIZE": {
+        const {
+          pin: rwfPin,
+          crypto_asset: rwfFinalAsset,
+          crypto_network: rwfFinalNetwork,
+          network_code: rwfFinalNetworkCode,
+          network_name: rwfFinalNetworkName,
+          phone_number: rwfFinalPhone,
+          sell_amount: rwfFinalSellAmount,   // RWF fiat amount
+          crypto_cost: rwfFinalCryptoCost,
+          total_crypto_usd: rwfFinalTotal,   // total crypto to deduct (incl. fee)
+        } = data as Record<string, string | undefined>;
+
+        // Validate required fields
+        if (!rwfPin || !rwfFinalAsset || !rwfFinalNetwork || !rwfFinalNetworkCode || !rwfFinalPhone || !rwfFinalSellAmount) {
+          return {
+            screen: "RWF_AUTHORIZE",
+            data: { ...data, error_message: "Missing required transaction details.", has_error: true },
+          };
+        }
+
+        // Validate PIN
+        const rwfUser = await userService.getUser(phone, true);
+        if (!rwfUser) {
+          return {
+            screen: "RWF_AUTHORIZE",
+            data: { ...data, error_message: "User not found.", has_error: true },
+          };
+        }
+        const validRwfPin = await rwfUser.comparePin(rwfPin);
+        if (!validRwfPin) {
+          return {
+            screen: "RWF_AUTHORIZE",
+            data: { ...data, error_message: "Invalid PIN.", has_error: true },
+          };
+        }
+
+        try {
+          // Normalize chain for crossmint
+          const rwfChainMapping: Record<string, { dexPay: string; crossmint: string }> = {
+            sol: { dexPay: "solana", crossmint: "solana" },
+            solana: { dexPay: "solana", crossmint: "solana" },
+            bsc: { dexPay: "bep20", crossmint: "bsc" },
+            bep20: { dexPay: "bep20", crossmint: "bsc" },
+            base: { dexPay: "base", crossmint: "base" },
+            arbitrum: { dexPay: "arbitrum", crossmint: "arbitrum" },
+            stellar: { dexPay: "stellar", crossmint: "stellar" },
+            erc20: { dexPay: "erc20", crossmint: "ethereum" },
+            ethereum: { dexPay: "erc20", crossmint: "ethereum" },
+            polygon: { dexPay: "polygon", crossmint: "polygon" },
+            optimism: { dexPay: "optimism", crossmint: "optimism" },
+            avalanche: { dexPay: "avalanche", crossmint: "avalanche" },
+          };
+
+          const normalizedRwfChain = rwfChainMapping[rwfFinalNetwork.toLowerCase()];
+          if (!normalizedRwfChain) {
+            return {
+              screen: "RWF_AUTHORIZE",
+              data: { ...data, error_message: `Unsupported network: ${rwfFinalNetwork}`, has_error: true },
+            };
+          }
+
+          const normalizedRwfAsset = rwfFinalAsset.toUpperCase();
+          const totalRequired = parseFloat(rwfFinalTotal || "0");
+          const crossmintChain = normalizedRwfChain.crossmint;
+          const chainType = crossmintService.getChainType(crossmintChain);
+
+          // Check balance
+          const rwfBalances = await crossmintService.getBalancesByChain(rwfUser.userId, crossmintChain, ["usdc", "usdt"]);
+          const rwfAssetBal = rwfBalances.find(
+            (b) => (b.symbol?.toLowerCase() || b.token?.toLowerCase()) === normalizedRwfAsset.toLowerCase(),
+          );
+          const rwfCurrentBalance = rwfAssetBal ? (() => {
+            const decimals = rwfAssetBal.decimals ?? 6;
+            const raw = parseFloat(rwfAssetBal.amount) || 0;
+            return raw >= Math.pow(10, decimals) && decimals > 0 ? raw / Math.pow(10, decimals) : raw;
+          })() : 0;
+
+          if (rwfCurrentBalance < totalRequired) {
+            const shortfall = (totalRequired - rwfCurrentBalance).toFixed(4);
+            return {
+              screen: "RWF_AUTHORIZE",
+              data: {
+                ...data,
+                error_message: `Insufficient balance. You need ${totalRequired.toFixed(4)} ${normalizedRwfAsset} but have ${rwfCurrentBalance.toFixed(4)}. Please deposit ${shortfall} more.`,
+                has_error: true,
+              },
+            };
+          }
+
+          // Get receiving address (use EVM/BSC address for PCXPay)
+          const rwfReceivingAddress = dexPayService.getReceivingAddress("bep20");
+
+          // Idempotency check
+          const rwfIdempotencyKey = `offramp:rwf:${Buffer.from(`${rwfUser.userId}:${rwfFinalSellAmount}:${rwfFinalNetworkCode}:${rwfFinalPhone}`).toString("base64")}`;
+          const existingRwfTx = await redisClient.get(rwfIdempotencyKey);
+          if (existingRwfTx) {
+            const txData = JSON.parse(existingRwfTx);
+            if (txData.status === "processing") {
+              return {
+                screen: "RWF_AUTHORIZE",
+                data: { ...data, error_message: "Transaction already in progress. Please wait.", has_error: true },
+              };
+            }
+          }
+
+          await redisClient.set(
+            rwfIdempotencyKey,
+            JSON.stringify({ status: "processing", userId: rwfUser.userId, startedAt: new Date().toISOString() }),
+            "EX",
+            600,
+          );
+
+          // Transfer crypto from user wallet to Chainpaye wallet
+          const rwfWallets = await crossmintService.getUserWallets(rwfUser.userId);
+          const rwfWallet = rwfWallets.find((w) => w.chainType === chainType);
+          if (!rwfWallet) {
+            await redisClient.del(rwfIdempotencyKey);
+            return {
+              screen: "RWF_AUTHORIZE",
+              data: { ...data, error_message: `No wallet found for ${crossmintChain}. Please contact support.`, has_error: true },
+            };
+          }
+
+          const isStellarRwf = crossmintChain === "stellar";
+          const decimalsRwf = isStellarRwf ? 7 : 6;
+          const transferResult = await crossmintService.transferTokens({
+            walletAddress: rwfWallet.address,
+            token: `${crossmintChain}:${normalizedRwfAsset.toLowerCase()}`,
+            recipient: rwfReceivingAddress,
+            amount: totalRequired.toFixed(decimalsRwf),
+            idempotencyKey: `rwf-transfer-${rwfUser.userId}-${Date.now()}`,
+          });
+
+          if (!transferResult.success) {
+            await redisClient.del(rwfIdempotencyKey);
+            return {
+              screen: "RWF_AUTHORIZE",
+              data: { ...data, error_message: `Transfer failed: ${transferResult.error || "Please try again."}`, has_error: true },
+            };
+          }
+
+          // Update idempotency to transfer_completed
+          await redisClient.set(
+            rwfIdempotencyKey,
+            JSON.stringify({ status: "transfer_completed", userId: rwfUser.userId, transferId: transferResult.transactionId, completedAt: new Date().toISOString() }),
+            "EX",
+            600,
+          );
+
+          // Fire PCXPay payout in background
+          // sell_amount is the RWF fiat amount the user entered
+          const rwfFiatAmount = rwfFinalSellAmount || "0";
+          processRwfPayoutInBackground(
+            rwfUser.userId,
+            phone,
+            rwfFinalNetworkCode,
+            rwfFinalPhone,
+            rwfFiatAmount,
+            rwfFinalCryptoCost || "0",
+            rwfFinalNetworkName || rwfFinalNetworkCode,
+            rwfIdempotencyKey,
+          ).catch((err) => logger.error("[OFFRAMP-RWF] Background payout error: " + (err as Error).message));
+
+          return { screen: "OFFRAMP_SUCCESS", data: {} };
+        } catch (error) {
+          logger.error("[OFFRAMP-RWF] Error in RWF_AUTHORIZE: " + (error as Error).message);
+          return {
+            screen: "RWF_AUTHORIZE",
+            data: { ...data, error_message: (error as Error).message || "Transaction failed. Please try again.", has_error: true },
+          };
+        }
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // ZAR SCREENS — South Africa bank transfer via PCXPay
+      // ─────────────────────────────────────────────────────────────
+
+      case "ZAR_DETAILS": {
+        const {
+          crypto_asset: zarAssetRaw,
+          crypto_network: zarNetworkRaw,
+          bank_code: zarBankCode,
+          account_number: zarAccountNumber,
+          account_name: zarAccountName,
+          sell_amount: zarSellAmount,
+        } = data as {
+          crypto_asset?: string;
+          crypto_network?: string;
+          bank_code?: string;
+          account_number?: string;
+          account_name?: string;
+          sell_amount?: string;
+        };
+
+        // Validation helper — refetches banks on error
+        const zarBanksOnError = async () => {
+          let b: { id: string; title: string }[] = [];
+          try { b = await fetchPcxPayNetworks("ZA"); } catch { /* use empty */ }
+          return b;
+        };
+
+        if (!zarAssetRaw || !zarNetworkRaw || !zarBankCode || !zarAccountNumber || !zarAccountName || !zarSellAmount) {
+          return {
+            screen: "ZAR_DETAILS",
+            data: { banks: await zarBanksOnError(), has_error: true, error_message: "Please fill in all required fields." },
+          };
+        }
+
+        const zarFiatInput = parseFloat(zarSellAmount);
+        if (isNaN(zarFiatInput) || zarFiatInput < 100) {
+          return {
+            screen: "ZAR_DETAILS",
+            data: { banks: await zarBanksOnError(), has_error: true, error_message: "Minimum withdrawal amount is ZAR 100." },
+          };
+        }
+
+        // Validate asset + chain combination
+        const zarAsset = zarAssetRaw.toUpperCase();
+        const zarChainKey = zarNetworkRaw.toLowerCase();
+        // USDC: BASE, ERC20, POLYGON, OPTIMISM, ARBITRUM, SOL, AVALANCHE
+        // USDT: ERC20, POLYGON, SOL, AVALANCHE
+        const zarUsdcChains = ["base", "erc20", "polygon", "optimism", "arbitrum", "sol", "solana", "avalanche"];
+        const zarUsdtChains = ["erc20", "polygon", "sol", "solana", "avalanche"];
+        const zarSupported =
+          (zarAsset === "USDC" && zarUsdcChains.includes(zarChainKey)) ||
+          (zarAsset === "USDT" && zarUsdtChains.includes(zarChainKey));
+
+        if (!zarSupported) {
+          return {
+            screen: "ZAR_DETAILS",
+            data: {
+              banks: await zarBanksOnError(),
+              has_error: true,
+              error_message: `${zarAsset} is not supported on ${zarNetworkRaw}. USDC: BASE/ERC20/POLYGON/OPTIMISM/ARBITRUM/SOL/AVALANCHE. USDT: ERC20/POLYGON/SOL/AVALANCHE`,
+            },
+          };
+        }
+
+        // Fetch live USD→ZAR rate
+        let zarRate: number;
+        try {
+          zarRate = await fetchPcxPayUsdRate("ZAR");
+          logger.info(`[OFFRAMP-ZAR] Live rate: 1 USD = ${zarRate} ZAR`);
+        } catch (rateError) {
+          logger.error("[OFFRAMP-ZAR] Rate fetch failed: " + (rateError as Error).message);
+          return {
+            screen: "ZAR_DETAILS",
+            data: { banks: await zarBanksOnError(), has_error: true, error_message: "Could not fetch current exchange rate. Please try again." },
+          };
+        }
+
+        // ZAR fiat → USD crypto cost
+        const zarCryptoCostUsd = zarFiatInput / zarRate;
+        const zarFormattedCryptoCost = zarCryptoCostUsd.toFixed(6).replace(/\.?0+$/, "") || "0.00";
+
+        // Resolve bank name from code
+        let zarBankName = zarBankCode;
+        try {
+          const allBanks = await fetchPcxPayNetworks("ZA");
+          const found = allBanks.find((b) => b.id === zarBankCode);
+          if (found) zarBankName = found.title;
+        } catch { /* keep code as name */ }
+
+        return {
+          screen: "ZAR_REVIEW",
+          data: {
+            crypto_asset: zarAsset,
+            crypto_network: zarNetworkRaw.toUpperCase(),
+            bank_code: zarBankCode,
+            bank_name: zarBankName,
+            account_number: zarAccountNumber,
+            account_name: zarAccountName,
+            sell_amount: zarFiatInput.toLocaleString("en-ZA", { maximumFractionDigits: 2 }),
+            crypto_cost: zarFormattedCryptoCost,
+            rate: zarRate.toFixed(2),
+            has_error: false,
+            error_message: "",
+          },
+        };
+      }
+
+      case "ZAR_REVIEW": {
+        const {
+          crypto_asset: zarRevAsset,
+          crypto_network: zarRevNetwork,
+          bank_code: zarRevBankCode,
+          bank_name: zarRevBankName,
+          account_number: zarRevAccountNumber,
+          account_name: zarRevAccountName,
+          sell_amount: zarRevSellAmount,
+          crypto_cost: zarRevCryptoCost,
+          rate: zarRevRate,
+        } = data as Record<string, string | undefined>;
+
+        const flatFeeUsd = parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75");
+        const zarCostNum = parseFloat(zarRevCryptoCost || "0");
+        const zarTotal = (zarCostNum + flatFeeUsd).toFixed(6).replace(/\.?0+$/, "") || "0.00";
+
+        return {
+          screen: "ZAR_AUTHORIZE",
+          data: {
+            crypto_asset: zarRevAsset || "USDC",
+            crypto_network: zarRevNetwork || "",
+            bank_code: zarRevBankCode || "",
+            bank_name: zarRevBankName || "",
+            account_number: zarRevAccountNumber || "",
+            account_name: zarRevAccountName || "",
+            sell_amount: zarRevSellAmount || "0",
+            crypto_cost: zarRevCryptoCost || "0",
+            total_crypto_usd: zarTotal,
+            has_error: false,
+            error_message: "",
+          },
+        };
+      }
+
+      case "ZAR_AUTHORIZE": {
+        const {
+          pin: zarPin,
+          crypto_asset: zarFinAsset,
+          crypto_network: zarFinNetwork,
+          bank_code: zarFinBankCode,
+          bank_name: zarFinBankName,
+          account_number: zarFinAccountNumber,
+          account_name: zarFinAccountName,
+          sell_amount: zarFinSellAmount,     // ZAR fiat amount
+          crypto_cost: zarFinCryptoCost,
+          total_crypto_usd: zarFinTotal,     // total crypto to deduct (incl. fee)
+        } = data as Record<string, string | undefined>;
+
+        if (!zarPin || !zarFinAsset || !zarFinNetwork || !zarFinBankCode || !zarFinAccountNumber || !zarFinAccountName || !zarFinSellAmount) {
+          return {
+            screen: "ZAR_AUTHORIZE",
+            data: { ...data, error_message: "Missing required transaction details.", has_error: true },
+          };
+        }
+
+        // Validate PIN
+        const zarUser = await userService.getUser(phone, true);
+        if (!zarUser) {
+          return {
+            screen: "ZAR_AUTHORIZE",
+            data: { ...data, error_message: "User not found.", has_error: true },
+          };
+        }
+        const validZarPin = await zarUser.comparePin(zarPin);
+        if (!validZarPin) {
+          return {
+            screen: "ZAR_AUTHORIZE",
+            data: { ...data, error_message: "Invalid PIN.", has_error: true },
+          };
+        }
+
+        try {
+          const zarChainMapping: Record<string, { crossmint: string }> = {
+            sol: { crossmint: "solana" },
+            solana: { crossmint: "solana" },
+            bsc: { crossmint: "bsc" },
+            bep20: { crossmint: "bsc" },
+            base: { crossmint: "base" },
+            arbitrum: { crossmint: "arbitrum" },
+            stellar: { crossmint: "stellar" },
+            erc20: { crossmint: "ethereum" },
+            ethereum: { crossmint: "ethereum" },
+            polygon: { crossmint: "polygon" },
+            optimism: { crossmint: "optimism" },
+            avalanche: { crossmint: "avalanche" },
+          };
+
+          const normalizedZarChain = zarChainMapping[zarFinNetwork.toLowerCase()];
+          if (!normalizedZarChain) {
+            return {
+              screen: "ZAR_AUTHORIZE",
+              data: { ...data, error_message: `Unsupported network: ${zarFinNetwork}`, has_error: true },
+            };
+          }
+
+          const normalizedZarAsset = zarFinAsset.toUpperCase();
+          const totalRequired = parseFloat(zarFinTotal || "0");
+          const crossmintChain = normalizedZarChain.crossmint;
+          const chainType = crossmintService.getChainType(crossmintChain);
+
+          // Check balance
+          const zarBalances = await crossmintService.getBalancesByChain(zarUser.userId, crossmintChain, ["usdc", "usdt"]);
+          const zarAssetBal = zarBalances.find(
+            (b) => (b.symbol?.toLowerCase() || b.token?.toLowerCase()) === normalizedZarAsset.toLowerCase(),
+          );
+          const zarCurrentBalance = zarAssetBal ? (() => {
+            const decimals = zarAssetBal.decimals ?? 6;
+            const raw = parseFloat(zarAssetBal.amount) || 0;
+            return raw >= Math.pow(10, decimals) && decimals > 0 ? raw / Math.pow(10, decimals) : raw;
+          })() : 0;
+
+          if (zarCurrentBalance < totalRequired) {
+            const shortfall = (totalRequired - zarCurrentBalance).toFixed(4);
+            return {
+              screen: "ZAR_AUTHORIZE",
+              data: {
+                ...data,
+                error_message: `Insufficient balance. You need ${totalRequired.toFixed(4)} ${normalizedZarAsset} but have ${zarCurrentBalance.toFixed(4)}. Please deposit ${shortfall} more.`,
+                has_error: true,
+              },
+            };
+          }
+
+          // Receiving address
+          const zarReceivingAddress = dexPayService.getReceivingAddress("bep20");
+
+          // Idempotency check
+          const zarIdempotencyKey = `offramp:zar:${Buffer.from(`${zarUser.userId}:${zarFinSellAmount}:${zarFinBankCode}:${zarFinAccountNumber}`).toString("base64")}`;
+          const existingZarTx = await redisClient.get(zarIdempotencyKey);
+          if (existingZarTx) {
+            const txData = JSON.parse(existingZarTx);
+            if (txData.status === "processing") {
+              return {
+                screen: "ZAR_AUTHORIZE",
+                data: { ...data, error_message: "Transaction already in progress. Please wait.", has_error: true },
+              };
+            }
+          }
+
+          await redisClient.set(
+            zarIdempotencyKey,
+            JSON.stringify({ status: "processing", userId: zarUser.userId, startedAt: new Date().toISOString() }),
+            "EX",
+            600,
+          );
+
+          // Transfer crypto from user wallet to Chainpaye wallet
+          const zarWallets = await crossmintService.getUserWallets(zarUser.userId);
+          const zarWallet = zarWallets.find((w) => w.chainType === chainType);
+          if (!zarWallet) {
+            await redisClient.del(zarIdempotencyKey);
+            return {
+              screen: "ZAR_AUTHORIZE",
+              data: { ...data, error_message: `No wallet found for ${crossmintChain}. Please contact support.`, has_error: true },
+            };
+          }
+
+          const isStellarZar = crossmintChain === "stellar";
+          const zarDecimals = isStellarZar ? 7 : 6;
+          const zarTransferResult = await crossmintService.transferTokens({
+            walletAddress: zarWallet.address,
+            token: `${crossmintChain}:${normalizedZarAsset.toLowerCase()}`,
+            recipient: zarReceivingAddress,
+            amount: totalRequired.toFixed(zarDecimals),
+            idempotencyKey: `zar-transfer-${zarUser.userId}-${Date.now()}`,
+          });
+
+          if (!zarTransferResult.success) {
+            await redisClient.del(zarIdempotencyKey);
+            return {
+              screen: "ZAR_AUTHORIZE",
+              data: { ...data, error_message: `Transfer failed: ${zarTransferResult.error || "Please try again."}`, has_error: true },
+            };
+          }
+
+          // Update idempotency to transfer_completed
+          await redisClient.set(
+            zarIdempotencyKey,
+            JSON.stringify({
+              status: "transfer_completed",
+              userId: zarUser.userId,
+              transferId: zarTransferResult.transactionId,
+              completedAt: new Date().toISOString(),
+            }),
+            "EX",
+            600,
+          );
+
+          // Fire ZAR payout in background
+          processZarPayoutInBackground(
+            zarUser.userId,
+            phone,
+            zarFinBankCode,
+            zarFinAccountNumber,
+            zarFinAccountName,
+            zarFinSellAmount,
+            zarFinCryptoCost || "0",
+            zarFinBankName || zarFinBankCode,
+            zarIdempotencyKey,
+          ).catch((err) => logger.error("[OFFRAMP-ZAR] Background payout error: " + (err as Error).message));
+
+          return { screen: "OFFRAMP_SUCCESS", data: {} };
+        } catch (error) {
+          logger.error("[OFFRAMP-ZAR] Error in ZAR_AUTHORIZE: " + (error as Error).message);
+          return {
+            screen: "ZAR_AUTHORIZE",
+            data: { ...data, error_message: (error as Error).message || "Transaction failed. Please try again.", has_error: true },
+          };
+        }
+      }
 
       default:
         break;
