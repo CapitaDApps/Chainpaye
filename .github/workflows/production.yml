@@ -1,6 +1,5 @@
 name: Deploy — Production
 
-# Only triggers on push to 'main' — after staging has been tested
 on:
   push:
     branches:
@@ -20,15 +19,17 @@ jobs:
         with:
           node-version: "20"
 
-      - uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@v4
         with:
           version: 10
-          run_install: false
 
-      - name: Cache pnpm store
-        uses: actions/cache@v4
+      - name: Get pnpm store path
+        id: pnpm-cache
+        run: echo "store=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - uses: actions/cache@v4
         with:
-          path: ~/.pnpm-store
+          path: ${{ steps.pnpm-cache.outputs.store }}
           key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: pnpm-${{ runner.os }}-
 
@@ -36,7 +37,6 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm build
 
-      # Bundle everything the server needs into one artifact
       - name: Package release artifact
         uses: actions/upload-artifact@v4
         with:
@@ -49,13 +49,12 @@ jobs:
           retention-days: 1
 
   # ─────────────────────────────────────────────────────
-  # 2. Deploy to the production EC2 instance
+  # 2. Deploy to EC2
   # ─────────────────────────────────────────────────────
   deploy:
     name: Deploy to EC2 (Production)
     needs: build
     runs-on: ubuntu-22.04
-
     steps:
       - name: Download build artifact
         uses: actions/download-artifact@v4
@@ -63,21 +62,18 @@ jobs:
           name: production-build
           path: release/
 
-      # Write the production .env from the GitHub Secret
       - name: Write .env for production
-        run: echo "${{ secrets.PRODUCTION_ENV }}" > release/.env
+        run: printf '%s' "${{ secrets.PRODUCTION_ENV }}" > release/.env
 
-      - name: Ensure ~/app directory exists on server
+      - name: Ensure ~/app exists on server
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            mkdir -p ~/app
-            test -w ~/app && echo "✅ Dir writable" || (echo "❌ Not writable" && exit 1)
+          script: mkdir -p ~/app
 
-      - name: Upload release + .env via SCP
+      - name: Upload files via SCP
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -86,7 +82,7 @@ jobs:
           source: "release/."
           target: ~/app
 
-      - name: Install prod deps and reload PM2 (chainpaye-prod)
+      - name: Install prod deps and reload PM2
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -95,13 +91,12 @@ jobs:
           script: |
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            export PATH="$HOME/.local/share/pnpm:$PATH"
 
             cd ~/app
 
-            # Production deps only — no devDependencies
             pnpm install --frozen-lockfile --prod
 
-            # pm2 reload = graceful zero-downtime swap on cluster mode
             if pm2 show chainpaye-prod > /dev/null 2>&1; then
               pm2 reload ecosystem.config.js --only chainpaye-prod --update-env
             else

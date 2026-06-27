@@ -1,6 +1,5 @@
 name: Deploy — Staging
 
-# Triggers on push to the 'stage' branch
 on:
   push:
     branches:
@@ -8,7 +7,7 @@ on:
 
 jobs:
   # ─────────────────────────────────────────────────────
-  # 1. Type-check first — fail fast before touching the server
+  # 1. Type-check
   # ─────────────────────────────────────────────────────
   typecheck:
     name: Type Check
@@ -20,15 +19,17 @@ jobs:
         with:
           node-version: "20"
 
-      - uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@v4
         with:
           version: 10
-          run_install: false
 
-      - name: Cache pnpm store
-        uses: actions/cache@v4
+      - name: Get pnpm store path
+        id: pnpm-cache
+        run: echo "store=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - uses: actions/cache@v4
         with:
-          path: ~/.pnpm-store
+          path: ${{ steps.pnpm-cache.outputs.store }}
           key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: pnpm-${{ runner.os }}-
 
@@ -36,37 +37,30 @@ jobs:
       - run: pnpm typecheck
 
   # ─────────────────────────────────────────────────────
-  # 2. Deploy to the staging EC2 instance
+  # 2. Deploy to EC2
   # ─────────────────────────────────────────────────────
   deploy:
     name: Deploy to EC2 (Staging)
     needs: typecheck
     runs-on: ubuntu-22.04
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # Strip git internals — we only need the source code on the server
       - name: Strip git metadata
         run: rm -rf .git .github .gitignore
 
-      # Write the staging .env from the GitHub Secret onto the runner
-      # so it gets SCP'd to the server along with the source code
       - name: Write .env for staging
-        run: echo "${{ secrets.STAGING_ENV }}" > .env
+        run: printf '%s' "${{ secrets.STAGING_ENV }}" > .env
 
-      - name: Ensure ~/staging directory exists on server
+      - name: Ensure ~/staging exists on server
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            mkdir -p ~/staging
-            test -w ~/staging && echo "✅ Dir writable" || (echo "❌ Not writable" && exit 1)
+          script: mkdir -p ~/staging
 
-      - name: Upload source + .env via SCP
+      - name: Upload files via SCP
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -75,7 +69,7 @@ jobs:
           source: "."
           target: ~/staging
 
-      - name: Install deps and restart PM2 (chainpaye-staging)
+      - name: Install deps and restart PM2
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -84,12 +78,12 @@ jobs:
           script: |
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            export PATH="$HOME/.local/share/pnpm:$PATH"
 
             cd ~/staging
 
             pnpm install --frozen-lockfile
 
-            # Restart the existing PM2 process, or start it fresh if missing
             if pm2 show chainpaye-staging > /dev/null 2>&1; then
               pm2 restart ecosystem.config.js --only chainpaye-staging --update-env
             else
