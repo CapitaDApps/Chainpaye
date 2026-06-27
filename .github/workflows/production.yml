@@ -65,16 +65,18 @@ jobs:
       - name: Write .env for production
         run: echo "${{ secrets.PRODUCTION_ENV }}" | base64 -d > release/.env
 
-      - name: Decode SSH key
-        id: ssh-key
-        run: echo "key=$(echo '${{ secrets.EC2_SSH_KEY }}' | base64 -d)" >> $GITHUB_OUTPUT
+      - name: Write SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" | base64 -d > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
 
       - name: Ensure ~/app exists on server
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.SERVER_USER }}
-          key: ${{ steps.ssh-key.outputs.key }}
+          key_path: ~/.ssh/deploy_key
           script: mkdir -p ~/app
 
       - name: Upload files via SCP
@@ -82,7 +84,7 @@ jobs:
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.SERVER_USER }}
-          key: ${{ steps.ssh-key.outputs.key }}
+          key_path: ~/.ssh/deploy_key
           source: "release/."
           target: ~/app
 
@@ -91,7 +93,7 @@ jobs:
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.SERVER_USER }}
-          key: ${{ steps.ssh-key.outputs.key }}
+          key_path: ~/.ssh/deploy_key
           script: |
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
