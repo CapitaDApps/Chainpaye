@@ -704,8 +704,15 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
         if (payout_country === "ZAR") {
           let banks: { id: string; title: string }[] = [];
           try {
-            banks = await fetchPcxPayNetworks("ZA");
-            logger.info(`[OFFRAMP-ZAR] Fetched ${banks.length} banks from PCXPay`);
+            const rawBanks = await fetchPcxPayNetworks("ZA");
+            // Deduplicate by id — WhatsApp Flow rejects dropdowns with duplicate IDs
+            const seen = new Set<string>();
+            banks = rawBanks.filter((b) => {
+              if (seen.has(b.id)) return false;
+              seen.add(b.id);
+              return true;
+            });
+            logger.info(`[OFFRAMP-ZAR] Fetched ${rawBanks.length} banks from PCXPay, ${banks.length} unique after dedup`);
           } catch (error) {
             logger.error("[OFFRAMP-ZAR] Failed to fetch banks: " + (error as Error).message);
             return {
