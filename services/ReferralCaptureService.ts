@@ -90,7 +90,7 @@ export class ReferralCaptureService implements SignupIntegrationService {
         return {
           success: false,
           message: validation.errorMessage || this.messageService.invalidCodeMessage(),
-          error: validation.errorMessage
+          ...(validation.errorMessage !== undefined ? { error: validation.errorMessage } : {})
         };
       }
 
@@ -196,7 +196,7 @@ export class ReferralCaptureService implements SignupIntegrationService {
       const storedCode = await this.getStoredReferralCode(phoneNumber);
       
       return {
-        referralCode: storedCode || undefined,
+        ...(storedCode !== null ? { referralCode: storedCode } : {}),
         isPrePopulated: storedCode !== null
       };
     } catch (error) {
@@ -251,7 +251,7 @@ export class ReferralCaptureService implements SignupIntegrationService {
     
     return {
       hasStoredCode: formData.isPrePopulated,
-      referralCode: formData.referralCode,
+      ...(formData.referralCode !== undefined ? { referralCode: formData.referralCode } : {}),
       formData
     };
   }

@@ -110,7 +110,7 @@ export class WhatsAppReferralMessageHandler {
       return {
         handled: true,
         success: result.success,
-        error: result.error
+        ...(result.error !== undefined ? { error: result.error } : {})
       };
 
     } catch (error) {

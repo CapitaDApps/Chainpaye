@@ -78,7 +78,7 @@ export async function getAllWithdrawals(req: Request, res: Response) {
  */
 export async function completeWithdrawal(req: Request, res: Response) {
   try {
-    const { id } = req.params;
+    const id = req.params['id'] as string;
     const { transactionHash, adminNotes } = req.body;
 
     if (!transactionHash) {
@@ -155,7 +155,7 @@ Type *referral history* to view all your withdrawals.
  */
 export async function failWithdrawal(req: Request, res: Response) {
   try {
-    const { id } = req.params;
+    const id = req.params['id'] as string;
     const { reason } = req.body;
 
     if (!reason) {

@@ -405,6 +405,5 @@ export {
   calculateNewEarnings,
   testSampleTransactions,
   validateRecentTransactions,
-  ValidationResult,
-  ValidationSummary
 };
+export type { ValidationResult, ValidationSummary };

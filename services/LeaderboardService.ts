@@ -61,6 +61,8 @@ export class LeaderboardService {
     for (let i = 0; i < topBalances.length; i++) {
       const balance = topBalances[i];
       
+      if (!balance) continue;
+
       // Get user info
       const user = await User.findOne({ userId: balance.userId });
       const username = user?.fullName || user?.userId || "Unknown";

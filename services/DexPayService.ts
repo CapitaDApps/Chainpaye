@@ -666,7 +666,7 @@ export class DexPayService implements IBankingManager, IDexPayService {
     }
 
     // Fallback to environment variable or default Solana address
-    return this.receivingAddress || chainPayeWallets.solana;
+    return this.receivingAddress || chainPayeWallets.solana || '';
   }
 
   /**

@@ -39,5 +39,15 @@
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
     "skipLibCheck": true
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "**/*.e2e.ts",
+    "**/*.property.test.ts",
+    "**/*.integration.test.ts",
+    "jest.config.js"
+  ]
 }

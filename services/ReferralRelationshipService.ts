@@ -131,8 +131,8 @@ export class ReferralRelationshipService {
         });
         return {
           success: false,
-          error: validationResult.validation.errorMessage,
-          errorType
+          ...(validationResult.validation.errorMessage !== undefined ? { error: validationResult.validation.errorMessage } : {}),
+          ...(errorType !== undefined ? { errorType } : {})
         };
       }
 
@@ -252,8 +252,8 @@ export class ReferralRelationshipService {
         const errorType = this.mapValidationErrorToType(validationResult.validation.errorMessage || '');
         return {
           success: false,
-          error: validationResult.validation.errorMessage,
-          errorType
+          ...(validationResult.validation.errorMessage !== undefined ? { error: validationResult.validation.errorMessage } : {}),
+          ...(errorType !== undefined ? { errorType } : {})
         };
       }
 
@@ -374,7 +374,9 @@ export class ReferralRelationshipService {
     const results: ReferralRelationshipResult[] = [];
     
     for (const { userId, referralCode, phoneNumber } of relationships) {
-      const result = await this.createReferralRelationship(userId, referralCode, { phoneNumber });
+      const result = await this.createReferralRelationship(userId, referralCode, {
+        ...(phoneNumber !== undefined ? { phoneNumber } : {})
+      });
       results.push(result);
     }
     

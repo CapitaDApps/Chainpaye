@@ -1,9 +1,9 @@
-import { Router, Request, Response } from "express";
+import { Router, IRouter, Request, Response } from "express";
 import argon2 from "argon2";
 import { User } from "../models/User";
 import { consumeResetToken } from "../webhooks/services/resetPinFlow.service";
 
-const router = Router();
+const router: IRouter = Router();
 
 router.post("/", async (req: Request, res: Response) => {
   const { token, pin } = req.body;

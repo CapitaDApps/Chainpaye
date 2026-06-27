@@ -1,7 +1,7 @@
-import { Router } from "express";
+import { Router, IRouter } from "express";
 import { getUserDetails, searchUsers, getAllUsers, deleteUser } from "../controllers/adminUserController";
 
-const router = Router();
+const router: IRouter = Router();
 
 // GET /api/admin/users?limit=50&offset=0
 router.get("/", getAllUsers);

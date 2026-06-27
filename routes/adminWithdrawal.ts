@@ -4,7 +4,7 @@
  * API routes for admin management of referral earnings withdrawals.
  */
 
-import { Router } from "express";
+import { Router, IRouter } from "express";
 import {
   getAllWithdrawals,
   completeWithdrawal,
@@ -12,7 +12,7 @@ import {
   getWithdrawalStats,
 } from "../controllers/adminWithdrawalController";
 
-const router = Router();
+const router: IRouter = Router();
 
 /**
  * GET /api/admin/referral-withdrawals
