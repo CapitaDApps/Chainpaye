@@ -730,6 +730,26 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           };
         }
 
+        // MWK — Malawi: mobile money only — fetch networks and go straight to details
+        if (payout_country === "MWK") {
+          let networks: { id: string; title: string }[] = [];
+          try {
+            const raw = await fetchPcxPayNetworks("MW");
+            networks = raw.filter((n) => n.id !== undefined).map((n) => ({ id: n.id, title: n.title }));
+            logger.info(`[OFFRAMP-MWK] Fetched ${networks.length} networks from PCXPay`);
+          } catch (error) {
+            logger.error("[OFFRAMP-MWK] Failed to fetch networks: " + (error as Error).message);
+            return {
+              screen: "SELECT_CURRENCY",
+              data: { has_error: true, error_message: "Could not load Malawi networks. Please try again." },
+            };
+          }
+          return {
+            screen: "MWK_DETAILS",
+            data: { networks, has_error: false, error_message: "" },
+          };
+        }
+
         // UGX — Uganda: mobile money only — fetch networks and go straight to details
         if (payout_country === "UGX") {
           let networks: { id: string; title: string }[] = [];
@@ -2300,6 +2320,63 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           logger.info(`[OFFRAMP-TZS-MOMO] Crypto transfer done — PCX payout pending`);
           return { screen: "OFFRAMP_SUCCESS", data: {} };
         } catch (err) { logger.error("[OFFRAMP-TZS-MOMO] Error: " + (err as Error).message); return { screen: "TZS_MOMO_AUTHORIZE", data: { ...data, error_message: (err as Error).message || "Transaction failed.", has_error: true } }; }
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // MWK SCREENS — Malawi mobile money only via PCXPay
+      // ─────────────────────────────────────────────────────────────
+
+      case "MWK_DETAILS": {
+        const { crypto_asset: mwkA, crypto_network: mwkN, network_code: mwkC, phone_number: mwkPhone, sell_amount: mwkSell } = data as Record<string, string | undefined>;
+        const mwkNetworksOnError = async () => { try { return (await fetchPcxPayNetworks("MW")).map((n) => ({ id: n.id, title: n.title })); } catch { return []; } };
+        if (!mwkA || !mwkN || !mwkC || !mwkPhone || !mwkSell) return { screen: "MWK_DETAILS", data: { networks: await mwkNetworksOnError(), has_error: true, error_message: "Please fill in all required fields." } };
+        const mwkFiatInput = parseFloat(mwkSell);
+        if (isNaN(mwkFiatInput) || mwkFiatInput < 5000) return { screen: "MWK_DETAILS", data: { networks: await mwkNetworksOnError(), has_error: true, error_message: "Minimum withdrawal amount is MWK 5,000." } };
+        let mwkRate: number;
+        try { mwkRate = await fetchPcxPayUsdRate("MWK"); logger.info(`[OFFRAMP-MWK] Rate: 1 USD = ${mwkRate} MWK`); } catch { return { screen: "MWK_DETAILS", data: { networks: await mwkNetworksOnError(), has_error: true, error_message: "Could not fetch exchange rate." } }; }
+        let mwkNetworkName = mwkC;
+        try { const all = await fetchPcxPayNetworks("MW"); const f = all.find((n) => n.id === mwkC); if (f) mwkNetworkName = f.title; } catch { /* keep */ }
+        return { screen: "MWK_REVIEW", data: { crypto_asset: mwkA.toUpperCase(), crypto_network: mwkN.toUpperCase(), network_code: mwkC, network_name: mwkNetworkName, phone_number: mwkPhone, sell_amount: mwkFiatInput.toLocaleString("en-MW", { maximumFractionDigits: 0 }), crypto_cost: (mwkFiatInput / mwkRate).toFixed(6).replace(/\.?0+$/, "") || "0.00", rate: mwkRate.toFixed(2), has_error: false, error_message: "" } };
+      }
+
+      case "MWK_REVIEW": {
+        const { crypto_asset: mwrA, crypto_network: mwrN, network_code: mwrC, network_name: mwrNN, phone_number: mwrPhone, sell_amount: mwrSell, crypto_cost: mwrCost } = data as Record<string, string | undefined>;
+        const mwrTotal = (parseFloat(mwrCost || "0") + parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75")).toFixed(6).replace(/\.?0+$/, "") || "0.00";
+        return { screen: "MWK_AUTHORIZE", data: { crypto_asset: mwrA || "USDC", crypto_network: mwrN || "", network_code: mwrC || "", network_name: mwrNN || "", phone_number: mwrPhone || "", sell_amount: mwrSell || "0", crypto_cost: mwrCost || "0", total_crypto_usd: mwrTotal, has_error: false, error_message: "" } };
+      }
+
+      case "MWK_AUTHORIZE": {
+        const { pin: mwaPin, crypto_asset: mwaAsset, crypto_network: mwaNetwork, network_code: mwaCode, network_name: mwaName, phone_number: mwaPhone, sell_amount: mwaSell, crypto_cost: mwaCost, total_crypto_usd: mwaTotal } = data as Record<string, string | undefined>;
+        if (!mwaPin || !mwaAsset || !mwaNetwork || !mwaCode || !mwaPhone || !mwaSell) return { screen: "MWK_AUTHORIZE", data: { ...data, error_message: "Missing required transaction details.", has_error: true } };
+        const mwaUser = await userService.getUser(phone, true);
+        if (!mwaUser) return { screen: "MWK_AUTHORIZE", data: { ...data, error_message: "User not found.", has_error: true } };
+        if (!await mwaUser.comparePin(mwaPin)) return { screen: "MWK_AUTHORIZE", data: { ...data, error_message: "Invalid PIN.", has_error: true } };
+        try {
+          const chainMap: Record<string, string> = { sol: "solana", solana: "solana", bep20: "bsc", bsc: "bsc", base: "base", arbitrum: "arbitrum", stellar: "stellar", erc20: "ethereum", ethereum: "ethereum", polygon: "polygon", optimism: "optimism", avalanche: "avalanche" };
+          const crossmintChain = chainMap[mwaNetwork.toLowerCase()];
+          if (!crossmintChain) return { screen: "MWK_AUTHORIZE", data: { ...data, error_message: `Unsupported network: ${mwaNetwork}`, has_error: true } };
+          const normalizedAsset = mwaAsset.toUpperCase();
+          const totalRequired = parseFloat(mwaTotal || "0");
+          const chainType = crossmintService.getChainType(crossmintChain);
+          const mwaBals = await crossmintService.getBalancesByChain(mwaUser.userId, crossmintChain, ["usdc", "usdt"]);
+          const mwaBal = mwaBals.find((b) => (b.symbol?.toLowerCase() || b.token?.toLowerCase()) === normalizedAsset.toLowerCase());
+          const mwaCurrentBal = mwaBal ? (() => { const d = mwaBal.decimals ?? 6; const r = parseFloat(mwaBal.amount) || 0; return r >= Math.pow(10, d) && d > 0 ? r / Math.pow(10, d) : r; })() : 0;
+          if (mwaCurrentBal < totalRequired) return { screen: "MWK_AUTHORIZE", data: { ...data, error_message: `Insufficient balance. Need ${totalRequired.toFixed(4)} ${normalizedAsset}.`, has_error: true } };
+          const receivingAddress = dexPayService.getReceivingAddress("bep20");
+          const idempKey = `offramp:mwk:${Buffer.from(`${mwaUser.userId}:${mwaSell}:${mwaCode}:${mwaPhone}`).toString("base64")}`;
+          const existingTx = await redisClient.get(idempKey);
+          if (existingTx && JSON.parse(existingTx).status === "processing") return { screen: "MWK_AUTHORIZE", data: { ...data, error_message: "Transaction already in progress.", has_error: true } };
+          await redisClient.set(idempKey, JSON.stringify({ status: "processing", userId: mwaUser.userId, startedAt: new Date().toISOString() }), "EX", 600);
+          const wallets = await crossmintService.getUserWallets(mwaUser.userId);
+          const wallet = wallets.find((w) => w.chainType === chainType);
+          if (!wallet) { await redisClient.del(idempKey); return { screen: "MWK_AUTHORIZE", data: { ...data, error_message: `No wallet for ${crossmintChain}.`, has_error: true } }; }
+          const decimals = crossmintChain === "stellar" ? 7 : 6;
+          const transferResult = await crossmintService.transferTokens({ walletAddress: wallet.address, token: `${crossmintChain}:${normalizedAsset.toLowerCase()}`, recipient: receivingAddress, amount: totalRequired.toFixed(decimals), idempotencyKey: `mwk-transfer-${mwaUser.userId}-${Date.now()}` });
+          if (!transferResult.success) { await redisClient.del(idempKey); return { screen: "MWK_AUTHORIZE", data: { ...data, error_message: `Transfer failed: ${transferResult.error || "Please try again."}`, has_error: true } }; }
+          await redisClient.set(idempKey, JSON.stringify({ status: "transfer_completed", userId: mwaUser.userId, transferId: transferResult.transactionId, completedAt: new Date().toISOString() }), "EX", 600);
+          logger.info(`[OFFRAMP-MWK] Crypto transfer done — PCX payout pending`);
+          return { screen: "OFFRAMP_SUCCESS", data: {} };
+        } catch (err) { logger.error("[OFFRAMP-MWK] Error: " + (err as Error).message); return { screen: "MWK_AUTHORIZE", data: { ...data, error_message: (err as Error).message || "Transaction failed.", has_error: true } }; }
       }
 
       case "UGX_DETAILS": {

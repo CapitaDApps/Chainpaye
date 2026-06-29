@@ -265,10 +265,12 @@ export class WhatsAppBusinessService {
 
     await this.sendImageFlowById(to, introFlowId, introInitScreedId, {
       link,
-      body: `Welcome to Chainpaye! 🎉
-      - Send, Receive and Convert USD 🇺🇸 | GBP 🇬🇧 | EUR 🇪🇺 | NGN 🇳🇬.
-      - Spend stablecoins like cash, cutting out middle-men and Banks🏦.
-      - Generate payment links & collect USD 🇺🇸 | NGN 🇳🇬 seamlessly`,
+      body: `Hey 👋 Welcome to Chainpaye! 
+      The payment account built for Africans on the move. 
+      - 💸 Send, receive & convert Naira 󰐕 | USD 󰑔 | GBP 󰏅 | EUR 󰎾 ✈ Pay for flights,
+       hotels & travel expenses in 7+ African countries
+      - ⚡ Settle stablecoin to local currency in under 60 seconds 
+      - 🔗 Generate payment links & collect USD | Naira instantly `,
       cta: "Sign Up",
     });
   }

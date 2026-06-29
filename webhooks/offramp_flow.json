@@ -2,7 +2,7 @@
   "version": "6.0",
   "data_api_version": "3.0",
   "routing_model": {
-    "SELECT_CURRENCY": ["OFFRAMP_DETAILS", "RWF_DETAILS", "ZAR_DETAILS", "SELECT_PAYMENT_METHOD", "UGX_DETAILS", "COMING_SOON"],
+    "SELECT_CURRENCY": ["OFFRAMP_DETAILS", "RWF_DETAILS", "ZAR_DETAILS", "SELECT_PAYMENT_METHOD", "UGX_DETAILS", "MWK_DETAILS", "COMING_SOON"],
     "SELECT_PAYMENT_METHOD": ["KES_BANK_DETAILS", "KES_MOMO_DETAILS", "TZS_BANK_DETAILS", "TZS_MOMO_DETAILS"],
     "OFFRAMP_DETAILS": ["OFFRAMP_FIAT_REVIEW"],
     "RWF_DETAILS": ["RWF_REVIEW"],
@@ -23,6 +23,9 @@
     "TZS_MOMO_DETAILS": ["TZS_MOMO_REVIEW"],
     "TZS_MOMO_REVIEW": ["TZS_MOMO_AUTHORIZE"],
     "TZS_MOMO_AUTHORIZE": ["OFFRAMP_SUCCESS"],
+    "MWK_DETAILS": ["MWK_REVIEW"],
+    "MWK_REVIEW": ["MWK_AUTHORIZE"],
+    "MWK_AUTHORIZE": ["OFFRAMP_SUCCESS"],
     "UGX_DETAILS": ["UGX_REVIEW"],
     "UGX_REVIEW": ["UGX_AUTHORIZE"],
     "UGX_AUTHORIZE": ["OFFRAMP_SUCCESS"],
@@ -2119,6 +2122,214 @@
           }
         ]
       }
+    },
+    {
+      "id": "MWK_DETAILS",
+      "title": "Withdraw to Malawi",
+      "data": {
+        "networks": {
+          "type": "array",
+          "items": { "type": "object", "properties": { "id": { "type": "string" }, "title": { "type": "string" } } },
+          "__example__": [{ "id": "AIRTEL_MW", "title": "Airtel Malawi" }]
+        },
+        "error_message": { "type": "string", "__example__": "" },
+        "has_error": { "type": "boolean", "__example__": false }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          { "type": "TextHeading", "text": "Withdraw to Malawi \uD83C\uDDF2\uD83C\uDDFC" },
+          { "type": "TextBody", "text": "Enter your mobile money details to receive MWK." },
+          {
+            "type": "If",
+            "condition": "${data.has_error}",
+            "then": [{ "type": "TextCaption", "text": "${data.error_message}" }]
+          },
+          {
+            "type": "Form",
+            "name": "mwk_form",
+            "children": [
+              {
+                "type": "Dropdown",
+                "name": "crypto_asset",
+                "label": "Asset to Sell",
+                "required": true,
+                "data-source": [
+                  { "id": "USDT", "title": "Tether (USDT)" },
+                  { "id": "USDC", "title": "USD Coin (USDC)" }
+                ]
+              },
+              {
+                "type": "Dropdown",
+                "name": "crypto_network",
+                "label": "Select Network",
+                "required": true,
+                "data-source": [
+                  { "id": "BASE", "title": "Base Network" },
+                  { "id": "ERC20", "title": "Ethereum (ERC20)" },
+                  { "id": "POLYGON", "title": "Polygon" },
+                  { "id": "SOL", "title": "Solana (SOL)" },
+                  { "id": "AVALANCHE", "title": "Avalanche" }
+                ]
+              },
+              {
+                "type": "Dropdown",
+                "name": "network_code",
+                "label": "Mobile Money Network",
+                "required": true,
+                "data-source": "${data.networks}"
+              },
+              {
+                "type": "TextInput",
+                "name": "phone_number",
+                "label": "Mobile Money Number",
+                "required": true,
+                "input-type": "phone",
+                "helper-text": "Enter number registered with mobile money"
+              },
+              {
+                "type": "TextInput",
+                "name": "sell_amount",
+                "label": "Amount (MWK)",
+                "required": true,
+                "input-type": "number",
+                "helper-text": "Min: MWK 5,000"
+              },
+              {
+                "type": "Footer",
+                "label": "Preview Withdrawal",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "crypto_asset": "${form.crypto_asset}",
+                    "crypto_network": "${form.crypto_network}",
+                    "network_code": "${form.network_code}",
+                    "phone_number": "${form.phone_number}",
+                    "sell_amount": "${form.sell_amount}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "MWK_REVIEW",
+      "title": "Review MWK Withdrawal",
+      "data": {
+        "crypto_asset": { "type": "string", "__example__": "USDC" },
+        "crypto_network": { "type": "string", "__example__": "BASE" },
+        "network_code": { "type": "string", "__example__": "AIRTEL_MW" },
+        "network_name": { "type": "string", "__example__": "Airtel Malawi" },
+        "phone_number": { "type": "string", "__example__": "0991234567" },
+        "sell_amount": { "type": "string", "__example__": "10000" },
+        "crypto_cost": { "type": "string", "__example__": "5.50" },
+        "rate": { "type": "string", "__example__": "1820.00" },
+        "error_message": { "type": "string", "__example__": "" },
+        "has_error": { "type": "boolean", "__example__": false }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          { "type": "TextHeading", "text": "Review Details" },
+          {
+            "type": "If",
+            "condition": "${data.has_error}",
+            "then": [{ "type": "TextCaption", "text": "${data.error_message}" }]
+          },
+          { "type": "TextBody", "text": "`'Network: '${data.network_name}''`" },
+          { "type": "TextBody", "text": "`'Mobile Number: '${data.phone_number}''`" },
+          { "type": "TextBody", "text": "`'Amount: MWK '${data.sell_amount}''`" },
+          { "type": "TextBody", "text": "`'You Pay: '${data.crypto_cost}' '${data.crypto_asset}''`" },
+          { "type": "TextBody", "text": "`'Rate: 1 '${data.crypto_asset}' = MWK '${data.rate}''`" },
+          { "type": "TextBody", "text": "`'Network: '${data.crypto_network}''`" },
+          {
+            "type": "Footer",
+            "label": "Proceed to Payment",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "crypto_asset": "${data.crypto_asset}",
+                "crypto_network": "${data.crypto_network}",
+                "network_code": "${data.network_code}",
+                "network_name": "${data.network_name}",
+                "phone_number": "${data.phone_number}",
+                "sell_amount": "${data.sell_amount}",
+                "crypto_cost": "${data.crypto_cost}",
+                "rate": "${data.rate}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "MWK_AUTHORIZE",
+      "title": "Authorize MWK Payment",
+      "data": {
+        "crypto_asset": { "type": "string", "__example__": "USDC" },
+        "crypto_network": { "type": "string", "__example__": "BASE" },
+        "network_code": { "type": "string", "__example__": "AIRTEL_MW" },
+        "network_name": { "type": "string", "__example__": "Airtel Malawi" },
+        "phone_number": { "type": "string", "__example__": "0991234567" },
+        "sell_amount": { "type": "string", "__example__": "10000" },
+        "crypto_cost": { "type": "string", "__example__": "5.50" },
+        "total_crypto_usd": { "type": "string", "__example__": "6.25" },
+        "error_message": { "type": "string", "__example__": "" },
+        "has_error": { "type": "boolean", "__example__": false }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          { "type": "TextHeading", "text": "Authorize" },
+          {
+            "type": "If",
+            "condition": "${data.has_error}",
+            "then": [{ "type": "TextCaption", "text": "${data.error_message}" }]
+          },
+          { "type": "TextBody", "text": "`'Network: '${data.network_name}''`" },
+          { "type": "TextBody", "text": "`'Mobile Number: '${data.phone_number}''`" },
+          { "type": "TextBody", "text": "`'You Receive: MWK '${data.sell_amount}''`" },
+          { "type": "TextBody", "text": "`'Crypto Cost: '${data.crypto_cost}' '${data.crypto_asset}''`" },
+          { "type": "TextBody", "text": "`'Fee: $0.75 USD'`" },
+          { "type": "TextBody", "text": "`'Total Deducted: '${data.total_crypto_usd}' '${data.crypto_asset}''`" },
+          { "type": "TextBody", "text": "Enter PIN to Confirm" },
+          {
+            "type": "Form",
+            "name": "mwk_pin_form",
+            "children": [
+              {
+                "type": "TextInput",
+                "name": "pin",
+                "label": "4 Digit PIN",
+                "required": true,
+                "input-type": "password",
+                "min-chars": 4,
+                "max-chars": 6
+              },
+              {
+                "type": "Footer",
+                "label": "Sell & Send",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "pin": "${form.pin}",
+                    "crypto_asset": "${data.crypto_asset}",
+                    "crypto_network": "${data.crypto_network}",
+                    "network_code": "${data.network_code}",
+                    "network_name": "${data.network_name}",
+                    "phone_number": "${data.phone_number}",
+                    "sell_amount": "${data.sell_amount}",
+                    "crypto_cost": "${data.crypto_cost}",
+                    "total_crypto_usd": "${data.total_crypto_usd}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
     },
     {
       "id": "OFFRAMP_SUCCESS",
