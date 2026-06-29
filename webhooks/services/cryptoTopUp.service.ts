@@ -6,6 +6,7 @@ import {
 } from "../../services/CrossmintService";
 import { financialService } from "../../services/crypto-off-ramp/FinancialService";
 import { dexPayService } from "../../services/DexPayService";
+import { resolvePaystackAccount } from "../../services/PaystackService";
 import { redisClient } from "../../services/redis";
 import { logger } from "../../utils/logger";
 // import { Types } from "mongoose";
@@ -700,9 +701,56 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           };
         }
 
+        // KES — Kenya: has both bank and momo — route to payment method selector
+        if (payout_country === "KES") {
+          return {
+            screen: "SELECT_PAYMENT_METHOD",
+            data: {
+              payout_country: "KES",
+              country_label: "Kenya 🇰🇪",
+              currency_code: "KES",
+              has_error: false,
+              error_message: "",
+            },
+          };
+        }
+
+        // TZS — Tanzania: has both bank and momo — route to payment method selector
+        if (payout_country === "TZS") {
+          return {
+            screen: "SELECT_PAYMENT_METHOD",
+            data: {
+              payout_country: "TZS",
+              country_label: "Tanzania 🇹🇿",
+              currency_code: "TZS",
+              has_error: false,
+              error_message: "",
+            },
+          };
+        }
+
+        // UGX — Uganda: mobile money only — fetch networks and go straight to details
+        if (payout_country === "UGX") {
+          let networks: { id: string; title: string }[] = [];
+          try {
+            const raw = await fetchPcxPayNetworks("UG");
+            networks = raw.filter((n) => n.id !== undefined);
+            logger.info(`[OFFRAMP-UGX] Fetched ${networks.length} networks from PCXPay`);
+          } catch (error) {
+            logger.error("[OFFRAMP-UGX] Failed to fetch networks: " + (error as Error).message);
+            return {
+              screen: "SELECT_CURRENCY",
+              data: { has_error: true, error_message: "Could not load Uganda networks. Please try again." },
+            };
+          }
+          return {
+            screen: "UGX_DETAILS",
+            data: { networks, has_error: false, error_message: "" },
+          };
+        }
+
         // ZAR — South Africa via PCXPay bank transfer
-        if (payout_country === "ZAR") {
-          let banks: { id: string; title: string }[] = [];
+        if (payout_country === "ZAR") {          let banks: { id: string; title: string }[] = [];
           try {
             const rawBanks = await fetchPcxPayNetworks("ZA");
             // Deduplicate by id — WhatsApp Flow rejects dropdowns with duplicate IDs
@@ -1707,6 +1755,607 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
       // RWF SCREENS — Rwanda mobile money via PCXPay
       // ─────────────────────────────────────────────────────────────
 
+      // ─────────────────────────────────────────────────────────────
+      // SELECT_PAYMENT_METHOD — KES & TZS route here first
+      // ─────────────────────────────────────────────────────────────
+
+      case "SELECT_PAYMENT_METHOD": {
+        const { payout_country: spmCountry, payment_method: spmMethod } = data as {
+          payout_country?: string;
+          payment_method?: string;
+        };
+
+        if (!spmCountry || !spmMethod) {
+          return {
+            screen: "SELECT_PAYMENT_METHOD",
+            data: {
+              payout_country: spmCountry || "",
+              country_label: spmCountry === "KES" ? "Kenya 🇰🇪" : "Tanzania 🇹🇿",
+              currency_code: spmCountry || "",
+              has_error: true,
+              error_message: "Please select a payment method.",
+            },
+          };
+        }
+
+        const pcxCountryCode = spmCountry === "KES" ? "KE" : "TZ";
+        const currencyCode = spmCountry;
+
+        if (spmMethod === "bank_transfer") {
+          // Fetch only bank-type networks from PCXPay
+          let banks: { id: string; title: string }[] = [];
+          try {
+            const raw = await fetchPcxPayNetworks(pcxCountryCode);
+            banks = raw.filter((n: any) => n.type === "bank" || !n.type);
+            // Dedup by id
+            const seen = new Set<string>();
+            banks = banks.filter((b) => {
+              if (seen.has(b.id)) return false;
+              seen.add(b.id);
+              return true;
+            });
+            logger.info(`[OFFRAMP-${currencyCode}] Fetched ${banks.length} banks from PCXPay`);
+          } catch (err) {
+            logger.error(`[OFFRAMP-${currencyCode}] Failed to fetch banks: ` + (err as Error).message);
+            return {
+              screen: "SELECT_PAYMENT_METHOD",
+              data: {
+                payout_country: spmCountry,
+                country_label: spmCountry === "KES" ? "Kenya 🇰🇪" : "Tanzania 🇹🇿",
+                currency_code: currencyCode,
+                has_error: true,
+                error_message: "Could not load banks. Please try again.",
+              },
+            };
+          }
+          const detailsScreen = spmCountry === "KES" ? "KES_BANK_DETAILS" : "TZS_BANK_DETAILS";
+          return {
+            screen: detailsScreen,
+            data: { banks, has_error: false, error_message: "" },
+          };
+        }
+
+        if (spmMethod === "mobile_money") {
+          // Fetch only momo-type networks from PCXPay
+          let networks: { id: string; title: string }[] = [];
+          try {
+            const raw = await fetchPcxPayNetworks(pcxCountryCode);
+            networks = raw.filter((n: any) => n.type === "momo");
+            logger.info(`[OFFRAMP-${currencyCode}] Fetched ${networks.length} momo networks from PCXPay`);
+          } catch (err) {
+            logger.error(`[OFFRAMP-${currencyCode}] Failed to fetch momo networks: ` + (err as Error).message);
+            return {
+              screen: "SELECT_PAYMENT_METHOD",
+              data: {
+                payout_country: spmCountry,
+                country_label: spmCountry === "KES" ? "Kenya 🇰🇪" : "Tanzania 🇹🇿",
+                currency_code: currencyCode,
+                has_error: true,
+                error_message: "Could not load mobile money networks. Please try again.",
+              },
+            };
+          }
+          const detailsScreen = spmCountry === "KES" ? "KES_MOMO_DETAILS" : "TZS_MOMO_DETAILS";
+          return {
+            screen: detailsScreen,
+            data: { networks, has_error: false, error_message: "" },
+          };
+        }
+
+        return {
+          screen: "SELECT_PAYMENT_METHOD",
+          data: {
+            payout_country: spmCountry,
+            country_label: spmCountry === "KES" ? "Kenya 🇰🇪" : "Tanzania 🇹🇿",
+            currency_code: currencyCode,
+            has_error: true,
+            error_message: "Invalid payment method selected.",
+          },
+        };
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // KES BANK SCREENS — Kenya bank transfer via PCXPay + Paystack resolve
+      // ─────────────────────────────────────────────────────────────
+
+      case "KES_BANK_DETAILS": {
+        const { crypto_asset: kesBankAsset, crypto_network: kesBankNetwork,
+          bank_code: kesBankCode, account_number: kesBankAccNum, sell_amount: kesBankSellAmt } =
+          data as Record<string, string | undefined>;
+
+        const kesBanksOnError = async () => {
+          try {
+            const raw = await fetchPcxPayNetworks("KE");
+            const seen = new Set<string>();
+            return raw.filter((n: any) => n.type === "bank").filter((b: any) => {
+              if (seen.has(b.id)) return false; seen.add(b.id); return true;
+            });
+          } catch { return []; }
+        };
+
+        if (!kesBankAsset || !kesBankNetwork || !kesBankCode || !kesBankAccNum || !kesBankSellAmt) {
+          return { screen: "KES_BANK_DETAILS", data: { banks: await kesBanksOnError(), has_error: true, error_message: "Please fill in all required fields." } };
+        }
+
+        const kesFiatInput = parseFloat(kesBankSellAmt);
+        if (isNaN(kesFiatInput) || kesFiatInput < 500) {
+          return { screen: "KES_BANK_DETAILS", data: { banks: await kesBanksOnError(), has_error: true, error_message: "Minimum withdrawal amount is KES 500." } };
+        }
+
+        let kesRate: number;
+        try {
+          kesRate = await fetchPcxPayUsdRate("KES");
+          logger.info(`[OFFRAMP-KES-BANK] Rate: 1 USD = ${kesRate} KES`);
+        } catch (err) {
+          return { screen: "KES_BANK_DETAILS", data: { banks: await kesBanksOnError(), has_error: true, error_message: "Could not fetch exchange rate. Please try again." } };
+        }
+
+        // Resolve bank name
+        let kesBankName = kesBankCode;
+        try {
+          const allBanks = await fetchPcxPayNetworks("KE");
+          const found = allBanks.find((b) => b.id === kesBankCode);
+          if (found) kesBankName = found.title;
+        } catch { /* keep code */ }
+
+        // Resolve account name via Paystack
+        let kesAccountName: string;
+        try {
+          const resolved = await resolvePaystackAccount(kesBankAccNum, kesBankCode);
+          kesAccountName = resolved.accountName;
+          logger.info(`[OFFRAMP-KES-BANK] Resolved: ${kesAccountName}`);
+        } catch (resolveErr: any) {
+          return { screen: "KES_BANK_DETAILS", data: { banks: await kesBanksOnError(), has_error: true, error_message: resolveErr.message || "Could not verify account." } };
+        }
+
+        const kesCryptoCost = kesFiatInput / kesRate;
+        const kesCostFormatted = kesCryptoCost.toFixed(6).replace(/\.?0+$/, "") || "0.00";
+
+        return {
+          screen: "KES_BANK_REVIEW",
+          data: {
+            crypto_asset: kesBankAsset.toUpperCase(),
+            crypto_network: kesBankNetwork.toUpperCase(),
+            bank_code: kesBankCode,
+            bank_name: kesBankName,
+            account_number: kesBankAccNum,
+            account_name: kesAccountName,
+            sell_amount: kesFiatInput.toLocaleString("en-KE", { maximumFractionDigits: 0 }),
+            crypto_cost: kesCostFormatted,
+            rate: kesRate.toFixed(2),
+            has_error: false,
+            error_message: "",
+          },
+        };
+      }
+
+      case "KES_BANK_REVIEW": {
+        const { crypto_asset: kbrAsset, crypto_network: kbrNetwork, bank_code: kbrBankCode,
+          bank_name: kbrBankName, account_number: kbrAccNum, account_name: kbrAccName,
+          sell_amount: kbrSellAmt, crypto_cost: kbrCryptoCost } = data as Record<string, string | undefined>;
+
+        const flatFee = parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75");
+        const kbrTotal = (parseFloat(kbrCryptoCost || "0") + flatFee).toFixed(6).replace(/\.?0+$/, "") || "0.00";
+
+        return {
+          screen: "KES_BANK_AUTHORIZE",
+          data: {
+            crypto_asset: kbrAsset || "USDC", crypto_network: kbrNetwork || "",
+            bank_code: kbrBankCode || "", bank_name: kbrBankName || "",
+            account_number: kbrAccNum || "", account_name: kbrAccName || "",
+            sell_amount: kbrSellAmt || "0", crypto_cost: kbrCryptoCost || "0",
+            total_crypto_usd: kbrTotal, has_error: false, error_message: "",
+          },
+        };
+      }
+
+      case "KES_BANK_AUTHORIZE": {
+        const { pin: kesBankPin, crypto_asset: kesBankFinAsset, crypto_network: kesBankFinNetwork,
+          bank_code: kesBankFinCode, bank_name: kesBankFinName, account_number: kesBankFinAccNum,
+          account_name: kesBankFinAccName, sell_amount: kesBankFinSellAmt,
+          crypto_cost: kesBankFinCryptoCost, total_crypto_usd: kesBankFinTotal } =
+          data as Record<string, string | undefined>;
+
+        if (!kesBankPin || !kesBankFinAsset || !kesBankFinNetwork || !kesBankFinCode || !kesBankFinAccNum || !kesBankFinSellAmt) {
+          return { screen: "KES_BANK_AUTHORIZE", data: { ...data, error_message: "Missing required transaction details.", has_error: true } };
+        }
+
+        const kesBankUser = await userService.getUser(phone, true);
+        if (!kesBankUser) return { screen: "KES_BANK_AUTHORIZE", data: { ...data, error_message: "User not found.", has_error: true } };
+        if (!await kesBankUser.comparePin(kesBankPin)) return { screen: "KES_BANK_AUTHORIZE", data: { ...data, error_message: "Invalid PIN.", has_error: true } };
+
+        try {
+          const chainMap: Record<string, string> = { sol: "solana", solana: "solana", bep20: "bsc", bsc: "bsc", base: "base", arbitrum: "arbitrum", stellar: "stellar", erc20: "ethereum", ethereum: "ethereum", polygon: "polygon", optimism: "optimism", avalanche: "avalanche" };
+          const crossmintChain = chainMap[kesBankFinNetwork.toLowerCase()];
+          if (!crossmintChain) return { screen: "KES_BANK_AUTHORIZE", data: { ...data, error_message: `Unsupported network: ${kesBankFinNetwork}`, has_error: true } };
+
+          const normalizedAsset = kesBankFinAsset.toUpperCase();
+          const totalRequired = parseFloat(kesBankFinTotal || "0");
+          const chainType = crossmintService.getChainType(crossmintChain);
+
+          // Check balance
+          const kesBankBalances = await crossmintService.getBalancesByChain(kesBankUser.userId, crossmintChain, ["usdc", "usdt"]);
+          const kesBankBal = kesBankBalances.find((b) => (b.symbol?.toLowerCase() || b.token?.toLowerCase()) === normalizedAsset.toLowerCase());
+          const kesBankCurrentBal = kesBankBal ? (() => { const d = kesBankBal.decimals ?? 6; const r = parseFloat(kesBankBal.amount) || 0; return r >= Math.pow(10, d) && d > 0 ? r / Math.pow(10, d) : r; })() : 0;
+          if (kesBankCurrentBal < totalRequired) {
+            const shortfall = (totalRequired - kesBankCurrentBal).toFixed(4);
+            return { screen: "KES_BANK_AUTHORIZE", data: { ...data, error_message: `Insufficient balance. Need ${totalRequired.toFixed(4)} ${normalizedAsset}, have ${kesBankCurrentBal.toFixed(4)}. Deposit ${shortfall} more.`, has_error: true } };
+          }
+
+          const receivingAddress = dexPayService.getReceivingAddress("bep20");
+          const idempKey = `offramp:kes_bank:${Buffer.from(`${kesBankUser.userId}:${kesBankFinSellAmt}:${kesBankFinCode}:${kesBankFinAccNum}`).toString("base64")}`;
+          const existingTx = await redisClient.get(idempKey);
+          if (existingTx && JSON.parse(existingTx).status === "processing") {
+            return { screen: "KES_BANK_AUTHORIZE", data: { ...data, error_message: "Transaction already in progress.", has_error: true } };
+          }
+          await redisClient.set(idempKey, JSON.stringify({ status: "processing", userId: kesBankUser.userId, startedAt: new Date().toISOString() }), "EX", 600);
+
+          const wallets = await crossmintService.getUserWallets(kesBankUser.userId);
+          const wallet = wallets.find((w) => w.chainType === chainType);
+          if (!wallet) { await redisClient.del(idempKey); return { screen: "KES_BANK_AUTHORIZE", data: { ...data, error_message: `No wallet for ${crossmintChain}.`, has_error: true } }; }
+
+          const isStellar = crossmintChain === "stellar";
+          const decimals = isStellar ? 7 : 6;
+          const transferResult = await crossmintService.transferTokens({
+            walletAddress: wallet.address,
+            token: `${crossmintChain}:${normalizedAsset.toLowerCase()}`,
+            recipient: receivingAddress,
+            amount: totalRequired.toFixed(decimals),
+            idempotencyKey: `kes-bank-transfer-${kesBankUser.userId}-${Date.now()}`,
+          });
+
+          if (!transferResult.success) { await redisClient.del(idempKey); return { screen: "KES_BANK_AUTHORIZE", data: { ...data, error_message: `Transfer failed: ${transferResult.error || "Please try again."}`, has_error: true } }; }
+
+          await redisClient.set(idempKey, JSON.stringify({ status: "transfer_completed", userId: kesBankUser.userId, transferId: transferResult.transactionId, completedAt: new Date().toISOString() }), "EX", 600);
+          logger.info(`[OFFRAMP-KES-BANK] Crypto transfer done — PCX payout pending for ${kesBankFinAccNum}`);
+          // PCX payout will be implemented when PCXPay service is ready
+          return { screen: "OFFRAMP_SUCCESS", data: {} };
+        } catch (err) {
+          logger.error("[OFFRAMP-KES-BANK] Error: " + (err as Error).message);
+          return { screen: "KES_BANK_AUTHORIZE", data: { ...data, error_message: (err as Error).message || "Transaction failed.", has_error: true } };
+        }
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // KES MOMO SCREENS — Kenya mobile money via PCXPay (no account resolve)
+      // ─────────────────────────────────────────────────────────────
+
+      case "KES_MOMO_DETAILS": {
+        const { crypto_asset: kesMA, crypto_network: kesMN, network_code: kesMC,
+          phone_number: kesMPhone, sell_amount: kesMSell } = data as Record<string, string | undefined>;
+
+        const kesNetworksOnError = async () => { try { const raw = await fetchPcxPayNetworks("KE"); return raw.filter((n: any) => n.type === "momo"); } catch { return []; } };
+
+        if (!kesMA || !kesMN || !kesMC || !kesMPhone || !kesMSell) {
+          return { screen: "KES_MOMO_DETAILS", data: { networks: await kesNetworksOnError(), has_error: true, error_message: "Please fill in all required fields." } };
+        }
+
+        const kesMomoInput = parseFloat(kesMSell);
+        if (isNaN(kesMomoInput) || kesMomoInput < 500) {
+          return { screen: "KES_MOMO_DETAILS", data: { networks: await kesNetworksOnError(), has_error: true, error_message: "Minimum withdrawal amount is KES 500." } };
+        }
+
+        let kesRate: number;
+        try { kesRate = await fetchPcxPayUsdRate("KES"); } catch {
+          return { screen: "KES_MOMO_DETAILS", data: { networks: await kesNetworksOnError(), has_error: true, error_message: "Could not fetch exchange rate." } };
+        }
+
+        let kesMomoNetworkName = kesMC;
+        try { const all = await fetchPcxPayNetworks("KE"); const f = all.find((n) => n.id === kesMC); if (f) kesMomoNetworkName = f.title; } catch { /* keep code */ }
+
+        const kesMomoCost = (kesMomoInput / kesRate).toFixed(6).replace(/\.?0+$/, "") || "0.00";
+        return {
+          screen: "KES_MOMO_REVIEW",
+          data: {
+            crypto_asset: kesMA.toUpperCase(), crypto_network: kesMN.toUpperCase(),
+            network_code: kesMC, network_name: kesMomoNetworkName,
+            phone_number: kesMPhone, sell_amount: kesMomoInput.toLocaleString("en-KE", { maximumFractionDigits: 0 }),
+            crypto_cost: kesMomoCost, rate: kesRate.toFixed(2), has_error: false, error_message: "",
+          },
+        };
+      }
+
+      case "KES_MOMO_REVIEW": {
+        const { crypto_asset: kmrA, crypto_network: kmrN, network_code: kmrC, network_name: kmrNN,
+          phone_number: kmrPhone, sell_amount: kmrSell, crypto_cost: kmrCost } = data as Record<string, string | undefined>;
+        const flatFee = parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75");
+        const kmrTotal = (parseFloat(kmrCost || "0") + flatFee).toFixed(6).replace(/\.?0+$/, "") || "0.00";
+        return {
+          screen: "KES_MOMO_AUTHORIZE",
+          data: { crypto_asset: kmrA || "USDC", crypto_network: kmrN || "", network_code: kmrC || "",
+            network_name: kmrNN || "", phone_number: kmrPhone || "", sell_amount: kmrSell || "0",
+            crypto_cost: kmrCost || "0", total_crypto_usd: kmrTotal, has_error: false, error_message: "" },
+        };
+      }
+
+      case "KES_MOMO_AUTHORIZE": {
+        const { pin: kmaPin, crypto_asset: kmaAsset, crypto_network: kmaNetwork, network_code: kmaCode,
+          network_name: kmaName, phone_number: kmaPhone, sell_amount: kmaSell,
+          crypto_cost: kmaCost, total_crypto_usd: kmaTotal } = data as Record<string, string | undefined>;
+
+        if (!kmaPin || !kmaAsset || !kmaNetwork || !kmaCode || !kmaPhone || !kmaSell) {
+          return { screen: "KES_MOMO_AUTHORIZE", data: { ...data, error_message: "Missing required transaction details.", has_error: true } };
+        }
+
+        const kmaUser = await userService.getUser(phone, true);
+        if (!kmaUser) return { screen: "KES_MOMO_AUTHORIZE", data: { ...data, error_message: "User not found.", has_error: true } };
+        if (!await kmaUser.comparePin(kmaPin)) return { screen: "KES_MOMO_AUTHORIZE", data: { ...data, error_message: "Invalid PIN.", has_error: true } };
+
+        try {
+          const chainMap: Record<string, string> = { sol: "solana", solana: "solana", bep20: "bsc", bsc: "bsc", base: "base", arbitrum: "arbitrum", stellar: "stellar", erc20: "ethereum", ethereum: "ethereum", polygon: "polygon", optimism: "optimism", avalanche: "avalanche" };
+          const crossmintChain = chainMap[kmaNetwork.toLowerCase()];
+          if (!crossmintChain) return { screen: "KES_MOMO_AUTHORIZE", data: { ...data, error_message: `Unsupported network: ${kmaNetwork}`, has_error: true } };
+
+          const normalizedAsset = kmaAsset.toUpperCase();
+          const totalRequired = parseFloat(kmaTotal || "0");
+          const chainType = crossmintService.getChainType(crossmintChain);
+
+          const kmaBals = await crossmintService.getBalancesByChain(kmaUser.userId, crossmintChain, ["usdc", "usdt"]);
+          const kmaBal = kmaBals.find((b) => (b.symbol?.toLowerCase() || b.token?.toLowerCase()) === normalizedAsset.toLowerCase());
+          const kmaCurrentBal = kmaBal ? (() => { const d = kmaBal.decimals ?? 6; const r = parseFloat(kmaBal.amount) || 0; return r >= Math.pow(10, d) && d > 0 ? r / Math.pow(10, d) : r; })() : 0;
+          if (kmaCurrentBal < totalRequired) {
+            return { screen: "KES_MOMO_AUTHORIZE", data: { ...data, error_message: `Insufficient balance. Need ${totalRequired.toFixed(4)} ${normalizedAsset}.`, has_error: true } };
+          }
+
+          const receivingAddress = dexPayService.getReceivingAddress("bep20");
+          const idempKey = `offramp:kes_momo:${Buffer.from(`${kmaUser.userId}:${kmaSell}:${kmaCode}:${kmaPhone}`).toString("base64")}`;
+          const existingTx = await redisClient.get(idempKey);
+          if (existingTx && JSON.parse(existingTx).status === "processing") {
+            return { screen: "KES_MOMO_AUTHORIZE", data: { ...data, error_message: "Transaction already in progress.", has_error: true } };
+          }
+          await redisClient.set(idempKey, JSON.stringify({ status: "processing", userId: kmaUser.userId, startedAt: new Date().toISOString() }), "EX", 600);
+
+          const wallets = await crossmintService.getUserWallets(kmaUser.userId);
+          const wallet = wallets.find((w) => w.chainType === chainType);
+          if (!wallet) { await redisClient.del(idempKey); return { screen: "KES_MOMO_AUTHORIZE", data: { ...data, error_message: `No wallet for ${crossmintChain}.`, has_error: true } }; }
+
+          const isStellar = crossmintChain === "stellar";
+          const decimals = isStellar ? 7 : 6;
+          const transferResult = await crossmintService.transferTokens({
+            walletAddress: wallet.address,
+            token: `${crossmintChain}:${normalizedAsset.toLowerCase()}`,
+            recipient: receivingAddress,
+            amount: totalRequired.toFixed(decimals),
+            idempotencyKey: `kes-momo-transfer-${kmaUser.userId}-${Date.now()}`,
+          });
+
+          if (!transferResult.success) { await redisClient.del(idempKey); return { screen: "KES_MOMO_AUTHORIZE", data: { ...data, error_message: `Transfer failed: ${transferResult.error || "Please try again."}`, has_error: true } }; }
+
+          await redisClient.set(idempKey, JSON.stringify({ status: "transfer_completed", userId: kmaUser.userId, transferId: transferResult.transactionId, completedAt: new Date().toISOString() }), "EX", 600);
+          logger.info(`[OFFRAMP-KES-MOMO] Crypto transfer done — PCX payout pending for ${kmaPhone}`);
+          // PCX payout will be implemented when PCXPay service is ready
+          return { screen: "OFFRAMP_SUCCESS", data: {} };
+        } catch (err) {
+          logger.error("[OFFRAMP-KES-MOMO] Error: " + (err as Error).message);
+          return { screen: "KES_MOMO_AUTHORIZE", data: { ...data, error_message: (err as Error).message || "Transaction failed.", has_error: true } };
+        }
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // TZS BANK SCREENS — Tanzania bank transfer via PCXPay + Paystack resolve
+      // ─────────────────────────────────────────────────────────────
+
+      case "TZS_BANK_DETAILS": {
+        const { crypto_asset: tzsBA, crypto_network: tzsBN, bank_code: tzsBC,
+          account_number: tzsBAcc, sell_amount: tzsBSell } = data as Record<string, string | undefined>;
+
+        const tzsBanksOnError = async () => {
+          try { const raw = await fetchPcxPayNetworks("TZ"); const seen = new Set<string>(); return raw.filter((n: any) => n.type === "bank").filter((b: any) => { if (seen.has(b.id)) return false; seen.add(b.id); return true; }); } catch { return []; }
+        };
+
+        if (!tzsBA || !tzsBN || !tzsBC || !tzsBAcc || !tzsBSell) {
+          return { screen: "TZS_BANK_DETAILS", data: { banks: await tzsBanksOnError(), has_error: true, error_message: "Please fill in all required fields." } };
+        }
+
+        const tzsFiatInput = parseFloat(tzsBSell);
+        if (isNaN(tzsFiatInput) || tzsFiatInput < 10000) {
+          return { screen: "TZS_BANK_DETAILS", data: { banks: await tzsBanksOnError(), has_error: true, error_message: "Minimum withdrawal amount is TZS 10,000." } };
+        }
+
+        let tzsRate: number;
+        try { tzsRate = await fetchPcxPayUsdRate("TZS"); logger.info(`[OFFRAMP-TZS-BANK] Rate: 1 USD = ${tzsRate} TZS`); }
+        catch { return { screen: "TZS_BANK_DETAILS", data: { banks: await tzsBanksOnError(), has_error: true, error_message: "Could not fetch exchange rate." } }; }
+
+        let tzsBankName = tzsBC;
+        try { const all = await fetchPcxPayNetworks("TZ"); const f = all.find((b) => b.id === tzsBC); if (f) tzsBankName = f.title; } catch { /* keep code */ }
+
+        // Resolve account name via Paystack
+        let tzsBankAccName: string;
+        try {
+          const resolved = await resolvePaystackAccount(tzsBAcc, tzsBC);
+          tzsBankAccName = resolved.accountName;
+          logger.info(`[OFFRAMP-TZS-BANK] Resolved: ${tzsBankAccName}`);
+        } catch (resolveErr: any) {
+          return { screen: "TZS_BANK_DETAILS", data: { banks: await tzsBanksOnError(), has_error: true, error_message: resolveErr.message || "Could not verify account." } };
+        }
+
+        const tzsCost = (tzsFiatInput / tzsRate).toFixed(6).replace(/\.?0+$/, "") || "0.00";
+        return {
+          screen: "TZS_BANK_REVIEW",
+          data: { crypto_asset: tzsBA.toUpperCase(), crypto_network: tzsBN.toUpperCase(), bank_code: tzsBC,
+            bank_name: tzsBankName, account_number: tzsBAcc, account_name: tzsBankAccName,
+            sell_amount: tzsFiatInput.toLocaleString("en-TZ", { maximumFractionDigits: 0 }),
+            crypto_cost: tzsCost, rate: tzsRate.toFixed(2), has_error: false, error_message: "" },
+        };
+      }
+
+      case "TZS_BANK_REVIEW": {
+        const { crypto_asset: tbrA, crypto_network: tbrN, bank_code: tbrBC, bank_name: tbrBN,
+          account_number: tbrAcc, account_name: tbrAN, sell_amount: tbrSell, crypto_cost: tbrCost } = data as Record<string, string | undefined>;
+        const flatFee = parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75");
+        const tbrTotal = (parseFloat(tbrCost || "0") + flatFee).toFixed(6).replace(/\.?0+$/, "") || "0.00";
+        return {
+          screen: "TZS_BANK_AUTHORIZE",
+          data: { crypto_asset: tbrA || "USDC", crypto_network: tbrN || "", bank_code: tbrBC || "",
+            bank_name: tbrBN || "", account_number: tbrAcc || "", account_name: tbrAN || "",
+            sell_amount: tbrSell || "0", crypto_cost: tbrCost || "0", total_crypto_usd: tbrTotal, has_error: false, error_message: "" },
+        };
+      }
+
+      case "TZS_BANK_AUTHORIZE": {
+        const { pin: tbaPin, crypto_asset: tbaAsset, crypto_network: tbaNetwork, bank_code: tbaCode,
+          bank_name: tbaBank, account_number: tbaAcc, account_name: tbaAccName,
+          sell_amount: tbaSell, crypto_cost: tbaCost, total_crypto_usd: tbaTotal } = data as Record<string, string | undefined>;
+
+        if (!tbaPin || !tbaAsset || !tbaNetwork || !tbaCode || !tbaAcc || !tbaSell) {
+          return { screen: "TZS_BANK_AUTHORIZE", data: { ...data, error_message: "Missing required transaction details.", has_error: true } };
+        }
+        const tbaUser = await userService.getUser(phone, true);
+        if (!tbaUser) return { screen: "TZS_BANK_AUTHORIZE", data: { ...data, error_message: "User not found.", has_error: true } };
+        if (!await tbaUser.comparePin(tbaPin)) return { screen: "TZS_BANK_AUTHORIZE", data: { ...data, error_message: "Invalid PIN.", has_error: true } };
+
+        try {
+          const chainMap: Record<string, string> = { sol: "solana", solana: "solana", bep20: "bsc", bsc: "bsc", base: "base", arbitrum: "arbitrum", stellar: "stellar", erc20: "ethereum", ethereum: "ethereum", polygon: "polygon", optimism: "optimism", avalanche: "avalanche" };
+          const crossmintChain = chainMap[tbaNetwork.toLowerCase()];
+          if (!crossmintChain) return { screen: "TZS_BANK_AUTHORIZE", data: { ...data, error_message: `Unsupported network: ${tbaNetwork}`, has_error: true } };
+
+          const normalizedAsset = tbaAsset.toUpperCase();
+          const totalRequired = parseFloat(tbaTotal || "0");
+          const chainType = crossmintService.getChainType(crossmintChain);
+          const tbaBals = await crossmintService.getBalancesByChain(tbaUser.userId, crossmintChain, ["usdc", "usdt"]);
+          const tbaBal = tbaBals.find((b) => (b.symbol?.toLowerCase() || b.token?.toLowerCase()) === normalizedAsset.toLowerCase());
+          const tbaCurrentBal = tbaBal ? (() => { const d = tbaBal.decimals ?? 6; const r = parseFloat(tbaBal.amount) || 0; return r >= Math.pow(10, d) && d > 0 ? r / Math.pow(10, d) : r; })() : 0;
+          if (tbaCurrentBal < totalRequired) return { screen: "TZS_BANK_AUTHORIZE", data: { ...data, error_message: `Insufficient balance. Need ${totalRequired.toFixed(4)} ${normalizedAsset}.`, has_error: true } };
+
+          const receivingAddress = dexPayService.getReceivingAddress("bep20");
+          const idempKey = `offramp:tzs_bank:${Buffer.from(`${tbaUser.userId}:${tbaSell}:${tbaCode}:${tbaAcc}`).toString("base64")}`;
+          const existingTx = await redisClient.get(idempKey);
+          if (existingTx && JSON.parse(existingTx).status === "processing") return { screen: "TZS_BANK_AUTHORIZE", data: { ...data, error_message: "Transaction already in progress.", has_error: true } };
+          await redisClient.set(idempKey, JSON.stringify({ status: "processing", userId: tbaUser.userId, startedAt: new Date().toISOString() }), "EX", 600);
+
+          const wallets = await crossmintService.getUserWallets(tbaUser.userId);
+          const wallet = wallets.find((w) => w.chainType === chainType);
+          if (!wallet) { await redisClient.del(idempKey); return { screen: "TZS_BANK_AUTHORIZE", data: { ...data, error_message: `No wallet for ${crossmintChain}.`, has_error: true } }; }
+
+          const decimals = crossmintChain === "stellar" ? 7 : 6;
+          const transferResult = await crossmintService.transferTokens({
+            walletAddress: wallet.address, token: `${crossmintChain}:${normalizedAsset.toLowerCase()}`,
+            recipient: receivingAddress, amount: totalRequired.toFixed(decimals),
+            idempotencyKey: `tzs-bank-transfer-${tbaUser.userId}-${Date.now()}`,
+          });
+
+          if (!transferResult.success) { await redisClient.del(idempKey); return { screen: "TZS_BANK_AUTHORIZE", data: { ...data, error_message: `Transfer failed: ${transferResult.error || "Please try again."}`, has_error: true } }; }
+
+          await redisClient.set(idempKey, JSON.stringify({ status: "transfer_completed", userId: tbaUser.userId, transferId: transferResult.transactionId, completedAt: new Date().toISOString() }), "EX", 600);
+          logger.info(`[OFFRAMP-TZS-BANK] Crypto transfer done — PCX payout pending`);
+          return { screen: "OFFRAMP_SUCCESS", data: {} };
+        } catch (err) {
+          logger.error("[OFFRAMP-TZS-BANK] Error: " + (err as Error).message);
+          return { screen: "TZS_BANK_AUTHORIZE", data: { ...data, error_message: (err as Error).message || "Transaction failed.", has_error: true } };
+        }
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // TZS MOMO + UGX SCREENS — mobile money only, no account resolve
+      // ─────────────────────────────────────────────────────────────
+
+      case "TZS_MOMO_DETAILS": {
+        const { crypto_asset: tzsMA, crypto_network: tzsMN, network_code: tzsMC,
+          phone_number: tzsMPhone, sell_amount: tzsMSell } = data as Record<string, string | undefined>;
+        const tzsNetworksOnError = async () => { try { const raw = await fetchPcxPayNetworks("TZ"); return raw.filter((n: any) => n.type === "momo"); } catch { return []; } };
+        if (!tzsMA || !tzsMN || !tzsMC || !tzsMPhone || !tzsMSell) return { screen: "TZS_MOMO_DETAILS", data: { networks: await tzsNetworksOnError(), has_error: true, error_message: "Please fill in all required fields." } };
+        const tzsMomoInput = parseFloat(tzsMSell);
+        if (isNaN(tzsMomoInput) || tzsMomoInput < 10000) return { screen: "TZS_MOMO_DETAILS", data: { networks: await tzsNetworksOnError(), has_error: true, error_message: "Minimum withdrawal amount is TZS 10,000." } };
+        let tzsRate: number;
+        try { tzsRate = await fetchPcxPayUsdRate("TZS"); } catch { return { screen: "TZS_MOMO_DETAILS", data: { networks: await tzsNetworksOnError(), has_error: true, error_message: "Could not fetch exchange rate." } }; }
+        let tzsMomoName = tzsMC;
+        try { const all = await fetchPcxPayNetworks("TZ"); const f = all.find((n) => n.id === tzsMC); if (f) tzsMomoName = f.title; } catch { /* keep */ }
+        return { screen: "TZS_MOMO_REVIEW", data: { crypto_asset: tzsMA.toUpperCase(), crypto_network: tzsMN.toUpperCase(), network_code: tzsMC, network_name: tzsMomoName, phone_number: tzsMPhone, sell_amount: tzsMomoInput.toLocaleString("en-TZ", { maximumFractionDigits: 0 }), crypto_cost: (tzsMomoInput / tzsRate).toFixed(6).replace(/\.?0+$/, "") || "0.00", rate: tzsRate.toFixed(2), has_error: false, error_message: "" } };
+      }
+
+      case "TZS_MOMO_REVIEW": {
+        const { crypto_asset: tmrA, crypto_network: tmrN, network_code: tmrC, network_name: tmrNN, phone_number: tmrPhone, sell_amount: tmrSell, crypto_cost: tmrCost } = data as Record<string, string | undefined>;
+        const tmrTotal = (parseFloat(tmrCost || "0") + parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75")).toFixed(6).replace(/\.?0+$/, "") || "0.00";
+        return { screen: "TZS_MOMO_AUTHORIZE", data: { crypto_asset: tmrA || "USDC", crypto_network: tmrN || "", network_code: tmrC || "", network_name: tmrNN || "", phone_number: tmrPhone || "", sell_amount: tmrSell || "0", crypto_cost: tmrCost || "0", total_crypto_usd: tmrTotal, has_error: false, error_message: "" } };
+      }
+
+      case "TZS_MOMO_AUTHORIZE": {
+        const { pin: tmaPin, crypto_asset: tmaAsset, crypto_network: tmaNetwork, network_code: tmaCode, network_name: tmaName, phone_number: tmaPhone, sell_amount: tmaSell, crypto_cost: tmaCost, total_crypto_usd: tmaTotal } = data as Record<string, string | undefined>;
+        if (!tmaPin || !tmaAsset || !tmaNetwork || !tmaCode || !tmaPhone || !tmaSell) return { screen: "TZS_MOMO_AUTHORIZE", data: { ...data, error_message: "Missing required transaction details.", has_error: true } };
+        const tmaUser = await userService.getUser(phone, true);
+        if (!tmaUser) return { screen: "TZS_MOMO_AUTHORIZE", data: { ...data, error_message: "User not found.", has_error: true } };
+        if (!await tmaUser.comparePin(tmaPin)) return { screen: "TZS_MOMO_AUTHORIZE", data: { ...data, error_message: "Invalid PIN.", has_error: true } };
+        try {
+          const chainMap: Record<string, string> = { sol: "solana", solana: "solana", bep20: "bsc", bsc: "bsc", base: "base", arbitrum: "arbitrum", stellar: "stellar", erc20: "ethereum", ethereum: "ethereum", polygon: "polygon", optimism: "optimism", avalanche: "avalanche" };
+          const crossmintChain = chainMap[tmaNetwork.toLowerCase()];
+          if (!crossmintChain) return { screen: "TZS_MOMO_AUTHORIZE", data: { ...data, error_message: `Unsupported network: ${tmaNetwork}`, has_error: true } };
+          const normalizedAsset = tmaAsset.toUpperCase();
+          const totalRequired = parseFloat(tmaTotal || "0");
+          const chainType = crossmintService.getChainType(crossmintChain);
+          const tmaBals = await crossmintService.getBalancesByChain(tmaUser.userId, crossmintChain, ["usdc", "usdt"]);
+          const tmaBal = tmaBals.find((b) => (b.symbol?.toLowerCase() || b.token?.toLowerCase()) === normalizedAsset.toLowerCase());
+          const tmaCurrentBal = tmaBal ? (() => { const d = tmaBal.decimals ?? 6; const r = parseFloat(tmaBal.amount) || 0; return r >= Math.pow(10, d) && d > 0 ? r / Math.pow(10, d) : r; })() : 0;
+          if (tmaCurrentBal < totalRequired) return { screen: "TZS_MOMO_AUTHORIZE", data: { ...data, error_message: `Insufficient balance. Need ${totalRequired.toFixed(4)} ${normalizedAsset}.`, has_error: true } };
+          const receivingAddress = dexPayService.getReceivingAddress("bep20");
+          const idempKey = `offramp:tzs_momo:${Buffer.from(`${tmaUser.userId}:${tmaSell}:${tmaCode}:${tmaPhone}`).toString("base64")}`;
+          const existingTx = await redisClient.get(idempKey);
+          if (existingTx && JSON.parse(existingTx).status === "processing") return { screen: "TZS_MOMO_AUTHORIZE", data: { ...data, error_message: "Transaction already in progress.", has_error: true } };
+          await redisClient.set(idempKey, JSON.stringify({ status: "processing", userId: tmaUser.userId, startedAt: new Date().toISOString() }), "EX", 600);
+          const wallets = await crossmintService.getUserWallets(tmaUser.userId);
+          const wallet = wallets.find((w) => w.chainType === chainType);
+          if (!wallet) { await redisClient.del(idempKey); return { screen: "TZS_MOMO_AUTHORIZE", data: { ...data, error_message: `No wallet for ${crossmintChain}.`, has_error: true } }; }
+          const decimals = crossmintChain === "stellar" ? 7 : 6;
+          const transferResult = await crossmintService.transferTokens({ walletAddress: wallet.address, token: `${crossmintChain}:${normalizedAsset.toLowerCase()}`, recipient: receivingAddress, amount: totalRequired.toFixed(decimals), idempotencyKey: `tzs-momo-transfer-${tmaUser.userId}-${Date.now()}` });
+          if (!transferResult.success) { await redisClient.del(idempKey); return { screen: "TZS_MOMO_AUTHORIZE", data: { ...data, error_message: `Transfer failed: ${transferResult.error || "Please try again."}`, has_error: true } }; }
+          await redisClient.set(idempKey, JSON.stringify({ status: "transfer_completed", userId: tmaUser.userId, transferId: transferResult.transactionId, completedAt: new Date().toISOString() }), "EX", 600);
+          logger.info(`[OFFRAMP-TZS-MOMO] Crypto transfer done — PCX payout pending`);
+          return { screen: "OFFRAMP_SUCCESS", data: {} };
+        } catch (err) { logger.error("[OFFRAMP-TZS-MOMO] Error: " + (err as Error).message); return { screen: "TZS_MOMO_AUTHORIZE", data: { ...data, error_message: (err as Error).message || "Transaction failed.", has_error: true } }; }
+      }
+
+      case "UGX_DETAILS": {
+        const { crypto_asset: ugxA, crypto_network: ugxN, network_code: ugxC, phone_number: ugxPhone, sell_amount: ugxSell } = data as Record<string, string | undefined>;
+        const ugxNetworksOnError = async () => { try { return await fetchPcxPayNetworks("UG"); } catch { return []; } };
+        if (!ugxA || !ugxN || !ugxC || !ugxPhone || !ugxSell) return { screen: "UGX_DETAILS", data: { networks: await ugxNetworksOnError(), has_error: true, error_message: "Please fill in all required fields." } };
+        const ugxFiatInput = parseFloat(ugxSell);
+        if (isNaN(ugxFiatInput) || ugxFiatInput < 50000) return { screen: "UGX_DETAILS", data: { networks: await ugxNetworksOnError(), has_error: true, error_message: "Minimum withdrawal amount is UGX 50,000." } };
+        let ugxRate: number;
+        try { ugxRate = await fetchPcxPayUsdRate("UGX"); logger.info(`[OFFRAMP-UGX] Rate: 1 USD = ${ugxRate} UGX`); } catch { return { screen: "UGX_DETAILS", data: { networks: await ugxNetworksOnError(), has_error: true, error_message: "Could not fetch exchange rate." } }; }
+        let ugxNetworkName = ugxC;
+        try { const all = await fetchPcxPayNetworks("UG"); const f = all.find((n) => n.id === ugxC); if (f) ugxNetworkName = f.title; } catch { /* keep */ }
+        return { screen: "UGX_REVIEW", data: { crypto_asset: ugxA.toUpperCase(), crypto_network: ugxN.toUpperCase(), network_code: ugxC, network_name: ugxNetworkName, phone_number: ugxPhone, sell_amount: ugxFiatInput.toLocaleString("en-UG", { maximumFractionDigits: 0 }), crypto_cost: (ugxFiatInput / ugxRate).toFixed(6).replace(/\.?0+$/, "") || "0.00", rate: ugxRate.toFixed(2), has_error: false, error_message: "" } };
+      }
+
+      case "UGX_REVIEW": {
+        const { crypto_asset: urA, crypto_network: urN, network_code: urC, network_name: urNN, phone_number: urPhone, sell_amount: urSell, crypto_cost: urCost } = data as Record<string, string | undefined>;
+        const urTotal = (parseFloat(urCost || "0") + parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75")).toFixed(6).replace(/\.?0+$/, "") || "0.00";
+        return { screen: "UGX_AUTHORIZE", data: { crypto_asset: urA || "USDC", crypto_network: urN || "", network_code: urC || "", network_name: urNN || "", phone_number: urPhone || "", sell_amount: urSell || "0", crypto_cost: urCost || "0", total_crypto_usd: urTotal, has_error: false, error_message: "" } };
+      }
+
+      case "UGX_AUTHORIZE": {
+        const { pin: uaPin, crypto_asset: uaAsset, crypto_network: uaNetwork, network_code: uaCode, network_name: uaName, phone_number: uaPhone, sell_amount: uaSell, crypto_cost: uaCost, total_crypto_usd: uaTotal } = data as Record<string, string | undefined>;
+        if (!uaPin || !uaAsset || !uaNetwork || !uaCode || !uaPhone || !uaSell) return { screen: "UGX_AUTHORIZE", data: { ...data, error_message: "Missing required transaction details.", has_error: true } };
+        const uaUser = await userService.getUser(phone, true);
+        if (!uaUser) return { screen: "UGX_AUTHORIZE", data: { ...data, error_message: "User not found.", has_error: true } };
+        if (!await uaUser.comparePin(uaPin)) return { screen: "UGX_AUTHORIZE", data: { ...data, error_message: "Invalid PIN.", has_error: true } };
+        try {
+          const chainMap: Record<string, string> = { sol: "solana", solana: "solana", bep20: "bsc", bsc: "bsc", base: "base", arbitrum: "arbitrum", stellar: "stellar", erc20: "ethereum", ethereum: "ethereum", polygon: "polygon", optimism: "optimism", avalanche: "avalanche" };
+          const crossmintChain = chainMap[uaNetwork.toLowerCase()];
+          if (!crossmintChain) return { screen: "UGX_AUTHORIZE", data: { ...data, error_message: `Unsupported network: ${uaNetwork}`, has_error: true } };
+          const normalizedAsset = uaAsset.toUpperCase();
+          const totalRequired = parseFloat(uaTotal || "0");
+          const chainType = crossmintService.getChainType(crossmintChain);
+          const uaBals = await crossmintService.getBalancesByChain(uaUser.userId, crossmintChain, ["usdc", "usdt"]);
+          const uaBal = uaBals.find((b) => (b.symbol?.toLowerCase() || b.token?.toLowerCase()) === normalizedAsset.toLowerCase());
+          const uaCurrentBal = uaBal ? (() => { const d = uaBal.decimals ?? 6; const r = parseFloat(uaBal.amount) || 0; return r >= Math.pow(10, d) && d > 0 ? r / Math.pow(10, d) : r; })() : 0;
+          if (uaCurrentBal < totalRequired) return { screen: "UGX_AUTHORIZE", data: { ...data, error_message: `Insufficient balance. Need ${totalRequired.toFixed(4)} ${normalizedAsset}.`, has_error: true } };
+          const receivingAddress = dexPayService.getReceivingAddress("bep20");
+          const idempKey = `offramp:ugx:${Buffer.from(`${uaUser.userId}:${uaSell}:${uaCode}:${uaPhone}`).toString("base64")}`;
+          const existingTx = await redisClient.get(idempKey);
+          if (existingTx && JSON.parse(existingTx).status === "processing") return { screen: "UGX_AUTHORIZE", data: { ...data, error_message: "Transaction already in progress.", has_error: true } };
+          await redisClient.set(idempKey, JSON.stringify({ status: "processing", userId: uaUser.userId, startedAt: new Date().toISOString() }), "EX", 600);
+          const wallets = await crossmintService.getUserWallets(uaUser.userId);
+          const wallet = wallets.find((w) => w.chainType === chainType);
+          if (!wallet) { await redisClient.del(idempKey); return { screen: "UGX_AUTHORIZE", data: { ...data, error_message: `No wallet for ${crossmintChain}.`, has_error: true } }; }
+          const decimals = crossmintChain === "stellar" ? 7 : 6;
+          const transferResult = await crossmintService.transferTokens({ walletAddress: wallet.address, token: `${crossmintChain}:${normalizedAsset.toLowerCase()}`, recipient: receivingAddress, amount: totalRequired.toFixed(decimals), idempotencyKey: `ugx-transfer-${uaUser.userId}-${Date.now()}` });
+          if (!transferResult.success) { await redisClient.del(idempKey); return { screen: "UGX_AUTHORIZE", data: { ...data, error_message: `Transfer failed: ${transferResult.error || "Please try again."}`, has_error: true } }; }
+          await redisClient.set(idempKey, JSON.stringify({ status: "transfer_completed", userId: uaUser.userId, transferId: transferResult.transactionId, completedAt: new Date().toISOString() }), "EX", 600);
+          logger.info(`[OFFRAMP-UGX] Crypto transfer done — PCX payout pending`);
+          return { screen: "OFFRAMP_SUCCESS", data: {} };
+        } catch (err) { logger.error("[OFFRAMP-UGX] Error: " + (err as Error).message); return { screen: "UGX_AUTHORIZE", data: { ...data, error_message: (err as Error).message || "Transaction failed.", has_error: true } }; }
+      }
+
       case "RWF_DETAILS": {
         const {
           crypto_asset,
@@ -2026,14 +2675,12 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           crypto_network: zarNetworkRaw,
           bank_code: zarBankCode,
           account_number: zarAccountNumber,
-          account_name: zarAccountName,
           sell_amount: zarSellAmount,
         } = data as {
           crypto_asset?: string;
           crypto_network?: string;
           bank_code?: string;
           account_number?: string;
-          account_name?: string;
           sell_amount?: string;
         };
 
@@ -2044,7 +2691,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           return b;
         };
 
-        if (!zarAssetRaw || !zarNetworkRaw || !zarBankCode || !zarAccountNumber || !zarAccountName || !zarSellAmount) {
+        if (!zarAssetRaw || !zarNetworkRaw || !zarBankCode || !zarAccountNumber || !zarSellAmount) {
           return {
             screen: "ZAR_DETAILS",
             data: { banks: await zarBanksOnError(), has_error: true, error_message: "Please fill in all required fields." },
@@ -2105,6 +2752,24 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           const found = allBanks.find((b) => b.id === zarBankCode);
           if (found) zarBankName = found.title;
         } catch { /* keep code as name */ }
+
+        // Resolve account name via Paystack
+        let zarAccountName: string;
+        try {
+          const resolved = await resolvePaystackAccount(zarAccountNumber, zarBankCode);
+          zarAccountName = resolved.accountName;
+          logger.info(`[OFFRAMP-ZAR] Resolved account: ${zarAccountName}`);
+        } catch (resolveErr: any) {
+          logger.error("[OFFRAMP-ZAR] Paystack resolution failed: " + resolveErr.message);
+          return {
+            screen: "ZAR_DETAILS",
+            data: {
+              banks: await zarBanksOnError(),
+              has_error: true,
+              error_message: resolveErr.message || "Could not verify account. Please check the account number and bank.",
+            },
+          };
+        }
 
         return {
           screen: "ZAR_REVIEW",
