@@ -60,7 +60,7 @@ const PCXPAY_ORG_ID = "3ed1170a-0151-4e9f-825b-16470b88ab62";
  */
 async function fetchPcxPayNetworks(
   countryCode: string,
-): Promise<{ id: string; title: string }[]> {
+): Promise<{ id: string; title: string; type: string }[]> {
   const axios = (await import("axios")).default;
   const response = await axios.post(
     `${PCXPAY_BASE_URL}/v1/externals/networks`,
@@ -82,6 +82,7 @@ async function fetchPcxPayNetworks(
   return networks.map((n: any) => ({
     id: String(n.code ?? n.id),
     title: String(n.name),
+    type: String(n.type ?? ""),
   }));
 }
 
@@ -1786,7 +1787,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           let banks: { id: string; title: string }[] = [];
           try {
             const raw = await fetchPcxPayNetworks(pcxCountryCode);
-            banks = raw.filter((n: any) => n.type === "bank" || !n.type);
+            banks = raw.filter((n: any) => n.type === "bank");
             // Dedup by id
             const seen = new Set<string>();
             banks = banks.filter((b) => {

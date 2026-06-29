@@ -1020,38 +1020,6 @@
       }
     },
     {
-      "id": "OFFRAMP_SUCCESS",
-      "title": "Processing",
-      "terminal": true,
-      "success": true,
-      "data": {},
-      "layout": {
-        "type": "SingleColumnLayout",
-        "children": [
-          {
-            "type": "TextHeading",
-            "text": "Funds are underway! 🚀"
-          },
-          {
-            "type": "TextBody",
-            "text": "Your withdrawal has been initiated. The funds usually hit the bank account in under 50 seconds."
-          },
-          {
-            "type": "Footer",
-            "label": "Done",
-            "on-click-action": {
-              "name": "complete",
-              "payload": {
-                "status": "offramp_initiated",
-                "result": "success"
-              }
-            }
-          }
-        ]
-      }
-
-    },
-    {
       "id": "SELECT_PAYMENT_METHOD",
       "title": "Payment Method",
       "data": {
