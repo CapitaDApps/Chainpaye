@@ -82,7 +82,7 @@ async function fetchPcxPayNetworks(
   return networks.map((n: any) => ({
     id: String(n.code ?? n.id),
     title: String(n.name),
-    type: String(n.type ?? ""),
+    type: String(n.type ?? ""),  // kept for server-side filtering, stripped before sending to flow
   }));
 }
 
@@ -679,7 +679,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
         if (payout_country === "RWF") {
           let networks: { id: string; title: string }[] = [];
           try {
-            networks = await fetchPcxPayNetworks("RW");
+            networks = (await fetchPcxPayNetworks("RW")).map((n) => ({ id: n.id, title: n.title }));
             logger.info(`[OFFRAMP-RWF] Fetched ${networks.length} networks from PCXPay`);
           } catch (error) {
             logger.error("[OFFRAMP-RWF] Failed to fetch networks: " + (error as Error).message);
@@ -735,7 +735,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           let networks: { id: string; title: string }[] = [];
           try {
             const raw = await fetchPcxPayNetworks("UG");
-            networks = raw.filter((n) => n.id !== undefined);
+            networks = raw.filter((n) => n.id !== undefined).map((n) => ({ id: n.id, title: n.title }));
             logger.info(`[OFFRAMP-UGX] Fetched ${networks.length} networks from PCXPay`);
           } catch (error) {
             logger.error("[OFFRAMP-UGX] Failed to fetch networks: " + (error as Error).message);
@@ -756,11 +756,9 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             const rawBanks = await fetchPcxPayNetworks("ZA");
             // Deduplicate by id — WhatsApp Flow rejects dropdowns with duplicate IDs
             const seen = new Set<string>();
-            banks = rawBanks.filter((b) => {
-              if (seen.has(b.id)) return false;
-              seen.add(b.id);
-              return true;
-            });
+            banks = rawBanks
+              .filter((b) => { if (seen.has(b.id)) return false; seen.add(b.id); return true; })
+              .map((b) => ({ id: b.id, title: b.title }));
             logger.info(`[OFFRAMP-ZAR] Fetched ${rawBanks.length} banks from PCXPay, ${banks.length} unique after dedup`);
           } catch (error) {
             logger.error("[OFFRAMP-ZAR] Failed to fetch banks: " + (error as Error).message);
@@ -1787,14 +1785,11 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           let banks: { id: string; title: string }[] = [];
           try {
             const raw = await fetchPcxPayNetworks(pcxCountryCode);
-            banks = raw.filter((n: any) => n.type === "bank");
-            // Dedup by id
             const seen = new Set<string>();
-            banks = banks.filter((b) => {
-              if (seen.has(b.id)) return false;
-              seen.add(b.id);
-              return true;
-            });
+            banks = raw
+              .filter((n) => n.type === "bank")
+              .filter((b) => { if (seen.has(b.id)) return false; seen.add(b.id); return true; })
+              .map((b) => ({ id: b.id, title: b.title }));
             logger.info(`[OFFRAMP-${currencyCode}] Fetched ${banks.length} banks from PCXPay`);
           } catch (err) {
             logger.error(`[OFFRAMP-${currencyCode}] Failed to fetch banks: ` + (err as Error).message);
@@ -1821,7 +1816,9 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           let networks: { id: string; title: string }[] = [];
           try {
             const raw = await fetchPcxPayNetworks(pcxCountryCode);
-            networks = raw.filter((n: any) => n.type === "momo");
+            networks = raw
+              .filter((n) => n.type === "momo")
+              .map((n) => ({ id: n.id, title: n.title }));
             logger.info(`[OFFRAMP-${currencyCode}] Fetched ${networks.length} momo networks from PCXPay`);
           } catch (err) {
             logger.error(`[OFFRAMP-${currencyCode}] Failed to fetch momo networks: ` + (err as Error).message);
@@ -1868,9 +1865,10 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           try {
             const raw = await fetchPcxPayNetworks("KE");
             const seen = new Set<string>();
-            return raw.filter((n: any) => n.type === "bank").filter((b: any) => {
-              if (seen.has(b.id)) return false; seen.add(b.id); return true;
-            });
+            return raw
+              .filter((n) => n.type === "bank")
+              .filter((b) => { if (seen.has(b.id)) return false; seen.add(b.id); return true; })
+              .map((b) => ({ id: b.id, title: b.title }));
           } catch { return []; }
         };
 
@@ -2025,7 +2023,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
         const { crypto_asset: kesMA, crypto_network: kesMN, network_code: kesMC,
           phone_number: kesMPhone, sell_amount: kesMSell } = data as Record<string, string | undefined>;
 
-        const kesNetworksOnError = async () => { try { const raw = await fetchPcxPayNetworks("KE"); return raw.filter((n: any) => n.type === "momo"); } catch { return []; } };
+        const kesNetworksOnError = async () => { try { const raw = await fetchPcxPayNetworks("KE"); return raw.filter((n) => n.type === "momo").map((n) => ({ id: n.id, title: n.title })); } catch { return []; } };
 
         if (!kesMA || !kesMN || !kesMC || !kesMPhone || !kesMSell) {
           return { screen: "KES_MOMO_DETAILS", data: { networks: await kesNetworksOnError(), has_error: true, error_message: "Please fill in all required fields." } };
@@ -2141,7 +2139,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           account_number: tzsBAcc, sell_amount: tzsBSell } = data as Record<string, string | undefined>;
 
         const tzsBanksOnError = async () => {
-          try { const raw = await fetchPcxPayNetworks("TZ"); const seen = new Set<string>(); return raw.filter((n: any) => n.type === "bank").filter((b: any) => { if (seen.has(b.id)) return false; seen.add(b.id); return true; }); } catch { return []; }
+          try { const raw = await fetchPcxPayNetworks("TZ"); const seen = new Set<string>(); return raw.filter((n) => n.type === "bank").filter((b) => { if (seen.has(b.id)) return false; seen.add(b.id); return true; }).map((b) => ({ id: b.id, title: b.title })); } catch { return []; }
         };
 
         if (!tzsBA || !tzsBN || !tzsBC || !tzsBAcc || !tzsBSell) {
@@ -2253,7 +2251,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
       case "TZS_MOMO_DETAILS": {
         const { crypto_asset: tzsMA, crypto_network: tzsMN, network_code: tzsMC,
           phone_number: tzsMPhone, sell_amount: tzsMSell } = data as Record<string, string | undefined>;
-        const tzsNetworksOnError = async () => { try { const raw = await fetchPcxPayNetworks("TZ"); return raw.filter((n: any) => n.type === "momo"); } catch { return []; } };
+        const tzsNetworksOnError = async () => { try { const raw = await fetchPcxPayNetworks("TZ"); return raw.filter((n) => n.type === "momo").map((n) => ({ id: n.id, title: n.title })); } catch { return []; } };
         if (!tzsMA || !tzsMN || !tzsMC || !tzsMPhone || !tzsMSell) return { screen: "TZS_MOMO_DETAILS", data: { networks: await tzsNetworksOnError(), has_error: true, error_message: "Please fill in all required fields." } };
         const tzsMomoInput = parseFloat(tzsMSell);
         if (isNaN(tzsMomoInput) || tzsMomoInput < 10000) return { screen: "TZS_MOMO_DETAILS", data: { networks: await tzsNetworksOnError(), has_error: true, error_message: "Minimum withdrawal amount is TZS 10,000." } };
@@ -2306,7 +2304,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
 
       case "UGX_DETAILS": {
         const { crypto_asset: ugxA, crypto_network: ugxN, network_code: ugxC, phone_number: ugxPhone, sell_amount: ugxSell } = data as Record<string, string | undefined>;
-        const ugxNetworksOnError = async () => { try { return await fetchPcxPayNetworks("UG"); } catch { return []; } };
+        const ugxNetworksOnError = async () => { try { return (await fetchPcxPayNetworks("UG")).map((n) => ({ id: n.id, title: n.title })); } catch { return []; } };
         if (!ugxA || !ugxN || !ugxC || !ugxPhone || !ugxSell) return { screen: "UGX_DETAILS", data: { networks: await ugxNetworksOnError(), has_error: true, error_message: "Please fill in all required fields." } };
         const ugxFiatInput = parseFloat(ugxSell);
         if (isNaN(ugxFiatInput) || ugxFiatInput < 50000) return { screen: "UGX_DETAILS", data: { networks: await ugxNetworksOnError(), has_error: true, error_message: "Minimum withdrawal amount is UGX 50,000." } };
@@ -2375,7 +2373,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
         // Basic validation
         if (!crypto_asset || !crypto_network || !network_code || !phone_number || !rwfSellAmount) {
           let networks: { id: string; title: string }[] = [];
-          try { networks = await fetchPcxPayNetworks("RW"); } catch { /* use empty */ }
+          try { networks = (await fetchPcxPayNetworks("RW")).map((n) => ({ id: n.id, title: n.title })); } catch { /* use empty */ }
           return {
             screen: "RWF_DETAILS",
             data: { networks, has_error: true, error_message: "Please fill in all required fields." },
@@ -2385,7 +2383,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
         const rwfInputAmount = parseFloat(rwfSellAmount);
         if (isNaN(rwfInputAmount) || rwfInputAmount < 5000) {
           let networks: { id: string; title: string }[] = [];
-          try { networks = await fetchPcxPayNetworks("RW"); } catch { /* use empty */ }
+          try { networks = (await fetchPcxPayNetworks("RW")).map((n) => ({ id: n.id, title: n.title })); } catch { /* use empty */ }
           return {
             screen: "RWF_DETAILS",
             data: { networks, has_error: true, error_message: "Minimum withdrawal amount is RWF 5,000." },
@@ -2405,7 +2403,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
 
         if (!supportedRwf) {
           let networks: { id: string; title: string }[] = [];
-          try { networks = await fetchPcxPayNetworks("RW"); } catch { /* use empty */ }
+          try { networks = (await fetchPcxPayNetworks("RW")).map((n) => ({ id: n.id, title: n.title })); } catch { /* use empty */ }
           return {
             screen: "RWF_DETAILS",
             data: {
@@ -2424,7 +2422,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
         } catch (rateError) {
           logger.error("[OFFRAMP-RWF] Rate fetch failed: " + (rateError as Error).message);
           let networks: { id: string; title: string }[] = [];
-          try { networks = await fetchPcxPayNetworks("RW"); } catch { /* use empty */ }
+          try { networks = (await fetchPcxPayNetworks("RW")).map((n) => ({ id: n.id, title: n.title })); } catch { /* use empty */ }
           return {
             screen: "RWF_DETAILS",
             data: { networks, has_error: true, error_message: "Could not fetch current exchange rate. Please try again." },
@@ -2688,7 +2686,13 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
         // Validation helper — refetches banks on error
         const zarBanksOnError = async () => {
           let b: { id: string; title: string }[] = [];
-          try { b = await fetchPcxPayNetworks("ZA"); } catch { /* use empty */ }
+          try {
+            const raw = await fetchPcxPayNetworks("ZA");
+            const seen = new Set<string>();
+            b = raw
+              .filter((n) => { if (seen.has(n.id)) return false; seen.add(n.id); return true; })
+              .map((n) => ({ id: n.id, title: n.title }));
+          } catch { /* use empty */ }
           return b;
         };
 
