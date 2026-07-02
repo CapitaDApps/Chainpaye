@@ -8,12 +8,12 @@ pnpm-debug.log*
 # Environment variables
 .env
 .env.local
-.env.example
 .env.development.local
 .env.test.local
 .env.production.local
 .env.staging
 .env.production
+.env.test
 .kiro
 .kiro/
 # Build outputs
@@ -58,9 +58,6 @@ jspm_packages/
 
 # Yarn Integrity file
 .yarn-integrity
-
-# dotenv environment variables file
-.env.test
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache

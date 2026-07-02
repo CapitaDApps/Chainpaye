@@ -6,6 +6,14 @@ import {
 } from "../../services/CrossmintService";
 import { financialService } from "../../services/crypto-off-ramp/FinancialService";
 import { dexPayService } from "../../services/DexPayService";
+import {
+  getPcxRate,
+  registerPcxDepositIntent,
+  runPcxOfframpBackground,
+  NETWORK_TO_RAIL,
+  type PCXBankTransferDestination,
+  type PCXMobileMoneyDestination,
+} from "../../services/PCXPayService";
 import { resolvePaystackAccount } from "../../services/PaystackService";
 import { redisClient } from "../../services/redis";
 import { logger } from "../../utils/logger";
@@ -50,9 +58,9 @@ const FALLBACK_BANKS: Bank[] = [
   { id: "090267", title: "Kuda Bank" },
 ];
 
-const PCXPAY_API_KEY = "pcx_prod_WGQFlAodEzlhFJoNcF5O4dIBuvlob09VehIwolsaajU";
+const PCXPAY_API_KEY  = process.env.PCXPAY_API_KEY  || "";
 const PCXPAY_BASE_URL = "https://prod-api.pcxpay.com";
-const PCXPAY_ORG_ID = "3ed1170a-0151-4e9f-825b-16470b88ab62";
+const PCXPAY_ORG_ID   = process.env.PCXPAY_ORG_ID   || "";
 
 /**
  * Fetch mobile money networks from PCXPay for a given country code.
@@ -88,25 +96,170 @@ async function fetchPcxPayNetworks(
 
 /**
  * Fetch the live USD → {toCurrency} exchange rate from PCXPay.
- * Returns the rate as a number (e.g. 1402.0 for RWF, 16.16 for ZAR).
+ * Returns both the rate and org_rate_id needed for transaction initiation.
  */
-async function fetchPcxPayUsdRate(toCurrency: string): Promise<number> {
-  const axios = (await import("axios")).default;
-  const response = await axios.get(
-    `${PCXPAY_BASE_URL}/v1/organizations/admin/exchange-rate?fromCurrency=USD&toCurrency=${toCurrency}&orgId=${PCXPAY_ORG_ID}`,
-    {
-      headers: {
-        "x-api-key": PCXPAY_API_KEY,
-        Authorization: "None",
-      },
-    },
-  );
+async function fetchPcxPayUsdRate(toCurrency: string): Promise<{ rate: number; orgRateId: string }> {
+  return getPcxRate(toCurrency);
+}
 
-  const rate = response.data?.data?.rate;
-  if (!rate || isNaN(Number(rate))) {
-    throw new Error(`Invalid rate response from PCXPay for ${toCurrency}`);
+/**
+ * Shared PCX offramp executor — used by all non-NGN AUTHORIZE handlers.
+ * 1. Validates PIN and balance
+ * 2. Registers deposit intent with PCX (gets bridge wallet address)
+ * 3. Transfers crypto from user's Crossmint wallet → PCX bridge wallet
+ * 4. Fires background orchestration (poll deposit → init ramp → withdraw → poll payment → notify)
+ * Returns { screen, data } for the WhatsApp flow.
+ */
+async function executePcxOfframp(params: {
+  screenId: string;           // e.g. "KES_BANK_AUTHORIZE" — for error returns
+  tag: string;                // log prefix e.g. "[OFFRAMP-KES-BANK]"
+  data: Record<string, unknown>;
+  phone: string;              // user's whatsapp number (with +)
+  pin: string;
+  cryptoAsset: string;        // "USDC" | "USDT"
+  cryptoNetwork: string;      // e.g. "BASE"
+  totalCryptoUsd: string;     // total to deduct incl. fee
+  fiatCurrency: string;       // e.g. "KES"
+  fiatAmount: string;         // numeric string e.g. "5,000"
+  clientRate: string;         // from review screen
+  orgRateId: string;          // from review screen
+  country: string;            // 2-letter ISO e.g. "KE"
+  paymentMethod: "bank_transfer" | "mobile_money";
+  beneficiaryName: string;
+  destination: PCXBankTransferDestination | PCXMobileMoneyDestination;
+  idempKeySuffix: string;     // unique part for idempotency key
+  displayAmount: string;      // e.g. "KES 5,000"
+  displayAccount: string;     // account number or phone
+}): Promise<{ screen: string; data: Record<string, unknown> }> {
+  const { screenId, tag, data, phone } = params;
+  const err = (msg: string) => ({ screen: screenId, data: { ...data, error_message: msg, has_error: true } });
+
+  // 1. Get user + validate PIN
+  const user = await userService.getUser(phone, true);
+  if (!user) return err("User not found.");
+  if (!user.emailVerified || !user.email) return err("Please verify your email before making a withdrawal.");
+  if (!await user.comparePin(params.pin)) return err("Invalid PIN.");
+
+  try {
+    // 2. Map network to crossmint chain
+    const chainMap: Record<string, string> = {
+      sol: "solana", solana: "solana", bep20: "bsc", bsc: "bsc", base: "base",
+      arbitrum: "arbitrum", stellar: "stellar", erc20: "ethereum", ethereum: "ethereum",
+      polygon: "polygon", optimism: "optimism", avalanche: "avalanche",
+    };
+    const crossmintChain = chainMap[params.cryptoNetwork.toLowerCase()];
+    if (!crossmintChain) return err(`Unsupported network: ${params.cryptoNetwork}`);
+
+    const normalizedAsset = params.cryptoAsset.toUpperCase();
+    const totalRequired = parseFloat(params.totalCryptoUsd || "0");
+    const chainType = crossmintService.getChainType(crossmintChain);
+
+    // 3. Check balance
+    const balances = await crossmintService.getBalancesByChain(user.userId, crossmintChain, ["usdc", "usdt"]);
+    const balEntry = balances.find((b) => (b.symbol?.toLowerCase() || b.token?.toLowerCase()) === normalizedAsset.toLowerCase());
+    const currentBal = balEntry ? (() => { const d = balEntry.decimals ?? 6; const r = parseFloat(balEntry.amount) || 0; return r >= Math.pow(10, d) && d > 0 ? r / Math.pow(10, d) : r; })() : 0;
+    if (currentBal < totalRequired) {
+      return err(`Insufficient balance. Need ${totalRequired.toFixed(4)} ${normalizedAsset}, have ${currentBal.toFixed(4)}.`);
+    }
+
+    // 4. Idempotency check
+    const idempKey = `offramp:pcx:${Buffer.from(`${user.userId}:${params.idempKeySuffix}`).toString("base64")}`;
+    const existingTx = await redisClient.get(idempKey);
+    if (existingTx && JSON.parse(existingTx).status === "processing") {
+      return err("Transaction already in progress. Please wait.");
+    }
+    await redisClient.set(idempKey, JSON.stringify({ status: "processing", userId: user.userId, startedAt: new Date().toISOString() }), "EX", 600);
+
+    // 5. Get user wallet address for this chain (needed for PCX deposit intent from_address)
+    const wallets = await crossmintService.getUserWallets(user.userId);
+    const wallet = wallets.find((w) => w.chainType === chainType);
+    if (!wallet) {
+      await redisClient.del(idempKey);
+      return err(`No wallet found for ${crossmintChain}. Please contact support.`);
+    }
+
+    // 6. Register PCX deposit intent — get bridge wallet address
+    const partnerTxId = `${user.userId}-${Date.now()}`;
+    const fiatAmountNum = parseFloat(params.fiatAmount.replace(/,/g, ""));
+    const depositIntent = await registerPcxDepositIntent({
+      fromAddress:    wallet.address,
+      cryptoCurrency: normalizedAsset,
+      cryptoNetwork:  params.cryptoNetwork,
+      amount:         totalRequired,
+      partnerTxId,
+      fiatAmount:     fiatAmountNum,
+    });
+    logger.info(`${tag} Deposit intent registered: txId=${depositIntent.transactionId}, bridge=${depositIntent.toAddress}`);
+
+    // 7. Transfer crypto from user wallet → PCX bridge wallet
+    const decimals = crossmintChain === "stellar" ? 7 : 6;
+    const transferResult = await crossmintService.transferTokens({
+      walletAddress: wallet.address,
+      token:         `${crossmintChain}:${normalizedAsset.toLowerCase()}`,
+      recipient:     depositIntent.toAddress,
+      amount:        totalRequired.toFixed(decimals),
+      idempotencyKey: `pcx-transfer-${user.userId}-${Date.now()}`,
+    });
+
+    if (!transferResult.success) {
+      await redisClient.del(idempKey);
+      return err(`Transfer failed: ${transferResult.error || "Please try again."}`);
+    }
+
+    await redisClient.set(idempKey, JSON.stringify({
+      status: "transfer_completed",
+      userId: user.userId,
+      transferId: transferResult.transactionId,
+      depositTxId: depositIntent.transactionId,
+      completedAt: new Date().toISOString(),
+    }), "EX", 3600);
+
+    logger.info(`${tag} Crypto transferred to PCX bridge. Starting background orchestration.`);
+
+    // 8. Fire background orchestration (non-blocking)
+    const { whatsappBusinessService } = await import("../../services");
+
+    // Send "processing" message immediately so user knows what's happening
+    await whatsappBusinessService.sendNormalMessage(
+      `⏳ *Transaction Processing*\n\n` +
+      `Your withdrawal of *${params.displayAmount}* is being processed.\n\n` +
+      `🔄 Crypto has been transferred. Fiat payout is underway and will typically complete within *120 seconds*.\n\n` +
+      `You will receive a confirmation message once funds are sent to *${params.displayAccount}*.\n\n` +
+      `Reference: \`${partnerTxId.slice(-12)}\``,
+      phone,
+    );
+
+    runPcxOfframpBackground({
+      userId:          user.userId,
+      phone,
+      idempotencyKey:  idempKey,
+      partnerTxId,
+      orgRateId:       params.orgRateId,
+      clientRate:      parseFloat(params.clientRate),
+      fiatCurrency:    params.fiatCurrency,
+      fiatAmount:      fiatAmountNum,
+      cryptoCurrency:  normalizedAsset,
+      cryptoNetwork:   params.cryptoNetwork,
+      country:         params.country,
+      payerName:       user.fullName,
+      payerEmail:      user.email!,
+      payerPhone:      phone,
+      beneficiaryName: params.beneficiaryName,
+      paymentMethod:   params.paymentMethod,
+      destination:     params.destination,
+      depositTxId:     depositIntent.transactionId,
+      displayAmount:   params.displayAmount,
+      displayAccount:  params.displayAccount,
+      cryptoCostUsd:   params.totalCryptoUsd,
+    }, (msg) => whatsappBusinessService.sendNormalMessage(msg, phone)).catch((e) =>
+      logger.error(`${tag} Background error: ${(e as Error).message}`)
+    );
+
+    return { screen: "OFFRAMP_SUCCESS", data: {} };
+  } catch (e: any) {
+    logger.error(`${tag} Error: ${e.message}`);
+    return err(e.message || "Transaction failed. Please try again.");
   }
-  return Number(rate);
 }
 
 /**
@@ -356,183 +509,6 @@ export async function processOfframpInBackground(
     
     // TODO: Send notification to user about failure
     // Could send a WhatsApp message or email notification
-  }
-}
-
-/**
- * Process PCXPay RWF mobile money payout in background after crypto transfer succeeds.
- * rwfFiatAmount — the RWF amount the user entered (e.g. "13500")
- * cryptoCostUsd — the USD equivalent of crypto sold (for notification display)
- */
-async function processRwfPayoutInBackground(
-  userId: string,
-  phone: string,
-  networkCode: string,
-  recipientPhone: string,
-  rwfFiatAmount: string,
-  cryptoCostUsd: string,
-  networkName: string,
-  idempotencyKey: string,
-): Promise<void> {
-  try {
-    const axios = (await import("axios")).default;
-
-    logger.info("[OFFRAMP-RWF-BG] Waiting 20s for crypto settlement...");
-    await new Promise((resolve) => setTimeout(resolve, 20000));
-
-    const rwfNumeric = parseFloat(rwfFiatAmount.replace(/,/g, ""));
-    logger.info(`[OFFRAMP-RWF-BG] Initiating PCXPay payout: RWF ${rwfNumeric} to ${recipientPhone} via ${networkCode}`);
-
-    const payoutResponse = await axios.post(
-      `${PCXPAY_BASE_URL}/v1/externals/payout`,
-      {
-        network_code: networkCode,
-        phone_number: recipientPhone,
-        amount: rwfNumeric,
-        currency: "RWF",
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": PCXPAY_API_KEY,
-          Authorization: "None",
-        },
-      },
-    );
-
-    const payoutData = payoutResponse.data;
-    logger.info("[OFFRAMP-RWF-BG] PCXPay payout response: " + JSON.stringify(payoutData, null, 2));
-
-    // Update idempotency to completed
-    await redisClient.set(
-      idempotencyKey,
-      JSON.stringify({ status: "completed", userId, payoutData, completedAt: new Date().toISOString() }),
-      "EX",
-      300,
-    );
-
-    // Notify the user
-    const { whatsappBusinessService } = await import("../../services");
-    await whatsappBusinessService.sendNormalMessage(
-      `✅ *Withdrawal Successful!*\n\n` +
-      `🇷🇼 *Rwanda (RWF) Payout*\n\n` +
-      `📱 Mobile Number: ${recipientPhone}\n` +
-      `🏦 Network: ${networkName}\n` +
-      `💰 Amount: RWF ${rwfFiatAmount}\n` +
-      `💵 Crypto Sold: ~$${parseFloat(cryptoCostUsd).toFixed(4)}\n\n` +
-      `The funds will arrive on your mobile money wallet shortly.`,
-      phone,
-    );
-
-    logger.info("[OFFRAMP-RWF-BG] Background payout completed successfully.");
-  } catch (error) {
-    logger.error("[OFFRAMP-RWF-BG] Background payout failed: " + (error as Error).message);
-
-    // Mark as failed in idempotency
-    await redisClient.set(
-      idempotencyKey,
-      JSON.stringify({ status: "failed", userId, error: (error as Error).message, failedAt: new Date().toISOString() }),
-      "EX",
-      300,
-    );
-
-    // Notify user of failure
-    try {
-      const { whatsappBusinessService } = await import("../../services");
-      await whatsappBusinessService.sendNormalMessage(
-        `❌ *Payout Failed*\n\nYour RWF mobile money payout could not be completed.\n\nPlease contact support and quote reference: ${idempotencyKey.slice(-12)}`,
-        phone,
-      );
-    } catch { /* swallow notification errors */ }
-  }
-}
-
-/**
- * Process PCXPay ZAR bank transfer payout in background after crypto transfer succeeds.
- * zarFiatAmount — the ZAR amount the user entered (e.g. "1000")
- * cryptoCostUsd — the USD equivalent of crypto sold (for notification display)
- */
-async function processZarPayoutInBackground(
-  userId: string,
-  phone: string,
-  bankCode: string,
-  accountNumber: string,
-  accountName: string,
-  zarFiatAmount: string,
-  cryptoCostUsd: string,
-  bankName: string,
-  idempotencyKey: string,
-): Promise<void> {
-  try {
-    const axios = (await import("axios")).default;
-
-    logger.info("[OFFRAMP-ZAR-BG] Waiting 20s for crypto settlement...");
-    await new Promise((resolve) => setTimeout(resolve, 20000));
-
-    const zarNumeric = parseFloat(zarFiatAmount.replace(/,/g, ""));
-    logger.info(`[OFFRAMP-ZAR-BG] Initiating PCXPay ZAR payout: ZAR ${zarNumeric} to ${accountNumber} at ${bankCode}`);
-
-    const payoutResponse = await axios.post(
-      `${PCXPAY_BASE_URL}/v1/externals/payout`,
-      {
-        bank_code: bankCode,
-        account_number: accountNumber,
-        account_name: accountName,
-        amount: zarNumeric,
-        currency: "ZAR",
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": PCXPAY_API_KEY,
-          Authorization: "None",
-        },
-      },
-    );
-
-    const payoutData = payoutResponse.data;
-    logger.info("[OFFRAMP-ZAR-BG] PCXPay payout response: " + JSON.stringify(payoutData, null, 2));
-
-    // Update idempotency to completed
-    await redisClient.set(
-      idempotencyKey,
-      JSON.stringify({ status: "completed", userId, payoutData, completedAt: new Date().toISOString() }),
-      "EX",
-      300,
-    );
-
-    // Notify the user
-    const { whatsappBusinessService } = await import("../../services");
-    await whatsappBusinessService.sendNormalMessage(
-      `✅ *Withdrawal Successful!*\n\n` +
-      `🇿🇦 *South Africa (ZAR) Payout*\n\n` +
-      `🏦 Bank: ${bankName}\n` +
-      `🔢 Account: ${accountNumber}\n` +
-      `👤 Name: ${accountName}\n` +
-      `💰 Amount: ZAR ${zarFiatAmount}\n` +
-      `💵 Crypto Sold: ~$${parseFloat(cryptoCostUsd).toFixed(4)}\n\n` +
-      `The funds will arrive in your bank account shortly.`,
-      phone,
-    );
-
-    logger.info("[OFFRAMP-ZAR-BG] Background payout completed successfully.");
-  } catch (error) {
-    logger.error("[OFFRAMP-ZAR-BG] Background payout failed: " + (error as Error).message);
-
-    await redisClient.set(
-      idempotencyKey,
-      JSON.stringify({ status: "failed", userId, error: (error as Error).message, failedAt: new Date().toISOString() }),
-      "EX",
-      300,
-    );
-
-    try {
-      const { whatsappBusinessService } = await import("../../services");
-      await whatsappBusinessService.sendNormalMessage(
-        `❌ *Payout Failed*\n\nYour ZAR bank transfer could not be completed.\n\nPlease contact support and quote reference: ${idempotencyKey.slice(-12)}`,
-        phone,
-      );
-    } catch { /* swallow notification errors */ }
   }
 }
 
@@ -1878,7 +1854,8 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
 
       case "KES_BANK_DETAILS": {
         const { crypto_asset: kesBankAsset, crypto_network: kesBankNetwork,
-          bank_code: kesBankCode, account_number: kesBankAccNum, sell_amount: kesBankSellAmt } =
+          bank_code: kesBankCode, account_number: kesBankAccNum,
+          account_name: kesBankAccNameInput, sell_amount: kesBankSellAmt } =
           data as Record<string, string | undefined>;
 
         const kesBanksOnError = async () => {
@@ -1892,7 +1869,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           } catch { return []; }
         };
 
-        if (!kesBankAsset || !kesBankNetwork || !kesBankCode || !kesBankAccNum || !kesBankSellAmt) {
+        if (!kesBankAsset || !kesBankNetwork || !kesBankCode || !kesBankAccNum || !kesBankAccNameInput || !kesBankSellAmt) {
           return { screen: "KES_BANK_DETAILS", data: { banks: await kesBanksOnError(), has_error: true, error_message: "Please fill in all required fields." } };
         }
 
@@ -1902,8 +1879,11 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
         }
 
         let kesRate: number;
+        let kesOrgRateId: string;
         try {
-          kesRate = await fetchPcxPayUsdRate("KES");
+          const rateData = await fetchPcxPayUsdRate("KES");
+          kesRate = rateData.rate;
+          kesOrgRateId = rateData.orgRateId;
           logger.info(`[OFFRAMP-KES-BANK] Rate: 1 USD = ${kesRate} KES`);
         } catch (err) {
           return { screen: "KES_BANK_DETAILS", data: { banks: await kesBanksOnError(), has_error: true, error_message: "Could not fetch exchange rate. Please try again." } };
@@ -1918,14 +1898,8 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
         } catch { /* keep code */ }
 
         // Resolve account name via Paystack
-        let kesAccountName: string;
-        try {
-          const resolved = await resolvePaystackAccount(kesBankAccNum, kesBankCode);
-          kesAccountName = resolved.accountName;
-          logger.info(`[OFFRAMP-KES-BANK] Resolved: ${kesAccountName}`);
-        } catch (resolveErr: any) {
-          return { screen: "KES_BANK_DETAILS", data: { banks: await kesBanksOnError(), has_error: true, error_message: resolveErr.message || "Could not verify account." } };
-        }
+        // Use user-entered account name directly (no Paystack resolution for KES bank)
+        const kesAccountName = kesBankAccNameInput!.trim();
 
         const kesCryptoCost = kesFiatInput / kesRate;
         const kesCostFormatted = kesCryptoCost.toFixed(6).replace(/\.?0+$/, "") || "0.00";
@@ -1942,6 +1916,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             sell_amount: kesFiatInput.toLocaleString("en-KE", { maximumFractionDigits: 0 }),
             crypto_cost: kesCostFormatted,
             rate: kesRate.toFixed(2),
+            org_rate_id: kesOrgRateId,
             has_error: false,
             error_message: "",
           },
@@ -1951,7 +1926,8 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
       case "KES_BANK_REVIEW": {
         const { crypto_asset: kbrAsset, crypto_network: kbrNetwork, bank_code: kbrBankCode,
           bank_name: kbrBankName, account_number: kbrAccNum, account_name: kbrAccName,
-          sell_amount: kbrSellAmt, crypto_cost: kbrCryptoCost } = data as Record<string, string | undefined>;
+          sell_amount: kbrSellAmt, crypto_cost: kbrCryptoCost, org_rate_id: kbrOrgRateId,
+          rate: kbrRate } = data as Record<string, string | undefined>;
 
         const flatFee = parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75");
         const kbrTotal = (parseFloat(kbrCryptoCost || "0") + flatFee).toFixed(6).replace(/\.?0+$/, "") || "0.00";
@@ -1963,6 +1939,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             bank_code: kbrBankCode || "", bank_name: kbrBankName || "",
             account_number: kbrAccNum || "", account_name: kbrAccName || "",
             sell_amount: kbrSellAmt || "0", crypto_cost: kbrCryptoCost || "0",
+            rate: kbrRate || "0", org_rate_id: kbrOrgRateId || "",
             total_crypto_usd: kbrTotal, has_error: false, error_message: "",
           },
         };
@@ -1972,67 +1949,26 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
         const { pin: kesBankPin, crypto_asset: kesBankFinAsset, crypto_network: kesBankFinNetwork,
           bank_code: kesBankFinCode, bank_name: kesBankFinName, account_number: kesBankFinAccNum,
           account_name: kesBankFinAccName, sell_amount: kesBankFinSellAmt,
-          crypto_cost: kesBankFinCryptoCost, total_crypto_usd: kesBankFinTotal } =
+          total_crypto_usd: kesBankFinTotal, rate: kesBankRate, org_rate_id: kesBankOrgRateId } =
           data as Record<string, string | undefined>;
 
         if (!kesBankPin || !kesBankFinAsset || !kesBankFinNetwork || !kesBankFinCode || !kesBankFinAccNum || !kesBankFinSellAmt) {
           return { screen: "KES_BANK_AUTHORIZE", data: { ...data, error_message: "Missing required transaction details.", has_error: true } };
         }
-
-        const kesBankUser = await userService.getUser(phone, true);
-        if (!kesBankUser) return { screen: "KES_BANK_AUTHORIZE", data: { ...data, error_message: "User not found.", has_error: true } };
-        if (!await kesBankUser.comparePin(kesBankPin)) return { screen: "KES_BANK_AUTHORIZE", data: { ...data, error_message: "Invalid PIN.", has_error: true } };
-
-        try {
-          const chainMap: Record<string, string> = { sol: "solana", solana: "solana", bep20: "bsc", bsc: "bsc", base: "base", arbitrum: "arbitrum", stellar: "stellar", erc20: "ethereum", ethereum: "ethereum", polygon: "polygon", optimism: "optimism", avalanche: "avalanche" };
-          const crossmintChain = chainMap[kesBankFinNetwork.toLowerCase()];
-          if (!crossmintChain) return { screen: "KES_BANK_AUTHORIZE", data: { ...data, error_message: `Unsupported network: ${kesBankFinNetwork}`, has_error: true } };
-
-          const normalizedAsset = kesBankFinAsset.toUpperCase();
-          const totalRequired = parseFloat(kesBankFinTotal || "0");
-          const chainType = crossmintService.getChainType(crossmintChain);
-
-          // Check balance
-          const kesBankBalances = await crossmintService.getBalancesByChain(kesBankUser.userId, crossmintChain, ["usdc", "usdt"]);
-          const kesBankBal = kesBankBalances.find((b) => (b.symbol?.toLowerCase() || b.token?.toLowerCase()) === normalizedAsset.toLowerCase());
-          const kesBankCurrentBal = kesBankBal ? (() => { const d = kesBankBal.decimals ?? 6; const r = parseFloat(kesBankBal.amount) || 0; return r >= Math.pow(10, d) && d > 0 ? r / Math.pow(10, d) : r; })() : 0;
-          if (kesBankCurrentBal < totalRequired) {
-            const shortfall = (totalRequired - kesBankCurrentBal).toFixed(4);
-            return { screen: "KES_BANK_AUTHORIZE", data: { ...data, error_message: `Insufficient balance. Need ${totalRequired.toFixed(4)} ${normalizedAsset}, have ${kesBankCurrentBal.toFixed(4)}. Deposit ${shortfall} more.`, has_error: true } };
-          }
-
-          const receivingAddress = dexPayService.getReceivingAddress("bep20");
-          const idempKey = `offramp:kes_bank:${Buffer.from(`${kesBankUser.userId}:${kesBankFinSellAmt}:${kesBankFinCode}:${kesBankFinAccNum}`).toString("base64")}`;
-          const existingTx = await redisClient.get(idempKey);
-          if (existingTx && JSON.parse(existingTx).status === "processing") {
-            return { screen: "KES_BANK_AUTHORIZE", data: { ...data, error_message: "Transaction already in progress.", has_error: true } };
-          }
-          await redisClient.set(idempKey, JSON.stringify({ status: "processing", userId: kesBankUser.userId, startedAt: new Date().toISOString() }), "EX", 600);
-
-          const wallets = await crossmintService.getUserWallets(kesBankUser.userId);
-          const wallet = wallets.find((w) => w.chainType === chainType);
-          if (!wallet) { await redisClient.del(idempKey); return { screen: "KES_BANK_AUTHORIZE", data: { ...data, error_message: `No wallet for ${crossmintChain}.`, has_error: true } }; }
-
-          const isStellar = crossmintChain === "stellar";
-          const decimals = isStellar ? 7 : 6;
-          const transferResult = await crossmintService.transferTokens({
-            walletAddress: wallet.address,
-            token: `${crossmintChain}:${normalizedAsset.toLowerCase()}`,
-            recipient: receivingAddress,
-            amount: totalRequired.toFixed(decimals),
-            idempotencyKey: `kes-bank-transfer-${kesBankUser.userId}-${Date.now()}`,
-          });
-
-          if (!transferResult.success) { await redisClient.del(idempKey); return { screen: "KES_BANK_AUTHORIZE", data: { ...data, error_message: `Transfer failed: ${transferResult.error || "Please try again."}`, has_error: true } }; }
-
-          await redisClient.set(idempKey, JSON.stringify({ status: "transfer_completed", userId: kesBankUser.userId, transferId: transferResult.transactionId, completedAt: new Date().toISOString() }), "EX", 600);
-          logger.info(`[OFFRAMP-KES-BANK] Crypto transfer done — PCX payout pending for ${kesBankFinAccNum}`);
-          // PCX payout will be implemented when PCXPay service is ready
-          return { screen: "OFFRAMP_SUCCESS", data: {} };
-        } catch (err) {
-          logger.error("[OFFRAMP-KES-BANK] Error: " + (err as Error).message);
-          return { screen: "KES_BANK_AUTHORIZE", data: { ...data, error_message: (err as Error).message || "Transaction failed.", has_error: true } };
-        }
+        return executePcxOfframp({
+          screenId: "KES_BANK_AUTHORIZE", tag: "[OFFRAMP-KES-BANK]",
+          data: data as Record<string, unknown>, phone,
+          pin: kesBankPin, cryptoAsset: kesBankFinAsset, cryptoNetwork: kesBankFinNetwork,
+          totalCryptoUsd: kesBankFinTotal || "0", fiatCurrency: "KES",
+          fiatAmount: kesBankFinSellAmt, clientRate: kesBankRate || "0",
+          orgRateId: kesBankOrgRateId || "", country: "KE",
+          paymentMethod: "bank_transfer",
+          beneficiaryName: kesBankFinAccName || kesBankFinAccNum || "",
+          destination: { accountNumber: kesBankFinAccNum, bankCode: kesBankFinCode, bankName: kesBankFinName || kesBankFinCode } as PCXBankTransferDestination,
+          idempKeySuffix: `${kesBankFinSellAmt}:${kesBankFinCode}:${kesBankFinAccNum}`,
+          displayAmount: `KES ${kesBankFinSellAmt}`,
+          displayAccount: kesBankFinAccNum,
+        });
       }
 
       // ─────────────────────────────────────────────────────────────
@@ -2055,7 +1991,8 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
         }
 
         let kesRate: number;
-        try { kesRate = await fetchPcxPayUsdRate("KES"); } catch {
+        let kesOrgRateId: string;
+        try { const r = await fetchPcxPayUsdRate("KES"); kesRate = r.rate; kesOrgRateId = r.orgRateId; } catch {
           return { screen: "KES_MOMO_DETAILS", data: { networks: await kesNetworksOnError(), has_error: true, error_message: "Could not fetch exchange rate." } };
         }
 
@@ -2069,100 +2006,63 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             crypto_asset: kesMA.toUpperCase(), crypto_network: kesMN.toUpperCase(),
             network_code: kesMC, network_name: kesMomoNetworkName,
             phone_number: kesMPhone, sell_amount: kesMomoInput.toLocaleString("en-KE", { maximumFractionDigits: 0 }),
-            crypto_cost: kesMomoCost, rate: kesRate.toFixed(2), has_error: false, error_message: "",
+            crypto_cost: kesMomoCost, rate: kesRate.toFixed(2),
+            org_rate_id: kesOrgRateId, has_error: false, error_message: "",
           },
         };
       }
 
       case "KES_MOMO_REVIEW": {
         const { crypto_asset: kmrA, crypto_network: kmrN, network_code: kmrC, network_name: kmrNN,
-          phone_number: kmrPhone, sell_amount: kmrSell, crypto_cost: kmrCost } = data as Record<string, string | undefined>;
+          phone_number: kmrPhone, sell_amount: kmrSell, crypto_cost: kmrCost,
+          org_rate_id: kmrOrgRateId, rate: kmrRate } = data as Record<string, string | undefined>;
         const flatFee = parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75");
         const kmrTotal = (parseFloat(kmrCost || "0") + flatFee).toFixed(6).replace(/\.?0+$/, "") || "0.00";
         return {
           screen: "KES_MOMO_AUTHORIZE",
           data: { crypto_asset: kmrA || "USDC", crypto_network: kmrN || "", network_code: kmrC || "",
             network_name: kmrNN || "", phone_number: kmrPhone || "", sell_amount: kmrSell || "0",
-            crypto_cost: kmrCost || "0", total_crypto_usd: kmrTotal, has_error: false, error_message: "" },
+            crypto_cost: kmrCost || "0", rate: kmrRate || "0", org_rate_id: kmrOrgRateId || "",
+            total_crypto_usd: kmrTotal, has_error: false, error_message: "" },
         };
       }
 
       case "KES_MOMO_AUTHORIZE": {
         const { pin: kmaPin, crypto_asset: kmaAsset, crypto_network: kmaNetwork, network_code: kmaCode,
           network_name: kmaName, phone_number: kmaPhone, sell_amount: kmaSell,
-          crypto_cost: kmaCost, total_crypto_usd: kmaTotal } = data as Record<string, string | undefined>;
-
+          total_crypto_usd: kmaTotal, rate: kmaRate, org_rate_id: kmaOrgRateId } = data as Record<string, string | undefined>;
         if (!kmaPin || !kmaAsset || !kmaNetwork || !kmaCode || !kmaPhone || !kmaSell) {
           return { screen: "KES_MOMO_AUTHORIZE", data: { ...data, error_message: "Missing required transaction details.", has_error: true } };
         }
-
-        const kmaUser = await userService.getUser(phone, true);
-        if (!kmaUser) return { screen: "KES_MOMO_AUTHORIZE", data: { ...data, error_message: "User not found.", has_error: true } };
-        if (!await kmaUser.comparePin(kmaPin)) return { screen: "KES_MOMO_AUTHORIZE", data: { ...data, error_message: "Invalid PIN.", has_error: true } };
-
-        try {
-          const chainMap: Record<string, string> = { sol: "solana", solana: "solana", bep20: "bsc", bsc: "bsc", base: "base", arbitrum: "arbitrum", stellar: "stellar", erc20: "ethereum", ethereum: "ethereum", polygon: "polygon", optimism: "optimism", avalanche: "avalanche" };
-          const crossmintChain = chainMap[kmaNetwork.toLowerCase()];
-          if (!crossmintChain) return { screen: "KES_MOMO_AUTHORIZE", data: { ...data, error_message: `Unsupported network: ${kmaNetwork}`, has_error: true } };
-
-          const normalizedAsset = kmaAsset.toUpperCase();
-          const totalRequired = parseFloat(kmaTotal || "0");
-          const chainType = crossmintService.getChainType(crossmintChain);
-
-          const kmaBals = await crossmintService.getBalancesByChain(kmaUser.userId, crossmintChain, ["usdc", "usdt"]);
-          const kmaBal = kmaBals.find((b) => (b.symbol?.toLowerCase() || b.token?.toLowerCase()) === normalizedAsset.toLowerCase());
-          const kmaCurrentBal = kmaBal ? (() => { const d = kmaBal.decimals ?? 6; const r = parseFloat(kmaBal.amount) || 0; return r >= Math.pow(10, d) && d > 0 ? r / Math.pow(10, d) : r; })() : 0;
-          if (kmaCurrentBal < totalRequired) {
-            return { screen: "KES_MOMO_AUTHORIZE", data: { ...data, error_message: `Insufficient balance. Need ${totalRequired.toFixed(4)} ${normalizedAsset}.`, has_error: true } };
-          }
-
-          const receivingAddress = dexPayService.getReceivingAddress("bep20");
-          const idempKey = `offramp:kes_momo:${Buffer.from(`${kmaUser.userId}:${kmaSell}:${kmaCode}:${kmaPhone}`).toString("base64")}`;
-          const existingTx = await redisClient.get(idempKey);
-          if (existingTx && JSON.parse(existingTx).status === "processing") {
-            return { screen: "KES_MOMO_AUTHORIZE", data: { ...data, error_message: "Transaction already in progress.", has_error: true } };
-          }
-          await redisClient.set(idempKey, JSON.stringify({ status: "processing", userId: kmaUser.userId, startedAt: new Date().toISOString() }), "EX", 600);
-
-          const wallets = await crossmintService.getUserWallets(kmaUser.userId);
-          const wallet = wallets.find((w) => w.chainType === chainType);
-          if (!wallet) { await redisClient.del(idempKey); return { screen: "KES_MOMO_AUTHORIZE", data: { ...data, error_message: `No wallet for ${crossmintChain}.`, has_error: true } }; }
-
-          const isStellar = crossmintChain === "stellar";
-          const decimals = isStellar ? 7 : 6;
-          const transferResult = await crossmintService.transferTokens({
-            walletAddress: wallet.address,
-            token: `${crossmintChain}:${normalizedAsset.toLowerCase()}`,
-            recipient: receivingAddress,
-            amount: totalRequired.toFixed(decimals),
-            idempotencyKey: `kes-momo-transfer-${kmaUser.userId}-${Date.now()}`,
-          });
-
-          if (!transferResult.success) { await redisClient.del(idempKey); return { screen: "KES_MOMO_AUTHORIZE", data: { ...data, error_message: `Transfer failed: ${transferResult.error || "Please try again."}`, has_error: true } }; }
-
-          await redisClient.set(idempKey, JSON.stringify({ status: "transfer_completed", userId: kmaUser.userId, transferId: transferResult.transactionId, completedAt: new Date().toISOString() }), "EX", 600);
-          logger.info(`[OFFRAMP-KES-MOMO] Crypto transfer done — PCX payout pending for ${kmaPhone}`);
-          // PCX payout will be implemented when PCXPay service is ready
-          return { screen: "OFFRAMP_SUCCESS", data: {} };
-        } catch (err) {
-          logger.error("[OFFRAMP-KES-MOMO] Error: " + (err as Error).message);
-          return { screen: "KES_MOMO_AUTHORIZE", data: { ...data, error_message: (err as Error).message || "Transaction failed.", has_error: true } };
-        }
+        return executePcxOfframp({
+          screenId: "KES_MOMO_AUTHORIZE", tag: "[OFFRAMP-KES-MOMO]",
+          data: data as Record<string, unknown>, phone,
+          pin: kmaPin, cryptoAsset: kmaAsset, cryptoNetwork: kmaNetwork,
+          totalCryptoUsd: kmaTotal || "0", fiatCurrency: "KES",
+          fiatAmount: kmaSell, clientRate: kmaRate || "0",
+          orgRateId: kmaOrgRateId || "", country: "KE",
+          paymentMethod: "mobile_money",
+          beneficiaryName: kmaName || kmaPhone,
+          destination: { provider: kmaCode, phoneNumber: kmaPhone } as PCXMobileMoneyDestination,
+          idempKeySuffix: `${kmaSell}:${kmaCode}:${kmaPhone}`,
+          displayAmount: `KES ${kmaSell}`,
+          displayAccount: kmaPhone,
+        });
       }
 
       // ─────────────────────────────────────────────────────────────
-      // TZS BANK SCREENS — Tanzania bank transfer via PCXPay + Paystack resolve
+      // TZS BANK SCREENS — Tanzania bank transfer via PCXPay (manual account name)
       // ─────────────────────────────────────────────────────────────
 
       case "TZS_BANK_DETAILS": {
         const { crypto_asset: tzsBA, crypto_network: tzsBN, bank_code: tzsBC,
-          account_number: tzsBAcc, sell_amount: tzsBSell } = data as Record<string, string | undefined>;
+          account_number: tzsBAcc, account_name: tzsBAccNameInput, sell_amount: tzsBSell } = data as Record<string, string | undefined>;
 
         const tzsBanksOnError = async () => {
           try { const raw = await fetchPcxPayNetworks("TZ"); const seen = new Set<string>(); return raw.filter((n) => n.type === "bank").filter((b) => { if (seen.has(b.id)) return false; seen.add(b.id); return true; }).map((b) => ({ id: b.id, title: b.title })); } catch { return []; }
         };
 
-        if (!tzsBA || !tzsBN || !tzsBC || !tzsBAcc || !tzsBSell) {
+        if (!tzsBA || !tzsBN || !tzsBC || !tzsBAcc || !tzsBAccNameInput || !tzsBSell) {
           return { screen: "TZS_BANK_DETAILS", data: { banks: await tzsBanksOnError(), has_error: true, error_message: "Please fill in all required fields." } };
         }
 
@@ -2172,21 +2072,16 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
         }
 
         let tzsRate: number;
-        try { tzsRate = await fetchPcxPayUsdRate("TZS"); logger.info(`[OFFRAMP-TZS-BANK] Rate: 1 USD = ${tzsRate} TZS`); }
+        let tzsOrgRateId: string;
+        try { const r = await fetchPcxPayUsdRate("TZS"); tzsRate = r.rate; tzsOrgRateId = r.orgRateId; logger.info(`[OFFRAMP-TZS-BANK] Rate: 1 USD = ${tzsRate} TZS`); }
         catch { return { screen: "TZS_BANK_DETAILS", data: { banks: await tzsBanksOnError(), has_error: true, error_message: "Could not fetch exchange rate." } }; }
 
         let tzsBankName = tzsBC;
         try { const all = await fetchPcxPayNetworks("TZ"); const f = all.find((b) => b.id === tzsBC); if (f) tzsBankName = f.title; } catch { /* keep code */ }
 
         // Resolve account name via Paystack
-        let tzsBankAccName: string;
-        try {
-          const resolved = await resolvePaystackAccount(tzsBAcc, tzsBC);
-          tzsBankAccName = resolved.accountName;
-          logger.info(`[OFFRAMP-TZS-BANK] Resolved: ${tzsBankAccName}`);
-        } catch (resolveErr: any) {
-          return { screen: "TZS_BANK_DETAILS", data: { banks: await tzsBanksOnError(), has_error: true, error_message: resolveErr.message || "Could not verify account." } };
-        }
+        // Use user-entered account name directly (no Paystack resolution for TZS bank)
+        const tzsBankAccName = tzsBAccNameInput!.trim();
 
         const tzsCost = (tzsFiatInput / tzsRate).toFixed(6).replace(/\.?0+$/, "") || "0.00";
         return {
@@ -2194,74 +2089,48 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           data: { crypto_asset: tzsBA.toUpperCase(), crypto_network: tzsBN.toUpperCase(), bank_code: tzsBC,
             bank_name: tzsBankName, account_number: tzsBAcc, account_name: tzsBankAccName,
             sell_amount: tzsFiatInput.toLocaleString("en-TZ", { maximumFractionDigits: 0 }),
-            crypto_cost: tzsCost, rate: tzsRate.toFixed(2), has_error: false, error_message: "" },
+            crypto_cost: tzsCost, rate: tzsRate.toFixed(2), org_rate_id: tzsOrgRateId,
+            has_error: false, error_message: "" },
         };
       }
 
       case "TZS_BANK_REVIEW": {
         const { crypto_asset: tbrA, crypto_network: tbrN, bank_code: tbrBC, bank_name: tbrBN,
-          account_number: tbrAcc, account_name: tbrAN, sell_amount: tbrSell, crypto_cost: tbrCost } = data as Record<string, string | undefined>;
+          account_number: tbrAcc, account_name: tbrAN, sell_amount: tbrSell, crypto_cost: tbrCost,
+          org_rate_id: tbrOrgRateId, rate: tbrRate } = data as Record<string, string | undefined>;
         const flatFee = parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75");
         const tbrTotal = (parseFloat(tbrCost || "0") + flatFee).toFixed(6).replace(/\.?0+$/, "") || "0.00";
         return {
           screen: "TZS_BANK_AUTHORIZE",
           data: { crypto_asset: tbrA || "USDC", crypto_network: tbrN || "", bank_code: tbrBC || "",
             bank_name: tbrBN || "", account_number: tbrAcc || "", account_name: tbrAN || "",
-            sell_amount: tbrSell || "0", crypto_cost: tbrCost || "0", total_crypto_usd: tbrTotal, has_error: false, error_message: "" },
+            sell_amount: tbrSell || "0", crypto_cost: tbrCost || "0",
+            rate: tbrRate || "0", org_rate_id: tbrOrgRateId || "",
+            total_crypto_usd: tbrTotal, has_error: false, error_message: "" },
         };
       }
 
       case "TZS_BANK_AUTHORIZE": {
         const { pin: tbaPin, crypto_asset: tbaAsset, crypto_network: tbaNetwork, bank_code: tbaCode,
           bank_name: tbaBank, account_number: tbaAcc, account_name: tbaAccName,
-          sell_amount: tbaSell, crypto_cost: tbaCost, total_crypto_usd: tbaTotal } = data as Record<string, string | undefined>;
-
+          sell_amount: tbaSell, total_crypto_usd: tbaTotal, rate: tbaRate, org_rate_id: tbaOrgRateId } = data as Record<string, string | undefined>;
         if (!tbaPin || !tbaAsset || !tbaNetwork || !tbaCode || !tbaAcc || !tbaSell) {
           return { screen: "TZS_BANK_AUTHORIZE", data: { ...data, error_message: "Missing required transaction details.", has_error: true } };
         }
-        const tbaUser = await userService.getUser(phone, true);
-        if (!tbaUser) return { screen: "TZS_BANK_AUTHORIZE", data: { ...data, error_message: "User not found.", has_error: true } };
-        if (!await tbaUser.comparePin(tbaPin)) return { screen: "TZS_BANK_AUTHORIZE", data: { ...data, error_message: "Invalid PIN.", has_error: true } };
-
-        try {
-          const chainMap: Record<string, string> = { sol: "solana", solana: "solana", bep20: "bsc", bsc: "bsc", base: "base", arbitrum: "arbitrum", stellar: "stellar", erc20: "ethereum", ethereum: "ethereum", polygon: "polygon", optimism: "optimism", avalanche: "avalanche" };
-          const crossmintChain = chainMap[tbaNetwork.toLowerCase()];
-          if (!crossmintChain) return { screen: "TZS_BANK_AUTHORIZE", data: { ...data, error_message: `Unsupported network: ${tbaNetwork}`, has_error: true } };
-
-          const normalizedAsset = tbaAsset.toUpperCase();
-          const totalRequired = parseFloat(tbaTotal || "0");
-          const chainType = crossmintService.getChainType(crossmintChain);
-          const tbaBals = await crossmintService.getBalancesByChain(tbaUser.userId, crossmintChain, ["usdc", "usdt"]);
-          const tbaBal = tbaBals.find((b) => (b.symbol?.toLowerCase() || b.token?.toLowerCase()) === normalizedAsset.toLowerCase());
-          const tbaCurrentBal = tbaBal ? (() => { const d = tbaBal.decimals ?? 6; const r = parseFloat(tbaBal.amount) || 0; return r >= Math.pow(10, d) && d > 0 ? r / Math.pow(10, d) : r; })() : 0;
-          if (tbaCurrentBal < totalRequired) return { screen: "TZS_BANK_AUTHORIZE", data: { ...data, error_message: `Insufficient balance. Need ${totalRequired.toFixed(4)} ${normalizedAsset}.`, has_error: true } };
-
-          const receivingAddress = dexPayService.getReceivingAddress("bep20");
-          const idempKey = `offramp:tzs_bank:${Buffer.from(`${tbaUser.userId}:${tbaSell}:${tbaCode}:${tbaAcc}`).toString("base64")}`;
-          const existingTx = await redisClient.get(idempKey);
-          if (existingTx && JSON.parse(existingTx).status === "processing") return { screen: "TZS_BANK_AUTHORIZE", data: { ...data, error_message: "Transaction already in progress.", has_error: true } };
-          await redisClient.set(idempKey, JSON.stringify({ status: "processing", userId: tbaUser.userId, startedAt: new Date().toISOString() }), "EX", 600);
-
-          const wallets = await crossmintService.getUserWallets(tbaUser.userId);
-          const wallet = wallets.find((w) => w.chainType === chainType);
-          if (!wallet) { await redisClient.del(idempKey); return { screen: "TZS_BANK_AUTHORIZE", data: { ...data, error_message: `No wallet for ${crossmintChain}.`, has_error: true } }; }
-
-          const decimals = crossmintChain === "stellar" ? 7 : 6;
-          const transferResult = await crossmintService.transferTokens({
-            walletAddress: wallet.address, token: `${crossmintChain}:${normalizedAsset.toLowerCase()}`,
-            recipient: receivingAddress, amount: totalRequired.toFixed(decimals),
-            idempotencyKey: `tzs-bank-transfer-${tbaUser.userId}-${Date.now()}`,
-          });
-
-          if (!transferResult.success) { await redisClient.del(idempKey); return { screen: "TZS_BANK_AUTHORIZE", data: { ...data, error_message: `Transfer failed: ${transferResult.error || "Please try again."}`, has_error: true } }; }
-
-          await redisClient.set(idempKey, JSON.stringify({ status: "transfer_completed", userId: tbaUser.userId, transferId: transferResult.transactionId, completedAt: new Date().toISOString() }), "EX", 600);
-          logger.info(`[OFFRAMP-TZS-BANK] Crypto transfer done — PCX payout pending`);
-          return { screen: "OFFRAMP_SUCCESS", data: {} };
-        } catch (err) {
-          logger.error("[OFFRAMP-TZS-BANK] Error: " + (err as Error).message);
-          return { screen: "TZS_BANK_AUTHORIZE", data: { ...data, error_message: (err as Error).message || "Transaction failed.", has_error: true } };
-        }
+        return executePcxOfframp({
+          screenId: "TZS_BANK_AUTHORIZE", tag: "[OFFRAMP-TZS-BANK]",
+          data: data as Record<string, unknown>, phone,
+          pin: tbaPin, cryptoAsset: tbaAsset, cryptoNetwork: tbaNetwork,
+          totalCryptoUsd: tbaTotal || "0", fiatCurrency: "TZS",
+          fiatAmount: tbaSell, clientRate: tbaRate || "0",
+          orgRateId: tbaOrgRateId || "", country: "TZ",
+          paymentMethod: "bank_transfer",
+          beneficiaryName: tbaAccName || tbaAcc,
+          destination: { accountNumber: tbaAcc, bankCode: tbaCode, bankName: tbaBank || tbaCode } as PCXBankTransferDestination,
+          idempKeySuffix: `${tbaSell}:${tbaCode}:${tbaAcc}`,
+          displayAmount: `TZS ${tbaSell}`,
+          displayAccount: tbaAcc,
+        });
       }
 
       // ─────────────────────────────────────────────────────────────
@@ -2276,50 +2145,36 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
         const tzsMomoInput = parseFloat(tzsMSell);
         if (isNaN(tzsMomoInput) || tzsMomoInput < 10000) return { screen: "TZS_MOMO_DETAILS", data: { networks: await tzsNetworksOnError(), has_error: true, error_message: "Minimum withdrawal amount is TZS 10,000." } };
         let tzsRate: number;
-        try { tzsRate = await fetchPcxPayUsdRate("TZS"); } catch { return { screen: "TZS_MOMO_DETAILS", data: { networks: await tzsNetworksOnError(), has_error: true, error_message: "Could not fetch exchange rate." } }; }
+        let tzsMomoOrgRateId: string;
+        try { const r = await fetchPcxPayUsdRate("TZS"); tzsRate = r.rate; tzsMomoOrgRateId = r.orgRateId; } catch { return { screen: "TZS_MOMO_DETAILS", data: { networks: await tzsNetworksOnError(), has_error: true, error_message: "Could not fetch exchange rate." } }; }
         let tzsMomoName = tzsMC;
         try { const all = await fetchPcxPayNetworks("TZ"); const f = all.find((n) => n.id === tzsMC); if (f) tzsMomoName = f.title; } catch { /* keep */ }
-        return { screen: "TZS_MOMO_REVIEW", data: { crypto_asset: tzsMA.toUpperCase(), crypto_network: tzsMN.toUpperCase(), network_code: tzsMC, network_name: tzsMomoName, phone_number: tzsMPhone, sell_amount: tzsMomoInput.toLocaleString("en-TZ", { maximumFractionDigits: 0 }), crypto_cost: (tzsMomoInput / tzsRate).toFixed(6).replace(/\.?0+$/, "") || "0.00", rate: tzsRate.toFixed(2), has_error: false, error_message: "" } };
+        return { screen: "TZS_MOMO_REVIEW", data: { crypto_asset: tzsMA.toUpperCase(), crypto_network: tzsMN.toUpperCase(), network_code: tzsMC, network_name: tzsMomoName, phone_number: tzsMPhone, sell_amount: tzsMomoInput.toLocaleString("en-TZ", { maximumFractionDigits: 0 }), crypto_cost: (tzsMomoInput / tzsRate).toFixed(6).replace(/\.?0+$/, "") || "0.00", rate: tzsRate.toFixed(2), org_rate_id: tzsMomoOrgRateId, has_error: false, error_message: "" } };
       }
 
       case "TZS_MOMO_REVIEW": {
-        const { crypto_asset: tmrA, crypto_network: tmrN, network_code: tmrC, network_name: tmrNN, phone_number: tmrPhone, sell_amount: tmrSell, crypto_cost: tmrCost } = data as Record<string, string | undefined>;
+        const { crypto_asset: tmrA, crypto_network: tmrN, network_code: tmrC, network_name: tmrNN, phone_number: tmrPhone, sell_amount: tmrSell, crypto_cost: tmrCost, org_rate_id: tmrOrgRateId, rate: tmrRate } = data as Record<string, string | undefined>;
         const tmrTotal = (parseFloat(tmrCost || "0") + parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75")).toFixed(6).replace(/\.?0+$/, "") || "0.00";
-        return { screen: "TZS_MOMO_AUTHORIZE", data: { crypto_asset: tmrA || "USDC", crypto_network: tmrN || "", network_code: tmrC || "", network_name: tmrNN || "", phone_number: tmrPhone || "", sell_amount: tmrSell || "0", crypto_cost: tmrCost || "0", total_crypto_usd: tmrTotal, has_error: false, error_message: "" } };
+        return { screen: "TZS_MOMO_AUTHORIZE", data: { crypto_asset: tmrA || "USDC", crypto_network: tmrN || "", network_code: tmrC || "", network_name: tmrNN || "", phone_number: tmrPhone || "", sell_amount: tmrSell || "0", crypto_cost: tmrCost || "0", rate: tmrRate || "0", org_rate_id: tmrOrgRateId || "", total_crypto_usd: tmrTotal, has_error: false, error_message: "" } };
       }
 
       case "TZS_MOMO_AUTHORIZE": {
-        const { pin: tmaPin, crypto_asset: tmaAsset, crypto_network: tmaNetwork, network_code: tmaCode, network_name: tmaName, phone_number: tmaPhone, sell_amount: tmaSell, crypto_cost: tmaCost, total_crypto_usd: tmaTotal } = data as Record<string, string | undefined>;
+        const { pin: tmaPin, crypto_asset: tmaAsset, crypto_network: tmaNetwork, network_code: tmaCode, network_name: tmaName, phone_number: tmaPhone, sell_amount: tmaSell, total_crypto_usd: tmaTotal, rate: tmaRate, org_rate_id: tmaOrgRateId } = data as Record<string, string | undefined>;
         if (!tmaPin || !tmaAsset || !tmaNetwork || !tmaCode || !tmaPhone || !tmaSell) return { screen: "TZS_MOMO_AUTHORIZE", data: { ...data, error_message: "Missing required transaction details.", has_error: true } };
-        const tmaUser = await userService.getUser(phone, true);
-        if (!tmaUser) return { screen: "TZS_MOMO_AUTHORIZE", data: { ...data, error_message: "User not found.", has_error: true } };
-        if (!await tmaUser.comparePin(tmaPin)) return { screen: "TZS_MOMO_AUTHORIZE", data: { ...data, error_message: "Invalid PIN.", has_error: true } };
-        try {
-          const chainMap: Record<string, string> = { sol: "solana", solana: "solana", bep20: "bsc", bsc: "bsc", base: "base", arbitrum: "arbitrum", stellar: "stellar", erc20: "ethereum", ethereum: "ethereum", polygon: "polygon", optimism: "optimism", avalanche: "avalanche" };
-          const crossmintChain = chainMap[tmaNetwork.toLowerCase()];
-          if (!crossmintChain) return { screen: "TZS_MOMO_AUTHORIZE", data: { ...data, error_message: `Unsupported network: ${tmaNetwork}`, has_error: true } };
-          const normalizedAsset = tmaAsset.toUpperCase();
-          const totalRequired = parseFloat(tmaTotal || "0");
-          const chainType = crossmintService.getChainType(crossmintChain);
-          const tmaBals = await crossmintService.getBalancesByChain(tmaUser.userId, crossmintChain, ["usdc", "usdt"]);
-          const tmaBal = tmaBals.find((b) => (b.symbol?.toLowerCase() || b.token?.toLowerCase()) === normalizedAsset.toLowerCase());
-          const tmaCurrentBal = tmaBal ? (() => { const d = tmaBal.decimals ?? 6; const r = parseFloat(tmaBal.amount) || 0; return r >= Math.pow(10, d) && d > 0 ? r / Math.pow(10, d) : r; })() : 0;
-          if (tmaCurrentBal < totalRequired) return { screen: "TZS_MOMO_AUTHORIZE", data: { ...data, error_message: `Insufficient balance. Need ${totalRequired.toFixed(4)} ${normalizedAsset}.`, has_error: true } };
-          const receivingAddress = dexPayService.getReceivingAddress("bep20");
-          const idempKey = `offramp:tzs_momo:${Buffer.from(`${tmaUser.userId}:${tmaSell}:${tmaCode}:${tmaPhone}`).toString("base64")}`;
-          const existingTx = await redisClient.get(idempKey);
-          if (existingTx && JSON.parse(existingTx).status === "processing") return { screen: "TZS_MOMO_AUTHORIZE", data: { ...data, error_message: "Transaction already in progress.", has_error: true } };
-          await redisClient.set(idempKey, JSON.stringify({ status: "processing", userId: tmaUser.userId, startedAt: new Date().toISOString() }), "EX", 600);
-          const wallets = await crossmintService.getUserWallets(tmaUser.userId);
-          const wallet = wallets.find((w) => w.chainType === chainType);
-          if (!wallet) { await redisClient.del(idempKey); return { screen: "TZS_MOMO_AUTHORIZE", data: { ...data, error_message: `No wallet for ${crossmintChain}.`, has_error: true } }; }
-          const decimals = crossmintChain === "stellar" ? 7 : 6;
-          const transferResult = await crossmintService.transferTokens({ walletAddress: wallet.address, token: `${crossmintChain}:${normalizedAsset.toLowerCase()}`, recipient: receivingAddress, amount: totalRequired.toFixed(decimals), idempotencyKey: `tzs-momo-transfer-${tmaUser.userId}-${Date.now()}` });
-          if (!transferResult.success) { await redisClient.del(idempKey); return { screen: "TZS_MOMO_AUTHORIZE", data: { ...data, error_message: `Transfer failed: ${transferResult.error || "Please try again."}`, has_error: true } }; }
-          await redisClient.set(idempKey, JSON.stringify({ status: "transfer_completed", userId: tmaUser.userId, transferId: transferResult.transactionId, completedAt: new Date().toISOString() }), "EX", 600);
-          logger.info(`[OFFRAMP-TZS-MOMO] Crypto transfer done — PCX payout pending`);
-          return { screen: "OFFRAMP_SUCCESS", data: {} };
-        } catch (err) { logger.error("[OFFRAMP-TZS-MOMO] Error: " + (err as Error).message); return { screen: "TZS_MOMO_AUTHORIZE", data: { ...data, error_message: (err as Error).message || "Transaction failed.", has_error: true } }; }
+        return executePcxOfframp({
+          screenId: "TZS_MOMO_AUTHORIZE", tag: "[OFFRAMP-TZS-MOMO]",
+          data: data as Record<string, unknown>, phone,
+          pin: tmaPin, cryptoAsset: tmaAsset, cryptoNetwork: tmaNetwork,
+          totalCryptoUsd: tmaTotal || "0", fiatCurrency: "TZS",
+          fiatAmount: tmaSell, clientRate: tmaRate || "0",
+          orgRateId: tmaOrgRateId || "", country: "TZ",
+          paymentMethod: "mobile_money",
+          beneficiaryName: tmaName || tmaPhone,
+          destination: { provider: tmaCode, phoneNumber: tmaPhone } as PCXMobileMoneyDestination,
+          idempKeySuffix: `${tmaSell}:${tmaCode}:${tmaPhone}`,
+          displayAmount: `TZS ${tmaSell}`,
+          displayAccount: tmaPhone,
+        });
       }
 
       // ─────────────────────────────────────────────────────────────
@@ -2333,50 +2188,36 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
         const mwkFiatInput = parseFloat(mwkSell);
         if (isNaN(mwkFiatInput) || mwkFiatInput < 5000) return { screen: "MWK_DETAILS", data: { networks: await mwkNetworksOnError(), has_error: true, error_message: "Minimum withdrawal amount is MWK 5,000." } };
         let mwkRate: number;
-        try { mwkRate = await fetchPcxPayUsdRate("MWK"); logger.info(`[OFFRAMP-MWK] Rate: 1 USD = ${mwkRate} MWK`); } catch { return { screen: "MWK_DETAILS", data: { networks: await mwkNetworksOnError(), has_error: true, error_message: "Could not fetch exchange rate." } }; }
+        let mwkOrgRateId: string;
+        try { const r = await fetchPcxPayUsdRate("MWK"); mwkRate = r.rate; mwkOrgRateId = r.orgRateId; logger.info(`[OFFRAMP-MWK] Rate: 1 USD = ${mwkRate} MWK`); } catch { return { screen: "MWK_DETAILS", data: { networks: await mwkNetworksOnError(), has_error: true, error_message: "Could not fetch exchange rate." } }; }
         let mwkNetworkName = mwkC;
         try { const all = await fetchPcxPayNetworks("MW"); const f = all.find((n) => n.id === mwkC); if (f) mwkNetworkName = f.title; } catch { /* keep */ }
-        return { screen: "MWK_REVIEW", data: { crypto_asset: mwkA.toUpperCase(), crypto_network: mwkN.toUpperCase(), network_code: mwkC, network_name: mwkNetworkName, phone_number: mwkPhone, sell_amount: mwkFiatInput.toLocaleString("en-MW", { maximumFractionDigits: 0 }), crypto_cost: (mwkFiatInput / mwkRate).toFixed(6).replace(/\.?0+$/, "") || "0.00", rate: mwkRate.toFixed(2), has_error: false, error_message: "" } };
+        return { screen: "MWK_REVIEW", data: { crypto_asset: mwkA.toUpperCase(), crypto_network: mwkN.toUpperCase(), network_code: mwkC, network_name: mwkNetworkName, phone_number: mwkPhone, sell_amount: mwkFiatInput.toLocaleString("en-MW", { maximumFractionDigits: 0 }), crypto_cost: (mwkFiatInput / mwkRate).toFixed(6).replace(/\.?0+$/, "") || "0.00", rate: mwkRate.toFixed(2), org_rate_id: mwkOrgRateId, has_error: false, error_message: "" } };
       }
 
       case "MWK_REVIEW": {
-        const { crypto_asset: mwrA, crypto_network: mwrN, network_code: mwrC, network_name: mwrNN, phone_number: mwrPhone, sell_amount: mwrSell, crypto_cost: mwrCost } = data as Record<string, string | undefined>;
+        const { crypto_asset: mwrA, crypto_network: mwrN, network_code: mwrC, network_name: mwrNN, phone_number: mwrPhone, sell_amount: mwrSell, crypto_cost: mwrCost, org_rate_id: mwrOrgRateId, rate: mwrRate } = data as Record<string, string | undefined>;
         const mwrTotal = (parseFloat(mwrCost || "0") + parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75")).toFixed(6).replace(/\.?0+$/, "") || "0.00";
-        return { screen: "MWK_AUTHORIZE", data: { crypto_asset: mwrA || "USDC", crypto_network: mwrN || "", network_code: mwrC || "", network_name: mwrNN || "", phone_number: mwrPhone || "", sell_amount: mwrSell || "0", crypto_cost: mwrCost || "0", total_crypto_usd: mwrTotal, has_error: false, error_message: "" } };
+        return { screen: "MWK_AUTHORIZE", data: { crypto_asset: mwrA || "USDC", crypto_network: mwrN || "", network_code: mwrC || "", network_name: mwrNN || "", phone_number: mwrPhone || "", sell_amount: mwrSell || "0", crypto_cost: mwrCost || "0", rate: mwrRate || "0", org_rate_id: mwrOrgRateId || "", total_crypto_usd: mwrTotal, has_error: false, error_message: "" } };
       }
 
       case "MWK_AUTHORIZE": {
-        const { pin: mwaPin, crypto_asset: mwaAsset, crypto_network: mwaNetwork, network_code: mwaCode, network_name: mwaName, phone_number: mwaPhone, sell_amount: mwaSell, crypto_cost: mwaCost, total_crypto_usd: mwaTotal } = data as Record<string, string | undefined>;
+        const { pin: mwaPin, crypto_asset: mwaAsset, crypto_network: mwaNetwork, network_code: mwaCode, network_name: mwaName, phone_number: mwaPhone, sell_amount: mwaSell, total_crypto_usd: mwaTotal, rate: mwaRate, org_rate_id: mwaOrgRateId } = data as Record<string, string | undefined>;
         if (!mwaPin || !mwaAsset || !mwaNetwork || !mwaCode || !mwaPhone || !mwaSell) return { screen: "MWK_AUTHORIZE", data: { ...data, error_message: "Missing required transaction details.", has_error: true } };
-        const mwaUser = await userService.getUser(phone, true);
-        if (!mwaUser) return { screen: "MWK_AUTHORIZE", data: { ...data, error_message: "User not found.", has_error: true } };
-        if (!await mwaUser.comparePin(mwaPin)) return { screen: "MWK_AUTHORIZE", data: { ...data, error_message: "Invalid PIN.", has_error: true } };
-        try {
-          const chainMap: Record<string, string> = { sol: "solana", solana: "solana", bep20: "bsc", bsc: "bsc", base: "base", arbitrum: "arbitrum", stellar: "stellar", erc20: "ethereum", ethereum: "ethereum", polygon: "polygon", optimism: "optimism", avalanche: "avalanche" };
-          const crossmintChain = chainMap[mwaNetwork.toLowerCase()];
-          if (!crossmintChain) return { screen: "MWK_AUTHORIZE", data: { ...data, error_message: `Unsupported network: ${mwaNetwork}`, has_error: true } };
-          const normalizedAsset = mwaAsset.toUpperCase();
-          const totalRequired = parseFloat(mwaTotal || "0");
-          const chainType = crossmintService.getChainType(crossmintChain);
-          const mwaBals = await crossmintService.getBalancesByChain(mwaUser.userId, crossmintChain, ["usdc", "usdt"]);
-          const mwaBal = mwaBals.find((b) => (b.symbol?.toLowerCase() || b.token?.toLowerCase()) === normalizedAsset.toLowerCase());
-          const mwaCurrentBal = mwaBal ? (() => { const d = mwaBal.decimals ?? 6; const r = parseFloat(mwaBal.amount) || 0; return r >= Math.pow(10, d) && d > 0 ? r / Math.pow(10, d) : r; })() : 0;
-          if (mwaCurrentBal < totalRequired) return { screen: "MWK_AUTHORIZE", data: { ...data, error_message: `Insufficient balance. Need ${totalRequired.toFixed(4)} ${normalizedAsset}.`, has_error: true } };
-          const receivingAddress = dexPayService.getReceivingAddress("bep20");
-          const idempKey = `offramp:mwk:${Buffer.from(`${mwaUser.userId}:${mwaSell}:${mwaCode}:${mwaPhone}`).toString("base64")}`;
-          const existingTx = await redisClient.get(idempKey);
-          if (existingTx && JSON.parse(existingTx).status === "processing") return { screen: "MWK_AUTHORIZE", data: { ...data, error_message: "Transaction already in progress.", has_error: true } };
-          await redisClient.set(idempKey, JSON.stringify({ status: "processing", userId: mwaUser.userId, startedAt: new Date().toISOString() }), "EX", 600);
-          const wallets = await crossmintService.getUserWallets(mwaUser.userId);
-          const wallet = wallets.find((w) => w.chainType === chainType);
-          if (!wallet) { await redisClient.del(idempKey); return { screen: "MWK_AUTHORIZE", data: { ...data, error_message: `No wallet for ${crossmintChain}.`, has_error: true } }; }
-          const decimals = crossmintChain === "stellar" ? 7 : 6;
-          const transferResult = await crossmintService.transferTokens({ walletAddress: wallet.address, token: `${crossmintChain}:${normalizedAsset.toLowerCase()}`, recipient: receivingAddress, amount: totalRequired.toFixed(decimals), idempotencyKey: `mwk-transfer-${mwaUser.userId}-${Date.now()}` });
-          if (!transferResult.success) { await redisClient.del(idempKey); return { screen: "MWK_AUTHORIZE", data: { ...data, error_message: `Transfer failed: ${transferResult.error || "Please try again."}`, has_error: true } }; }
-          await redisClient.set(idempKey, JSON.stringify({ status: "transfer_completed", userId: mwaUser.userId, transferId: transferResult.transactionId, completedAt: new Date().toISOString() }), "EX", 600);
-          logger.info(`[OFFRAMP-MWK] Crypto transfer done — PCX payout pending`);
-          return { screen: "OFFRAMP_SUCCESS", data: {} };
-        } catch (err) { logger.error("[OFFRAMP-MWK] Error: " + (err as Error).message); return { screen: "MWK_AUTHORIZE", data: { ...data, error_message: (err as Error).message || "Transaction failed.", has_error: true } }; }
+        return executePcxOfframp({
+          screenId: "MWK_AUTHORIZE", tag: "[OFFRAMP-MWK]",
+          data: data as Record<string, unknown>, phone,
+          pin: mwaPin, cryptoAsset: mwaAsset, cryptoNetwork: mwaNetwork,
+          totalCryptoUsd: mwaTotal || "0", fiatCurrency: "MWK",
+          fiatAmount: mwaSell, clientRate: mwaRate || "0",
+          orgRateId: mwaOrgRateId || "", country: "MW",
+          paymentMethod: "mobile_money",
+          beneficiaryName: mwaName || mwaPhone,
+          destination: { provider: mwaCode, phoneNumber: mwaPhone } as PCXMobileMoneyDestination,
+          idempKeySuffix: `${mwaSell}:${mwaCode}:${mwaPhone}`,
+          displayAmount: `MWK ${mwaSell}`,
+          displayAccount: mwaPhone,
+        });
       }
 
       case "UGX_DETAILS": {
@@ -2386,50 +2227,36 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
         const ugxFiatInput = parseFloat(ugxSell);
         if (isNaN(ugxFiatInput) || ugxFiatInput < 50000) return { screen: "UGX_DETAILS", data: { networks: await ugxNetworksOnError(), has_error: true, error_message: "Minimum withdrawal amount is UGX 50,000." } };
         let ugxRate: number;
-        try { ugxRate = await fetchPcxPayUsdRate("UGX"); logger.info(`[OFFRAMP-UGX] Rate: 1 USD = ${ugxRate} UGX`); } catch { return { screen: "UGX_DETAILS", data: { networks: await ugxNetworksOnError(), has_error: true, error_message: "Could not fetch exchange rate." } }; }
+        let ugxOrgRateId: string;
+        try { const r = await fetchPcxPayUsdRate("UGX"); ugxRate = r.rate; ugxOrgRateId = r.orgRateId; logger.info(`[OFFRAMP-UGX] Rate: 1 USD = ${ugxRate} UGX`); } catch { return { screen: "UGX_DETAILS", data: { networks: await ugxNetworksOnError(), has_error: true, error_message: "Could not fetch exchange rate." } }; }
         let ugxNetworkName = ugxC;
         try { const all = await fetchPcxPayNetworks("UG"); const f = all.find((n) => n.id === ugxC); if (f) ugxNetworkName = f.title; } catch { /* keep */ }
-        return { screen: "UGX_REVIEW", data: { crypto_asset: ugxA.toUpperCase(), crypto_network: ugxN.toUpperCase(), network_code: ugxC, network_name: ugxNetworkName, phone_number: ugxPhone, sell_amount: ugxFiatInput.toLocaleString("en-UG", { maximumFractionDigits: 0 }), crypto_cost: (ugxFiatInput / ugxRate).toFixed(6).replace(/\.?0+$/, "") || "0.00", rate: ugxRate.toFixed(2), has_error: false, error_message: "" } };
+        return { screen: "UGX_REVIEW", data: { crypto_asset: ugxA.toUpperCase(), crypto_network: ugxN.toUpperCase(), network_code: ugxC, network_name: ugxNetworkName, phone_number: ugxPhone, sell_amount: ugxFiatInput.toLocaleString("en-UG", { maximumFractionDigits: 0 }), crypto_cost: (ugxFiatInput / ugxRate).toFixed(6).replace(/\.?0+$/, "") || "0.00", rate: ugxRate.toFixed(2), org_rate_id: ugxOrgRateId, has_error: false, error_message: "" } };
       }
 
       case "UGX_REVIEW": {
-        const { crypto_asset: urA, crypto_network: urN, network_code: urC, network_name: urNN, phone_number: urPhone, sell_amount: urSell, crypto_cost: urCost } = data as Record<string, string | undefined>;
+        const { crypto_asset: urA, crypto_network: urN, network_code: urC, network_name: urNN, phone_number: urPhone, sell_amount: urSell, crypto_cost: urCost, org_rate_id: urOrgRateId, rate: urRate } = data as Record<string, string | undefined>;
         const urTotal = (parseFloat(urCost || "0") + parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75")).toFixed(6).replace(/\.?0+$/, "") || "0.00";
-        return { screen: "UGX_AUTHORIZE", data: { crypto_asset: urA || "USDC", crypto_network: urN || "", network_code: urC || "", network_name: urNN || "", phone_number: urPhone || "", sell_amount: urSell || "0", crypto_cost: urCost || "0", total_crypto_usd: urTotal, has_error: false, error_message: "" } };
+        return { screen: "UGX_AUTHORIZE", data: { crypto_asset: urA || "USDC", crypto_network: urN || "", network_code: urC || "", network_name: urNN || "", phone_number: urPhone || "", sell_amount: urSell || "0", crypto_cost: urCost || "0", rate: urRate || "0", org_rate_id: urOrgRateId || "", total_crypto_usd: urTotal, has_error: false, error_message: "" } };
       }
 
       case "UGX_AUTHORIZE": {
-        const { pin: uaPin, crypto_asset: uaAsset, crypto_network: uaNetwork, network_code: uaCode, network_name: uaName, phone_number: uaPhone, sell_amount: uaSell, crypto_cost: uaCost, total_crypto_usd: uaTotal } = data as Record<string, string | undefined>;
+        const { pin: uaPin, crypto_asset: uaAsset, crypto_network: uaNetwork, network_code: uaCode, network_name: uaName, phone_number: uaPhone, sell_amount: uaSell, total_crypto_usd: uaTotal, rate: uaRate, org_rate_id: uaOrgRateId } = data as Record<string, string | undefined>;
         if (!uaPin || !uaAsset || !uaNetwork || !uaCode || !uaPhone || !uaSell) return { screen: "UGX_AUTHORIZE", data: { ...data, error_message: "Missing required transaction details.", has_error: true } };
-        const uaUser = await userService.getUser(phone, true);
-        if (!uaUser) return { screen: "UGX_AUTHORIZE", data: { ...data, error_message: "User not found.", has_error: true } };
-        if (!await uaUser.comparePin(uaPin)) return { screen: "UGX_AUTHORIZE", data: { ...data, error_message: "Invalid PIN.", has_error: true } };
-        try {
-          const chainMap: Record<string, string> = { sol: "solana", solana: "solana", bep20: "bsc", bsc: "bsc", base: "base", arbitrum: "arbitrum", stellar: "stellar", erc20: "ethereum", ethereum: "ethereum", polygon: "polygon", optimism: "optimism", avalanche: "avalanche" };
-          const crossmintChain = chainMap[uaNetwork.toLowerCase()];
-          if (!crossmintChain) return { screen: "UGX_AUTHORIZE", data: { ...data, error_message: `Unsupported network: ${uaNetwork}`, has_error: true } };
-          const normalizedAsset = uaAsset.toUpperCase();
-          const totalRequired = parseFloat(uaTotal || "0");
-          const chainType = crossmintService.getChainType(crossmintChain);
-          const uaBals = await crossmintService.getBalancesByChain(uaUser.userId, crossmintChain, ["usdc", "usdt"]);
-          const uaBal = uaBals.find((b) => (b.symbol?.toLowerCase() || b.token?.toLowerCase()) === normalizedAsset.toLowerCase());
-          const uaCurrentBal = uaBal ? (() => { const d = uaBal.decimals ?? 6; const r = parseFloat(uaBal.amount) || 0; return r >= Math.pow(10, d) && d > 0 ? r / Math.pow(10, d) : r; })() : 0;
-          if (uaCurrentBal < totalRequired) return { screen: "UGX_AUTHORIZE", data: { ...data, error_message: `Insufficient balance. Need ${totalRequired.toFixed(4)} ${normalizedAsset}.`, has_error: true } };
-          const receivingAddress = dexPayService.getReceivingAddress("bep20");
-          const idempKey = `offramp:ugx:${Buffer.from(`${uaUser.userId}:${uaSell}:${uaCode}:${uaPhone}`).toString("base64")}`;
-          const existingTx = await redisClient.get(idempKey);
-          if (existingTx && JSON.parse(existingTx).status === "processing") return { screen: "UGX_AUTHORIZE", data: { ...data, error_message: "Transaction already in progress.", has_error: true } };
-          await redisClient.set(idempKey, JSON.stringify({ status: "processing", userId: uaUser.userId, startedAt: new Date().toISOString() }), "EX", 600);
-          const wallets = await crossmintService.getUserWallets(uaUser.userId);
-          const wallet = wallets.find((w) => w.chainType === chainType);
-          if (!wallet) { await redisClient.del(idempKey); return { screen: "UGX_AUTHORIZE", data: { ...data, error_message: `No wallet for ${crossmintChain}.`, has_error: true } }; }
-          const decimals = crossmintChain === "stellar" ? 7 : 6;
-          const transferResult = await crossmintService.transferTokens({ walletAddress: wallet.address, token: `${crossmintChain}:${normalizedAsset.toLowerCase()}`, recipient: receivingAddress, amount: totalRequired.toFixed(decimals), idempotencyKey: `ugx-transfer-${uaUser.userId}-${Date.now()}` });
-          if (!transferResult.success) { await redisClient.del(idempKey); return { screen: "UGX_AUTHORIZE", data: { ...data, error_message: `Transfer failed: ${transferResult.error || "Please try again."}`, has_error: true } }; }
-          await redisClient.set(idempKey, JSON.stringify({ status: "transfer_completed", userId: uaUser.userId, transferId: transferResult.transactionId, completedAt: new Date().toISOString() }), "EX", 600);
-          logger.info(`[OFFRAMP-UGX] Crypto transfer done — PCX payout pending`);
-          return { screen: "OFFRAMP_SUCCESS", data: {} };
-        } catch (err) { logger.error("[OFFRAMP-UGX] Error: " + (err as Error).message); return { screen: "UGX_AUTHORIZE", data: { ...data, error_message: (err as Error).message || "Transaction failed.", has_error: true } }; }
+        return executePcxOfframp({
+          screenId: "UGX_AUTHORIZE", tag: "[OFFRAMP-UGX]",
+          data: data as Record<string, unknown>, phone,
+          pin: uaPin, cryptoAsset: uaAsset, cryptoNetwork: uaNetwork,
+          totalCryptoUsd: uaTotal || "0", fiatCurrency: "UGX",
+          fiatAmount: uaSell, clientRate: uaRate || "0",
+          orgRateId: uaOrgRateId || "", country: "UG",
+          paymentMethod: "mobile_money",
+          beneficiaryName: uaName || uaPhone,
+          destination: { provider: uaCode, phoneNumber: uaPhone } as PCXMobileMoneyDestination,
+          idempKeySuffix: `${uaSell}:${uaCode}:${uaPhone}`,
+          displayAmount: `UGX ${uaSell}`,
+          displayAccount: uaPhone,
+        });
       }
 
       case "RWF_DETAILS": {
@@ -2493,8 +2320,11 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
 
         // Fetch live USD→RWF rate from PCXPay
         let rwfRate: number;
+        let rwfOrgRateId: string;
         try {
-          rwfRate = await fetchPcxPayUsdRate("RWF");
+          const rateData = await fetchPcxPayUsdRate("RWF");
+          rwfRate = rateData.rate;
+          rwfOrgRateId = rateData.orgRateId;
           logger.info(`[OFFRAMP-RWF] Live rate: 1 USD = ${rwfRate} RWF`);
         } catch (rateError) {
           logger.error("[OFFRAMP-RWF] Rate fetch failed: " + (rateError as Error).message);
@@ -2529,6 +2359,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             sell_amount: rwfInputAmount.toLocaleString("en-RW", { maximumFractionDigits: 0 }),
             crypto_cost: formattedCryptoCost,
             rate: rwfRate.toLocaleString("en-RW", { maximumFractionDigits: 0 }),
+            org_rate_id: rwfOrgRateId,
             has_error: false,
             error_message: "",
           },
@@ -2544,6 +2375,8 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           phone_number: rwfReviewPhone,
           sell_amount: rwfReviewSellAmount,
           crypto_cost: rwfReviewCryptoCost,
+          org_rate_id: rwfReviewOrgRateId,
+          rate: rwfReviewRate,
         } = data as Record<string, string | undefined>;
 
         const flatFeeUsd = parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75");
@@ -2560,6 +2393,8 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             phone_number: rwfReviewPhone || "",
             sell_amount: rwfReviewSellAmount || "0",
             crypto_cost: rwfReviewCryptoCost || "0",
+            rate: rwfReviewRate || "0",
+            org_rate_id: rwfReviewOrgRateId || "",
             total_crypto_usd: totalCrypto,
             has_error: false,
             error_message: "",
@@ -2575,170 +2410,29 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           network_code: rwfFinalNetworkCode,
           network_name: rwfFinalNetworkName,
           phone_number: rwfFinalPhone,
-          sell_amount: rwfFinalSellAmount,   // RWF fiat amount
-          crypto_cost: rwfFinalCryptoCost,
-          total_crypto_usd: rwfFinalTotal,   // total crypto to deduct (incl. fee)
+          sell_amount: rwfFinalSellAmount,
+          total_crypto_usd: rwfFinalTotal,
+          rate: rwfFinalRate,
+          org_rate_id: rwfFinalOrgRateId,
         } = data as Record<string, string | undefined>;
 
-        // Validate required fields
         if (!rwfPin || !rwfFinalAsset || !rwfFinalNetwork || !rwfFinalNetworkCode || !rwfFinalPhone || !rwfFinalSellAmount) {
-          return {
-            screen: "RWF_AUTHORIZE",
-            data: { ...data, error_message: "Missing required transaction details.", has_error: true },
-          };
+          return { screen: "RWF_AUTHORIZE", data: { ...data, error_message: "Missing required transaction details.", has_error: true } };
         }
-
-        // Validate PIN
-        const rwfUser = await userService.getUser(phone, true);
-        if (!rwfUser) {
-          return {
-            screen: "RWF_AUTHORIZE",
-            data: { ...data, error_message: "User not found.", has_error: true },
-          };
-        }
-        const validRwfPin = await rwfUser.comparePin(rwfPin);
-        if (!validRwfPin) {
-          return {
-            screen: "RWF_AUTHORIZE",
-            data: { ...data, error_message: "Invalid PIN.", has_error: true },
-          };
-        }
-
-        try {
-          // Normalize chain for crossmint
-          const rwfChainMapping: Record<string, { dexPay: string; crossmint: string }> = {
-            sol: { dexPay: "solana", crossmint: "solana" },
-            solana: { dexPay: "solana", crossmint: "solana" },
-            bsc: { dexPay: "bep20", crossmint: "bsc" },
-            bep20: { dexPay: "bep20", crossmint: "bsc" },
-            base: { dexPay: "base", crossmint: "base" },
-            arbitrum: { dexPay: "arbitrum", crossmint: "arbitrum" },
-            stellar: { dexPay: "stellar", crossmint: "stellar" },
-            erc20: { dexPay: "erc20", crossmint: "ethereum" },
-            ethereum: { dexPay: "erc20", crossmint: "ethereum" },
-            polygon: { dexPay: "polygon", crossmint: "polygon" },
-            optimism: { dexPay: "optimism", crossmint: "optimism" },
-            avalanche: { dexPay: "avalanche", crossmint: "avalanche" },
-          };
-
-          const normalizedRwfChain = rwfChainMapping[rwfFinalNetwork.toLowerCase()];
-          if (!normalizedRwfChain) {
-            return {
-              screen: "RWF_AUTHORIZE",
-              data: { ...data, error_message: `Unsupported network: ${rwfFinalNetwork}`, has_error: true },
-            };
-          }
-
-          const normalizedRwfAsset = rwfFinalAsset.toUpperCase();
-          const totalRequired = parseFloat(rwfFinalTotal || "0");
-          const crossmintChain = normalizedRwfChain.crossmint;
-          const chainType = crossmintService.getChainType(crossmintChain);
-
-          // Check balance
-          const rwfBalances = await crossmintService.getBalancesByChain(rwfUser.userId, crossmintChain, ["usdc", "usdt"]);
-          const rwfAssetBal = rwfBalances.find(
-            (b) => (b.symbol?.toLowerCase() || b.token?.toLowerCase()) === normalizedRwfAsset.toLowerCase(),
-          );
-          const rwfCurrentBalance = rwfAssetBal ? (() => {
-            const decimals = rwfAssetBal.decimals ?? 6;
-            const raw = parseFloat(rwfAssetBal.amount) || 0;
-            return raw >= Math.pow(10, decimals) && decimals > 0 ? raw / Math.pow(10, decimals) : raw;
-          })() : 0;
-
-          if (rwfCurrentBalance < totalRequired) {
-            const shortfall = (totalRequired - rwfCurrentBalance).toFixed(4);
-            return {
-              screen: "RWF_AUTHORIZE",
-              data: {
-                ...data,
-                error_message: `Insufficient balance. You need ${totalRequired.toFixed(4)} ${normalizedRwfAsset} but have ${rwfCurrentBalance.toFixed(4)}. Please deposit ${shortfall} more.`,
-                has_error: true,
-              },
-            };
-          }
-
-          // Get receiving address (use EVM/BSC address for PCXPay)
-          const rwfReceivingAddress = dexPayService.getReceivingAddress("bep20");
-
-          // Idempotency check
-          const rwfIdempotencyKey = `offramp:rwf:${Buffer.from(`${rwfUser.userId}:${rwfFinalSellAmount}:${rwfFinalNetworkCode}:${rwfFinalPhone}`).toString("base64")}`;
-          const existingRwfTx = await redisClient.get(rwfIdempotencyKey);
-          if (existingRwfTx) {
-            const txData = JSON.parse(existingRwfTx);
-            if (txData.status === "processing") {
-              return {
-                screen: "RWF_AUTHORIZE",
-                data: { ...data, error_message: "Transaction already in progress. Please wait.", has_error: true },
-              };
-            }
-          }
-
-          await redisClient.set(
-            rwfIdempotencyKey,
-            JSON.stringify({ status: "processing", userId: rwfUser.userId, startedAt: new Date().toISOString() }),
-            "EX",
-            600,
-          );
-
-          // Transfer crypto from user wallet to Chainpaye wallet
-          const rwfWallets = await crossmintService.getUserWallets(rwfUser.userId);
-          const rwfWallet = rwfWallets.find((w) => w.chainType === chainType);
-          if (!rwfWallet) {
-            await redisClient.del(rwfIdempotencyKey);
-            return {
-              screen: "RWF_AUTHORIZE",
-              data: { ...data, error_message: `No wallet found for ${crossmintChain}. Please contact support.`, has_error: true },
-            };
-          }
-
-          const isStellarRwf = crossmintChain === "stellar";
-          const decimalsRwf = isStellarRwf ? 7 : 6;
-          const transferResult = await crossmintService.transferTokens({
-            walletAddress: rwfWallet.address,
-            token: `${crossmintChain}:${normalizedRwfAsset.toLowerCase()}`,
-            recipient: rwfReceivingAddress,
-            amount: totalRequired.toFixed(decimalsRwf),
-            idempotencyKey: `rwf-transfer-${rwfUser.userId}-${Date.now()}`,
-          });
-
-          if (!transferResult.success) {
-            await redisClient.del(rwfIdempotencyKey);
-            return {
-              screen: "RWF_AUTHORIZE",
-              data: { ...data, error_message: `Transfer failed: ${transferResult.error || "Please try again."}`, has_error: true },
-            };
-          }
-
-          // Update idempotency to transfer_completed
-          await redisClient.set(
-            rwfIdempotencyKey,
-            JSON.stringify({ status: "transfer_completed", userId: rwfUser.userId, transferId: transferResult.transactionId, completedAt: new Date().toISOString() }),
-            "EX",
-            600,
-          );
-
-          // Fire PCXPay payout in background
-          // sell_amount is the RWF fiat amount the user entered
-          const rwfFiatAmount = rwfFinalSellAmount || "0";
-          processRwfPayoutInBackground(
-            rwfUser.userId,
-            phone,
-            rwfFinalNetworkCode,
-            rwfFinalPhone,
-            rwfFiatAmount,
-            rwfFinalCryptoCost || "0",
-            rwfFinalNetworkName || rwfFinalNetworkCode,
-            rwfIdempotencyKey,
-          ).catch((err) => logger.error("[OFFRAMP-RWF] Background payout error: " + (err as Error).message));
-
-          return { screen: "OFFRAMP_SUCCESS", data: {} };
-        } catch (error) {
-          logger.error("[OFFRAMP-RWF] Error in RWF_AUTHORIZE: " + (error as Error).message);
-          return {
-            screen: "RWF_AUTHORIZE",
-            data: { ...data, error_message: (error as Error).message || "Transaction failed. Please try again.", has_error: true },
-          };
-        }
+        return executePcxOfframp({
+          screenId: "RWF_AUTHORIZE", tag: "[OFFRAMP-RWF]",
+          data: data as Record<string, unknown>, phone,
+          pin: rwfPin, cryptoAsset: rwfFinalAsset, cryptoNetwork: rwfFinalNetwork,
+          totalCryptoUsd: rwfFinalTotal || "0", fiatCurrency: "RWF",
+          fiatAmount: rwfFinalSellAmount, clientRate: rwfFinalRate || "0",
+          orgRateId: rwfFinalOrgRateId || "", country: "RW",
+          paymentMethod: "mobile_money",
+          beneficiaryName: rwfFinalNetworkName || rwfFinalPhone,
+          destination: { provider: rwfFinalNetworkCode, phoneNumber: rwfFinalPhone } as PCXMobileMoneyDestination,
+          idempKeySuffix: `${rwfFinalSellAmount}:${rwfFinalNetworkCode}:${rwfFinalPhone}`,
+          displayAmount: `RWF ${rwfFinalSellAmount}`,
+          displayAccount: rwfFinalPhone,
+        });
       }
 
       // ─────────────────────────────────────────────────────────────
@@ -2812,8 +2506,11 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
 
         // Fetch live USD→ZAR rate
         let zarRate: number;
+        let zarOrgRateId: string;
         try {
-          zarRate = await fetchPcxPayUsdRate("ZAR");
+          const rateData = await fetchPcxPayUsdRate("ZAR");
+          zarRate = rateData.rate;
+          zarOrgRateId = rateData.orgRateId;
           logger.info(`[OFFRAMP-ZAR] Live rate: 1 USD = ${zarRate} ZAR`);
         } catch (rateError) {
           logger.error("[OFFRAMP-ZAR] Rate fetch failed: " + (rateError as Error).message);
@@ -2865,6 +2562,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             sell_amount: zarFiatInput.toLocaleString("en-ZA", { maximumFractionDigits: 2 }),
             crypto_cost: zarFormattedCryptoCost,
             rate: zarRate.toFixed(2),
+            org_rate_id: zarOrgRateId,
             has_error: false,
             error_message: "",
           },
@@ -2882,6 +2580,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           sell_amount: zarRevSellAmount,
           crypto_cost: zarRevCryptoCost,
           rate: zarRevRate,
+          org_rate_id: zarRevOrgRateId,
         } = data as Record<string, string | undefined>;
 
         const flatFeeUsd = parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75");
@@ -2899,6 +2598,8 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
             account_name: zarRevAccountName || "",
             sell_amount: zarRevSellAmount || "0",
             crypto_cost: zarRevCryptoCost || "0",
+            rate: zarRevRate || "0",
+            org_rate_id: zarRevOrgRateId || "",
             total_crypto_usd: zarTotal,
             has_error: false,
             error_message: "",
@@ -2915,172 +2616,29 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           bank_name: zarFinBankName,
           account_number: zarFinAccountNumber,
           account_name: zarFinAccountName,
-          sell_amount: zarFinSellAmount,     // ZAR fiat amount
-          crypto_cost: zarFinCryptoCost,
-          total_crypto_usd: zarFinTotal,     // total crypto to deduct (incl. fee)
+          sell_amount: zarFinSellAmount,
+          total_crypto_usd: zarFinTotal,
+          rate: zarFinRate,
+          org_rate_id: zarFinOrgRateId,
         } = data as Record<string, string | undefined>;
 
         if (!zarPin || !zarFinAsset || !zarFinNetwork || !zarFinBankCode || !zarFinAccountNumber || !zarFinAccountName || !zarFinSellAmount) {
-          return {
-            screen: "ZAR_AUTHORIZE",
-            data: { ...data, error_message: "Missing required transaction details.", has_error: true },
-          };
+          return { screen: "ZAR_AUTHORIZE", data: { ...data, error_message: "Missing required transaction details.", has_error: true } };
         }
-
-        // Validate PIN
-        const zarUser = await userService.getUser(phone, true);
-        if (!zarUser) {
-          return {
-            screen: "ZAR_AUTHORIZE",
-            data: { ...data, error_message: "User not found.", has_error: true },
-          };
-        }
-        const validZarPin = await zarUser.comparePin(zarPin);
-        if (!validZarPin) {
-          return {
-            screen: "ZAR_AUTHORIZE",
-            data: { ...data, error_message: "Invalid PIN.", has_error: true },
-          };
-        }
-
-        try {
-          const zarChainMapping: Record<string, { crossmint: string }> = {
-            sol: { crossmint: "solana" },
-            solana: { crossmint: "solana" },
-            bsc: { crossmint: "bsc" },
-            bep20: { crossmint: "bsc" },
-            base: { crossmint: "base" },
-            arbitrum: { crossmint: "arbitrum" },
-            stellar: { crossmint: "stellar" },
-            erc20: { crossmint: "ethereum" },
-            ethereum: { crossmint: "ethereum" },
-            polygon: { crossmint: "polygon" },
-            optimism: { crossmint: "optimism" },
-            avalanche: { crossmint: "avalanche" },
-          };
-
-          const normalizedZarChain = zarChainMapping[zarFinNetwork.toLowerCase()];
-          if (!normalizedZarChain) {
-            return {
-              screen: "ZAR_AUTHORIZE",
-              data: { ...data, error_message: `Unsupported network: ${zarFinNetwork}`, has_error: true },
-            };
-          }
-
-          const normalizedZarAsset = zarFinAsset.toUpperCase();
-          const totalRequired = parseFloat(zarFinTotal || "0");
-          const crossmintChain = normalizedZarChain.crossmint;
-          const chainType = crossmintService.getChainType(crossmintChain);
-
-          // Check balance
-          const zarBalances = await crossmintService.getBalancesByChain(zarUser.userId, crossmintChain, ["usdc", "usdt"]);
-          const zarAssetBal = zarBalances.find(
-            (b) => (b.symbol?.toLowerCase() || b.token?.toLowerCase()) === normalizedZarAsset.toLowerCase(),
-          );
-          const zarCurrentBalance = zarAssetBal ? (() => {
-            const decimals = zarAssetBal.decimals ?? 6;
-            const raw = parseFloat(zarAssetBal.amount) || 0;
-            return raw >= Math.pow(10, decimals) && decimals > 0 ? raw / Math.pow(10, decimals) : raw;
-          })() : 0;
-
-          if (zarCurrentBalance < totalRequired) {
-            const shortfall = (totalRequired - zarCurrentBalance).toFixed(4);
-            return {
-              screen: "ZAR_AUTHORIZE",
-              data: {
-                ...data,
-                error_message: `Insufficient balance. You need ${totalRequired.toFixed(4)} ${normalizedZarAsset} but have ${zarCurrentBalance.toFixed(4)}. Please deposit ${shortfall} more.`,
-                has_error: true,
-              },
-            };
-          }
-
-          // Receiving address
-          const zarReceivingAddress = dexPayService.getReceivingAddress("bep20");
-
-          // Idempotency check
-          const zarIdempotencyKey = `offramp:zar:${Buffer.from(`${zarUser.userId}:${zarFinSellAmount}:${zarFinBankCode}:${zarFinAccountNumber}`).toString("base64")}`;
-          const existingZarTx = await redisClient.get(zarIdempotencyKey);
-          if (existingZarTx) {
-            const txData = JSON.parse(existingZarTx);
-            if (txData.status === "processing") {
-              return {
-                screen: "ZAR_AUTHORIZE",
-                data: { ...data, error_message: "Transaction already in progress. Please wait.", has_error: true },
-              };
-            }
-          }
-
-          await redisClient.set(
-            zarIdempotencyKey,
-            JSON.stringify({ status: "processing", userId: zarUser.userId, startedAt: new Date().toISOString() }),
-            "EX",
-            600,
-          );
-
-          // Transfer crypto from user wallet to Chainpaye wallet
-          const zarWallets = await crossmintService.getUserWallets(zarUser.userId);
-          const zarWallet = zarWallets.find((w) => w.chainType === chainType);
-          if (!zarWallet) {
-            await redisClient.del(zarIdempotencyKey);
-            return {
-              screen: "ZAR_AUTHORIZE",
-              data: { ...data, error_message: `No wallet found for ${crossmintChain}. Please contact support.`, has_error: true },
-            };
-          }
-
-          const isStellarZar = crossmintChain === "stellar";
-          const zarDecimals = isStellarZar ? 7 : 6;
-          const zarTransferResult = await crossmintService.transferTokens({
-            walletAddress: zarWallet.address,
-            token: `${crossmintChain}:${normalizedZarAsset.toLowerCase()}`,
-            recipient: zarReceivingAddress,
-            amount: totalRequired.toFixed(zarDecimals),
-            idempotencyKey: `zar-transfer-${zarUser.userId}-${Date.now()}`,
-          });
-
-          if (!zarTransferResult.success) {
-            await redisClient.del(zarIdempotencyKey);
-            return {
-              screen: "ZAR_AUTHORIZE",
-              data: { ...data, error_message: `Transfer failed: ${zarTransferResult.error || "Please try again."}`, has_error: true },
-            };
-          }
-
-          // Update idempotency to transfer_completed
-          await redisClient.set(
-            zarIdempotencyKey,
-            JSON.stringify({
-              status: "transfer_completed",
-              userId: zarUser.userId,
-              transferId: zarTransferResult.transactionId,
-              completedAt: new Date().toISOString(),
-            }),
-            "EX",
-            600,
-          );
-
-          // Fire ZAR payout in background
-          processZarPayoutInBackground(
-            zarUser.userId,
-            phone,
-            zarFinBankCode,
-            zarFinAccountNumber,
-            zarFinAccountName,
-            zarFinSellAmount,
-            zarFinCryptoCost || "0",
-            zarFinBankName || zarFinBankCode,
-            zarIdempotencyKey,
-          ).catch((err) => logger.error("[OFFRAMP-ZAR] Background payout error: " + (err as Error).message));
-
-          return { screen: "OFFRAMP_SUCCESS", data: {} };
-        } catch (error) {
-          logger.error("[OFFRAMP-ZAR] Error in ZAR_AUTHORIZE: " + (error as Error).message);
-          return {
-            screen: "ZAR_AUTHORIZE",
-            data: { ...data, error_message: (error as Error).message || "Transaction failed. Please try again.", has_error: true },
-          };
-        }
+        return executePcxOfframp({
+          screenId: "ZAR_AUTHORIZE", tag: "[OFFRAMP-ZAR]",
+          data: data as Record<string, unknown>, phone,
+          pin: zarPin, cryptoAsset: zarFinAsset, cryptoNetwork: zarFinNetwork,
+          totalCryptoUsd: zarFinTotal || "0", fiatCurrency: "ZAR",
+          fiatAmount: zarFinSellAmount, clientRate: zarFinRate || "0",
+          orgRateId: zarFinOrgRateId || "", country: "ZA",
+          paymentMethod: "bank_transfer",
+          beneficiaryName: zarFinAccountName,
+          destination: { accountNumber: zarFinAccountNumber, bankCode: zarFinBankCode, bankName: zarFinBankName || zarFinBankCode } as PCXBankTransferDestination,
+          idempKeySuffix: `${zarFinSellAmount}:${zarFinBankCode}:${zarFinAccountNumber}`,
+          displayAmount: `ZAR ${zarFinSellAmount}`,
+          displayAccount: zarFinAccountNumber,
+        });
       }
 
       default:

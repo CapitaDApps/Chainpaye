@@ -901,6 +901,34 @@ const COMMANDS: Record<string, CommandConfig> = {
     description: "View your saved beneficiary accounts",
     priority: 5,
   },
+
+  // ============================================================
+  // RATES
+  // View live exchange rates for all supported currencies
+  // ============================================================
+  rates: {
+    triggers: [
+      "/rates",
+      "/rate",
+      "/exchangerates",
+      "rates",
+      "rate",
+      "exchange rates",
+      "live rates",
+      "current rates",
+      "show rates",
+      "view rates",
+      "check rates",
+      "what are the rates",
+      "what is the rate",
+      "today rates",
+      "today's rates",
+      "crypto rates",
+      "conversion rates",
+    ],
+    description: "View live exchange rates for all supported currencies",
+    priority: 6,
+  },
 };
 
 export { COMMANDS };

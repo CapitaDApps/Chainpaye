@@ -359,6 +359,7 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
                   other_menu_wallets: "wallets",
                   other_menu_withdraw: "withdraw",
                   other_menu_referral: "referral",
+                  other_menu_rates: "rates",
                   other_menu_payment_link: "payment link",
                   other_menu_transaction_history: "transaction history",
                   other_menu_support: "support",

@@ -425,6 +425,11 @@ What can I do for you?
             title:"Referral",
             description:"View referral stats and details"
           },
+          {
+            id:"other_menu_rates",
+            title:"Live Rates",
+            description:"View current exchange rates"
+          },
           
           
             {
