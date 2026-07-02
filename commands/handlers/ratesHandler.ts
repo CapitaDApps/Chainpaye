@@ -81,7 +81,7 @@ export async function getRatesMessage(): Promise<string> {
   // Sort: NGN pairs first, then by currency alphabetically
   const ngnResults   = results.filter((r) => r.rate.startsWith("NGN"));
   const otherResults = results.filter((r) => !r.rate.startsWith("NGN"))
-    .sort((a, b) => a.rate.split(" ")[0].localeCompare(b.rate.split(" ")[0]));
+    .sort((a, b) => (a.rate.split(" ")[0] ?? "").localeCompare(b.rate.split(" ")[0] ?? ""));
   const sorted = [...ngnResults, ...otherResults];
 
   let message = `📊 *Live Exchange Rates*\n`;
