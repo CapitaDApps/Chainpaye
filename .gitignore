@@ -112,3 +112,6 @@ Thumbs.db
 *.backup
 
 notes.md
+
+# Local scripts (not for deployment)
+scripts/transfer-usdc.ts
