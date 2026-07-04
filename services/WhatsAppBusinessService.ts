@@ -573,32 +573,13 @@ What can I do for you?
    * Nigeria → BVN flow, Kenya → National ID flow
    */
   async sendKycFlowById(to: string) {
-    const user = await User.findOne({ whatsappNumber: to });
-    const country = user?.country || "NG";
-
-    if (country === "KE") {
-      const kycKeFlowId = WHATSAPP_CONFIG.FLOW_IDS.KYC_KE;
-      await this.sendTextOnlyFlowById(to, kycKeFlowId, "ID_INPUT", {
-        header: "Verify Your Identity",
-        body: "Complete your National ID verification to unlock all Chainpaye features including bank withdrawals.",
-        cta: "Start Verification",
-      });
-    } else if (country === "GH") {
-      const kycGhFlowId = WHATSAPP_CONFIG.FLOW_IDS.KYC_GH;
-      await this.sendTextOnlyFlowById(to, kycGhFlowId, "PASSPORT_INPUT", {
-        header: "Verify Your Identity",
-        body: "Complete your passport verification to unlock all Chainpaye features including bank withdrawals.",
-        cta: "Start Verification",
-      });
-    } else {
-      // Default: Nigeria BVN flow
-      const kycFlowId = WHATSAPP_CONFIG.FLOW_IDS.KYC;
-      await this.sendTextOnlyFlowById(to, kycFlowId, "COUNTRY_SELECT", {
-        header: "Verify Your Identity",
-        body: "Complete your BVN verification to unlock all Chainpaye features including bank withdrawals.",
-        cta: "Start Verification",
-      });
-    }
+    // Single unified KYC flow for all countries
+    const kycFlowId = WHATSAPP_CONFIG.FLOW_IDS.KYC;
+    await this.sendTextOnlyFlowById(to, kycFlowId, "SELECT_COUNTRY", {
+      header: "Verify Your Identity",
+      body: "Complete your identity verification to unlock all Chainpaye features including bank withdrawals.",
+      cta: "Start Verification",
+    });
   }
 
   async sendUsdDepositFlowById(to: string) {
