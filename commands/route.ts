@@ -465,6 +465,13 @@ export async function commandRouteHandler(from: string, message: string) {
             `Hi ${displayName}, your account is already verified! ✅\n\nYou have full access to all features. No need to verify again.`,
             from,
           );
+        } else if (!user?.emailVerified) {
+          // Email must be verified before KYC
+          await whatsappBusinessService.sendNormalMessage(
+            "📧 *Email Verification Required*\n\nPlease verify your email address before completing KYC.\n\nYou'll be redirected to email verification now.",
+            from,
+          );
+          await whatsappBusinessService.sendEmailVerificationFlowById(from);
         } else {
           await whatsappBusinessService.sendKycFlowById(from);
         }

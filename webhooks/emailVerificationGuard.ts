@@ -9,12 +9,14 @@
  * any bot command is processed.
  *
  * Conditions:
- *  - User has completed KYC (`isVerified = true`)
  *  - User has NOT yet verified their email (`emailVerified = false`)
+ *
+ * Email verification is now required for all registered users, not only
+ * post-KYC users. This ensures email is verified before KYC is attempted.
  */
 export function shouldGateEmailVerification(user: {
   isVerified: boolean;
   emailVerified: boolean;
 }): boolean {
-  return user.isVerified && !user.emailVerified;
+  return !user.emailVerified;
 }

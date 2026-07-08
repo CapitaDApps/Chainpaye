@@ -224,10 +224,16 @@ export const emailVerificationFlowScreen = async (decryptedBody: {
           try {
             const wbs = new WhatsAppBusinessService();
             await wbs.sendNormalMessage(
-              "✅ *Email Verified Successfully!*\n\nYour email has been verified. You now have full access to all Chainpaye features.",
+              "✅ *Email Verified Successfully!*\n\nYour email has been verified. You can now complete your KYC identity verification to unlock all Chainpaye features.\n\nType *kyc* or *verify* to start identity verification.",
               phone!,
             );
-            await wbs.sendMenuMessageMyFlowId(phone!);
+            // Prompt KYC if not yet verified
+            const updatedUser = await User.findOne({ whatsappNumber: phone });
+            if (updatedUser && !updatedUser.isVerified) {
+              await wbs.sendKycFlowById(phone!);
+            } else {
+              await wbs.sendMenuMessageMyFlowId(phone!);
+            }
           } catch (msgErr) {
             logger.error("Failed to send email verification confirmation message", { msgErr });
           }

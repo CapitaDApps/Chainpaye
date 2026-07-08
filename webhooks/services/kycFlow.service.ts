@@ -6,7 +6,6 @@ import { UserService } from "../../services/UserService";
 import { WhatsAppBusinessService } from "../../services/WhatsAppBusinessService";
 import { handleKYCCompletion } from "../controllers/referral.controller";
 import { logger } from "../../utils/logger";
-
 // ─── Country config ───────────────────────────────────────────────────────────
 // Countries that require ID type selection (multiple options available)
 const MULTI_ID_COUNTRIES = ["NG", "KE"];
@@ -213,6 +212,28 @@ export const kycFlowScreen = async (decryptedBody: {
       return {
         screen: "VERIFICATION_COMPLETE",
         data: { already_verified: true, verified: false, auto_verified: false, first_name: user.firstName || "" },
+      };
+    }
+    // Email must be verified before KYC can proceed
+    if (!user.emailVerified) {
+      const whatsappBusinessService = new WhatsAppBusinessService();
+      setImmediate(async () => {
+        try {
+          await whatsappBusinessService.sendNormalMessage(
+            "📧 *Email Verification Required*\n\nYou need to verify your email address before completing KYC identity verification.\n\nPlease complete email verification first, then come back to verify your identity.",
+            phone,
+          );
+          await whatsappBusinessService.sendEmailVerificationFlowById(phone);
+        } catch (e) {
+          logger.error("[KYC] Failed to redirect to email verification", e);
+        }
+      });
+      return {
+        screen: "SELECT_COUNTRY",
+        data: {
+          has_error: true,
+          error_message: "Please verify your email address first before completing KYC. Check your WhatsApp for the email verification link.",
+        },
       };
     }
     return {

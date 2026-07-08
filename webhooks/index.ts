@@ -405,13 +405,13 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
                     message.from,
                   );
 
-                  // If Nigerian user, prompt for KYC
+                  // If Nigerian user, prompt for email verification first (then KYC)
                   if (account?.needsKyc) {
-                    // await whatsappBusinessService.sendNormalMessage(
-                    //   "To unlock all features (including bank withdrawals), please complete your BVN verification. Type 'verify' or 'kyc' to start.",
-                    //   message.from,
-                    // );
-                    await whatsappBusinessService.sendKycFlowById(message.from);
+                    await whatsappBusinessService.sendNormalMessage(
+                      "📧 *Email Verification Required*\n\nBefore completing your KYC identity verification, please verify your email address.",
+                      message.from,
+                    );
+                    await whatsappBusinessService.sendEmailVerificationFlowById(message.from);
                   }
 
                   // await whatsappBusinessService.sendMenuMessageMyFlowId(
