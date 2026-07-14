@@ -267,13 +267,25 @@ export class WhatsAppBusinessService {
       link,
       body: `Hey 👋 Welcome to Chainpaye! 
       The payment account built for Africans on the move. 
-      - 💸 Send, receive & convert Naira 󰐕 | USD 󰑔 | GBP 󰏅 | EUR 󰎾 ✈ Pay for flights,
-       hotels & travel expenses in 7+ African countries
-      - ⚡ Settle stablecoin to local currency in under 60 seconds 
-      - 🔗 Generate payment links & collect USD | Naira instantly `,
+      - 💸 Send, receive & convert Naira 󰐕 | USD 󰑔 | ✈ Pay for flights,
+       hotels & travel expenses in 4+ African countries
+      - ⚡ Settle stablecoin to local currency in under 60 seconds`,
       cta: "Sign Up",
     });
   }
+
+  // intro old
+  //   await this.sendImageFlowById(to, introFlowId, introInitScreedId, {
+  //     link,
+  //     body: `Hey 👋 Welcome to Chainpaye! 
+  //     The payment account built for Africans on the move. 
+  //     - 💸 Send, receive & convert Naira 󰐕 | USD 󰑔 | ✈ Pay for flights,
+  //      hotels & travel expenses in 4+ African countries
+  //     - ⚡ Settle stablecoin to local currency in under 60 seconds 
+  //     - 🔗 Generate payment links & collect USD | Naira instantly `,
+  //     cta: "Sign Up",
+  //   });
+  // }
 
   async sendMenuMessageMyFlowId(to: string) {
     // const topUpFlowId = "1513776869736922";
