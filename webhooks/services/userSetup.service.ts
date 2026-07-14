@@ -13,12 +13,9 @@ import { logger } from "../../utils/logger";
 
 const countries = [
   { id: "NG", title: "Nigeria" },
-  { id: "US", title: "United States" },
-  { id: "GB", title: "United Kingdom" },
-  { id: "CA", title: "Canada" },
-  { id: "GH", title: "Ghana" },
   { id: "KE", title: "Kenya" },
   { id: "ZA", title: "South Africa" },
+  { id: "UG", title: "Uganda" },
 ];
 
 export const userSetupScreen = async (decryptedBody: {
@@ -368,7 +365,7 @@ export const userSetupScreen = async (decryptedBody: {
             JSON.stringify({
               fullName: userFullName,
               country: data.country,
-              needsKyc: data.country === "NG",
+              needsKyc: ["NG", "KE", "ZA", "UG"].includes(data.country),
             }),
             "EX",
             3600,

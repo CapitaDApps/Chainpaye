@@ -49,9 +49,6 @@
           {
             "type": "Form",
             "name": "personal_info_form",
-            "init-values": {
-              "referral_code": "${data.referral_code}"
-            },
             "children": [
               {
                 "type": "TextHeading",
@@ -76,21 +73,10 @@
                 "required": true,
                 "data-source": [
                   { "id": "NG", "title": "Nigeria" },
-                  { "id": "US", "title": "United States" },
-                  { "id": "GB", "title": "United Kingdom" },
-                  { "id": "CA", "title": "Canada" },
-                  { "id": "GH", "title": "Ghana" },
                   { "id": "KE", "title": "Kenya" },
-                  { "id": "ZA", "title": "South Africa" }
+                  { "id": "ZA", "title": "South Africa" },
+                  { "id": "UG", "title": "Uganda" }
                 ]
-              },
-              {
-                "type": "TextInput",
-                "label": "Referral Code (Optional)",
-                "name": "referral_code",
-                "required": false,
-                "input-type": "text",
-                "helper-text": "Enter referral code if you have one"
               },
               {
                 "type": "Footer",
@@ -99,8 +85,7 @@
                   "name": "data_exchange",
                   "payload": {
                     "full_name": "${form.full_name}",
-                    "country": "${form.country}",
-                    "referral_code": "${form.referral_code}"
+                    "country": "${form.country}"
                   }
                 }
               }
@@ -171,12 +156,9 @@
                 "required": true,
                 "data-source": [
                   { "id": "NG", "title": "Nigeria" },
-                  { "id": "US", "title": "United States" },
-                  { "id": "GB", "title": "United Kingdom" },
-                  { "id": "CA", "title": "Canada" },
-                  { "id": "GH", "title": "Ghana" },
                   { "id": "KE", "title": "Kenya" },
-                  { "id": "ZA", "title": "South Africa" }
+                  { "id": "ZA", "title": "South Africa" },
+                  { "id": "UG", "title": "Uganda" }
                 ]
               },
               {

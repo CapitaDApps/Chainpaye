@@ -41,10 +41,7 @@
                   { "id": "NG", "title": "🇳🇬 Nigeria" },
                   { "id": "KE", "title": "🇰🇪 Kenya" },
                   { "id": "ZA", "title": "🇿🇦 South Africa" },
-                  { "id": "UG", "title": "🇺🇬 Uganda" },
-                  { "id": "RW", "title": "🇷🇼 Rwanda" },
-                  { "id": "MW", "title": "🇲🇼 Malawi" },
-                  { "id": "TZ", "title": "🇹🇿 Tanzania" }
+                  { "id": "UG", "title": "🇺🇬 Uganda" }
                 ]
               },
               {

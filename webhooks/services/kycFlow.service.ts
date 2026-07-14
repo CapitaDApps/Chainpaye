@@ -10,15 +10,8 @@ import { logger } from "../../utils/logger";
 // Countries that require ID type selection (multiple options available)
 const MULTI_ID_COUNTRIES = ["NG", "KE"];
 
-// Countries supported by Dojah (others get auto-verified)
-const DOJAH_SUPPORTED_COUNTRIES = ["NG", "KE", "ZA", "UG"];
-
-// Countries without Dojah support — auto-verified
-const AUTO_VERIFY_COUNTRIES = ["RW", "MW", "TZ"];
-
 const COUNTRY_NAMES: Record<string, string> = {
-  NG: "Nigeria", KE: "Kenya", ZA: "South Africa",
-  UG: "Uganda",  RW: "Rwanda", MW: "Malawi", TZ: "Tanzania",
+  NG: "Nigeria", KE: "Kenya", ZA: "South Africa", UG: "Uganda",
 };
 
 // ID type options per country
@@ -261,17 +254,6 @@ export const kycFlowScreen = async (decryptedBody: {
           return {
             screen: "SELECT_COUNTRY",
             data: { has_error: true, error_message: "User not found. Please create an account first." },
-          };
-        }
-
-        // Auto-verify countries without Dojah support
-        if (AUTO_VERIFY_COUNTRIES.includes(country)) {
-          const firstName = user.firstName || user.fullName?.split(" ")[0] || "there";
-          await userService.markUserVerified(phone);
-          try { await handleKYCCompletion(user.userId); } catch { /* silent */ }
-          return {
-            screen: "VERIFICATION_COMPLETE",
-            data: { auto_verified: true, verified: false, already_verified: false, first_name: firstName },
           };
         }
 
