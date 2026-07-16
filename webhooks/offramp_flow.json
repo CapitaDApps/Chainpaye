@@ -2,35 +2,102 @@
   "version": "6.0",
   "data_api_version": "3.0",
   "routing_model": {
-    "SELECT_CURRENCY": ["OFFRAMP_DETAILS", "RWF_DETAILS", "ZAR_DETAILS", "SELECT_PAYMENT_METHOD", "UGX_DETAILS", "MWK_DETAILS", "COMING_SOON"],
-    "SELECT_PAYMENT_METHOD": ["KES_BANK_DETAILS", "KES_MOMO_DETAILS", "TZS_BANK_DETAILS", "TZS_MOMO_DETAILS"],
-    "OFFRAMP_DETAILS": ["OFFRAMP_FIAT_REVIEW"],
-    "RWF_DETAILS": ["RWF_REVIEW"],
-    "RWF_REVIEW": ["RWF_AUTHORIZE"],
-    "RWF_AUTHORIZE": ["OFFRAMP_SUCCESS"],
-    "ZAR_DETAILS": ["ZAR_REVIEW"],
-    "ZAR_REVIEW": ["ZAR_AUTHORIZE"],
-    "ZAR_AUTHORIZE": ["OFFRAMP_SUCCESS"],
-    "KES_BANK_DETAILS": ["KES_BANK_REVIEW"],
-    "KES_BANK_REVIEW": ["KES_BANK_AUTHORIZE"],
-    "KES_BANK_AUTHORIZE": ["OFFRAMP_SUCCESS"],
-    "KES_MOMO_DETAILS": ["KES_MOMO_REVIEW"],
-    "KES_MOMO_REVIEW": ["KES_MOMO_AUTHORIZE"],
-    "KES_MOMO_AUTHORIZE": ["OFFRAMP_SUCCESS"],
-    "TZS_BANK_DETAILS": ["TZS_BANK_REVIEW"],
-    "TZS_BANK_REVIEW": ["TZS_BANK_AUTHORIZE"],
-    "TZS_BANK_AUTHORIZE": ["OFFRAMP_SUCCESS"],
-    "TZS_MOMO_DETAILS": ["TZS_MOMO_REVIEW"],
-    "TZS_MOMO_REVIEW": ["TZS_MOMO_AUTHORIZE"],
-    "TZS_MOMO_AUTHORIZE": ["OFFRAMP_SUCCESS"],
-    "MWK_DETAILS": ["MWK_REVIEW"],
-    "MWK_REVIEW": ["MWK_AUTHORIZE"],
-    "MWK_AUTHORIZE": ["OFFRAMP_SUCCESS"],
-    "UGX_DETAILS": ["UGX_REVIEW"],
-    "UGX_REVIEW": ["UGX_AUTHORIZE"],
-    "UGX_AUTHORIZE": ["OFFRAMP_SUCCESS"],
-    "OFFRAMP_FIAT_REVIEW": ["OFFRAMP_CRYPTO_REVIEW"],
-    "OFFRAMP_CRYPTO_REVIEW": ["OFFRAMP_SUCCESS"],
+    "SELECT_CURRENCY": [
+      "OFFRAMP_DETAILS",
+      "RWF_DETAILS",
+      "ZAR_DETAILS",
+      "SELECT_PAYMENT_METHOD",
+      "UGX_DETAILS",
+      "MWK_DETAILS",
+      "COMING_SOON"
+    ],
+    "SELECT_PAYMENT_METHOD": [
+      "KES_BANK_DETAILS",
+      "KES_MOMO_DETAILS",
+      "TZS_BANK_DETAILS",
+      "TZS_MOMO_DETAILS"
+    ],
+    "OFFRAMP_DETAILS": [
+      "OFFRAMP_FIAT_REVIEW"
+    ],
+    "RWF_DETAILS": [
+      "RWF_REVIEW"
+    ],
+    "RWF_REVIEW": [
+      "RWF_AUTHORIZE"
+    ],
+    "RWF_AUTHORIZE": [
+      "OFFRAMP_SUCCESS"
+    ],
+    "ZAR_DETAILS": [
+      "ZAR_REVIEW"
+    ],
+    "ZAR_REVIEW": [
+      "ZAR_AUTHORIZE"
+    ],
+    "ZAR_AUTHORIZE": [
+      "OFFRAMP_SUCCESS"
+    ],
+    "KES_BANK_DETAILS": [
+      "KES_BANK_REVIEW"
+    ],
+    "KES_BANK_REVIEW": [
+      "KES_BANK_AUTHORIZE"
+    ],
+    "KES_BANK_AUTHORIZE": [
+      "OFFRAMP_SUCCESS"
+    ],
+    "KES_MOMO_DETAILS": [
+      "KES_MOMO_REVIEW"
+    ],
+    "KES_MOMO_REVIEW": [
+      "KES_MOMO_AUTHORIZE"
+    ],
+    "KES_MOMO_AUTHORIZE": [
+      "OFFRAMP_SUCCESS"
+    ],
+    "TZS_BANK_DETAILS": [
+      "TZS_BANK_REVIEW"
+    ],
+    "TZS_BANK_REVIEW": [
+      "TZS_BANK_AUTHORIZE"
+    ],
+    "TZS_BANK_AUTHORIZE": [
+      "OFFRAMP_SUCCESS"
+    ],
+    "TZS_MOMO_DETAILS": [
+      "TZS_MOMO_REVIEW"
+    ],
+    "TZS_MOMO_REVIEW": [
+      "TZS_MOMO_AUTHORIZE"
+    ],
+    "TZS_MOMO_AUTHORIZE": [
+      "OFFRAMP_SUCCESS"
+    ],
+    "MWK_DETAILS": [
+      "MWK_REVIEW"
+    ],
+    "MWK_REVIEW": [
+      "MWK_AUTHORIZE"
+    ],
+    "MWK_AUTHORIZE": [
+      "OFFRAMP_SUCCESS"
+    ],
+    "UGX_DETAILS": [
+      "UGX_REVIEW"
+    ],
+    "UGX_REVIEW": [
+      "UGX_AUTHORIZE"
+    ],
+    "UGX_AUTHORIZE": [
+      "OFFRAMP_SUCCESS"
+    ],
+    "OFFRAMP_FIAT_REVIEW": [
+      "OFFRAMP_CRYPTO_REVIEW"
+    ],
+    "OFFRAMP_CRYPTO_REVIEW": [
+      "OFFRAMP_SUCCESS"
+    ],
     "OFFRAMP_SUCCESS": [],
     "COMING_SOON": []
   },
@@ -79,13 +146,34 @@
                 "label": "Payout Country",
                 "required": true,
                 "data-source": [
-                  { "id": "NGN", "title": "🇳🇬 Nigeria (NGN)" },
-                  { "id": "KES", "title": "🇰🇪 Kenya (KES)" },
-                  { "id": "ZAR", "title": "🇿🇦 South Africa (ZAR)" },
-                  { "id": "RWF", "title": "🇷🇼 Rwanda (RWF)" },
-                  { "id": "UGX", "title": "🇺🇬 Uganda (UGX)" },
-                  { "id": "MWK", "title": "🇲🇼 Malawi (MWK)" },
-                  { "id": "TZS", "title": "🇹🇿 Tanzania (TZS)" }
+                  {
+                    "id": "NGN",
+                    "title": "🇳🇬 Nigeria (NGN)"
+                  },
+                  {
+                    "id": "KES",
+                    "title": "🇰🇪 Kenya (KES)"
+                  },
+                  {
+                    "id": "ZAR",
+                    "title": "🇿🇦 South Africa (ZAR)"
+                  },
+                  {
+                    "id": "RWF",
+                    "title": "🇷🇼 Rwanda (RWF)"
+                  },
+                  {
+                    "id": "UGX",
+                    "title": "🇺🇬 Uganda (UGX)"
+                  },
+                  {
+                    "id": "MWK",
+                    "title": "🇲🇼 Malawi (MWK)"
+                  },
+                  {
+                    "id": "TZS",
+                    "title": "🇹🇿 Tanzania (TZS)"
+                  }
                 ]
               },
               {
@@ -112,13 +200,23 @@
           "items": {
             "type": "object",
             "properties": {
-              "id": { "type": "string" },
-              "title": { "type": "string" }
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
             }
           },
           "__example__": [
-            { "id": "000014", "title": "Access Bank" },
-            { "id": "000013", "title": "GTBank" }
+            {
+              "id": "000014",
+              "title": "Access Bank"
+            },
+            {
+              "id": "000013",
+              "title": "GTBank"
+            }
           ]
         },
         "prefilledAmount": {
@@ -268,13 +366,23 @@
           "items": {
             "type": "object",
             "properties": {
-              "id": { "type": "string" },
-              "title": { "type": "string" }
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
             }
           },
           "__example__": [
-            { "id": "MTN", "title": "MTN Rwanda" },
-            { "id": "Mobile Wallet", "title": "Mobile Wallet" }
+            {
+              "id": "MTN",
+              "title": "MTN Rwanda"
+            },
+            {
+              "id": "Mobile Wallet",
+              "title": "Mobile Wallet"
+            }
           ]
         },
         "error_message": {
@@ -317,8 +425,14 @@
                 "label": "Asset to Sell",
                 "required": true,
                 "data-source": [
-                  { "id": "USDT", "title": "Tether (USDT)" },
-                  { "id": "USDC", "title": "USD Coin (USDC)" }
+                  {
+                    "id": "USDT",
+                    "title": "Tether (USDT)"
+                  },
+                  {
+                    "id": "USDC",
+                    "title": "USD Coin (USDC)"
+                  }
                 ]
               },
               {
@@ -327,13 +441,34 @@
                 "label": "Select Network",
                 "required": true,
                 "data-source": [
-                  { "id": "BASE", "title": "Base Network" },
-                  { "id": "ERC20", "title": "Ethereum (ERC20)" },
-                  { "id": "POLYGON", "title": "Polygon" },
-                  { "id": "OPTIMISM", "title": "Optimism" },
-                  { "id": "ARBITRUM", "title": "Arbitrum" },
-                  { "id": "SOL", "title": "Solana (SOL)" },
-                  { "id": "AVALANCHE", "title": "Avalanche" }
+                  {
+                    "id": "BASE",
+                    "title": "Base Network"
+                  },
+                  {
+                    "id": "ERC20",
+                    "title": "Ethereum (ERC20)"
+                  },
+                  {
+                    "id": "POLYGON",
+                    "title": "Polygon"
+                  },
+                  {
+                    "id": "OPTIMISM",
+                    "title": "Optimism"
+                  },
+                  {
+                    "id": "ARBITRUM",
+                    "title": "Arbitrum"
+                  },
+                  {
+                    "id": "SOL",
+                    "title": "Solana (SOL)"
+                  },
+                  {
+                    "id": "AVALANCHE",
+                    "title": "Avalanche"
+                  }
                 ]
               },
               {
@@ -382,16 +517,46 @@
       "id": "RWF_REVIEW",
       "title": "Review RWF Withdrawal",
       "data": {
-        "crypto_asset": { "type": "string", "__example__": "USDC" },
-        "crypto_network": { "type": "string", "__example__": "BASE" },
-        "network_code": { "type": "string", "__example__": "MTN" },
-        "network_name": { "type": "string", "__example__": "MTN Rwanda" },
-        "phone_number": { "type": "string", "__example__": "0781234567" },
-        "sell_amount": { "type": "string", "__example__": "13500" },
-        "crypto_cost": { "type": "string", "__example__": "9.63" },
-        "rate": { "type": "string", "__example__": "1,402" },
-        "error_message": { "type": "string", "__example__": "" },
-        "has_error": { "type": "boolean", "__example__": false }
+        "crypto_asset": {
+          "type": "string",
+          "__example__": "USDC"
+        },
+        "crypto_network": {
+          "type": "string",
+          "__example__": "BASE"
+        },
+        "network_code": {
+          "type": "string",
+          "__example__": "MTN"
+        },
+        "network_name": {
+          "type": "string",
+          "__example__": "MTN Rwanda"
+        },
+        "phone_number": {
+          "type": "string",
+          "__example__": "0781234567"
+        },
+        "sell_amount": {
+          "type": "string",
+          "__example__": "13500"
+        },
+        "crypto_cost": {
+          "type": "string",
+          "__example__": "9.63"
+        },
+        "rate": {
+          "type": "string",
+          "__example__": "1,402"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
       },
       "layout": {
         "type": "SingleColumnLayout",
@@ -404,15 +569,36 @@
             "type": "If",
             "condition": "${data.has_error}",
             "then": [
-              { "type": "TextCaption", "text": "${data.error_message}" }
+              {
+                "type": "TextCaption",
+                "text": "${data.error_message}"
+              }
             ]
           },
-          { "type": "TextBody", "text": "`'Network: '${data.network_name}''`" },
-          { "type": "TextBody", "text": "`'Mobile Number: '${data.phone_number}''`" },
-          { "type": "TextBody", "text": "`'Amount: RWF '${data.sell_amount}''`" },
-          { "type": "TextBody", "text": "`'You Pay: '${data.crypto_cost}' '${data.crypto_asset}''`" },
-          { "type": "TextBody", "text": "`'Rate: 1 '${data.crypto_asset}' = RWF '${data.rate}''`" },
-          { "type": "TextBody", "text": "`'Network: '${data.crypto_network}''`" },
+          {
+            "type": "TextBody",
+            "text": "`'Network: '${data.network_name}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Mobile Number: '${data.phone_number}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Amount: RWF '${data.sell_amount}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'You Pay: '${data.crypto_cost}' '${data.crypto_asset}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Rate: 1 '${data.crypto_asset}' = RWF '${data.rate}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Network: '${data.crypto_network}''`"
+          },
           {
             "type": "Footer",
             "label": "Proceed to Payment",
@@ -437,16 +623,46 @@
       "id": "RWF_AUTHORIZE",
       "title": "Authorize RWF Payment",
       "data": {
-        "crypto_asset": { "type": "string", "__example__": "USDC" },
-        "crypto_network": { "type": "string", "__example__": "BASE" },
-        "network_code": { "type": "string", "__example__": "MTN" },
-        "network_name": { "type": "string", "__example__": "MTN Rwanda" },
-        "phone_number": { "type": "string", "__example__": "0781234567" },
-        "sell_amount": { "type": "string", "__example__": "13500" },
-        "crypto_cost": { "type": "string", "__example__": "9.63" },
-        "total_crypto_usd": { "type": "string", "__example__": "10.38" },
-        "error_message": { "type": "string", "__example__": "" },
-        "has_error": { "type": "boolean", "__example__": false }
+        "crypto_asset": {
+          "type": "string",
+          "__example__": "USDC"
+        },
+        "crypto_network": {
+          "type": "string",
+          "__example__": "BASE"
+        },
+        "network_code": {
+          "type": "string",
+          "__example__": "MTN"
+        },
+        "network_name": {
+          "type": "string",
+          "__example__": "MTN Rwanda"
+        },
+        "phone_number": {
+          "type": "string",
+          "__example__": "0781234567"
+        },
+        "sell_amount": {
+          "type": "string",
+          "__example__": "13500"
+        },
+        "crypto_cost": {
+          "type": "string",
+          "__example__": "9.63"
+        },
+        "total_crypto_usd": {
+          "type": "string",
+          "__example__": "10.38"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
       },
       "layout": {
         "type": "SingleColumnLayout",
@@ -459,16 +675,40 @@
             "type": "If",
             "condition": "${data.has_error}",
             "then": [
-              { "type": "TextCaption", "text": "${data.error_message}" }
+              {
+                "type": "TextCaption",
+                "text": "${data.error_message}"
+              }
             ]
           },
-          { "type": "TextBody", "text": "`'Network: '${data.network_name}''`" },
-          { "type": "TextBody", "text": "`'Mobile Number: '${data.phone_number}''`" },
-          { "type": "TextBody", "text": "`'You Receive: RWF '${data.sell_amount}''`" },
-          { "type": "TextBody", "text": "`'Crypto Cost: '${data.crypto_cost}' '${data.crypto_asset}''`" },
-          { "type": "TextBody", "text": "`'Fee: $0.75 USD'`" },
-          { "type": "TextBody", "text": "`'Total Deducted: '${data.total_crypto_usd}' '${data.crypto_asset}''`" },
-          { "type": "TextBody", "text": "Enter PIN to Confirm" },
+          {
+            "type": "TextBody",
+            "text": "`'Network: '${data.network_name}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Mobile Number: '${data.phone_number}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'You Receive: RWF '${data.sell_amount}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Crypto Cost: '${data.crypto_cost}' '${data.crypto_asset}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Fee: $0.75 USD'`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Total Deducted: '${data.total_crypto_usd}' '${data.crypto_asset}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "Enter PIN to Confirm"
+          },
           {
             "type": "Form",
             "name": "rwf_pin_form",
@@ -514,17 +754,33 @@
           "items": {
             "type": "object",
             "properties": {
-              "id": { "type": "string" },
-              "title": { "type": "string" }
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
             }
           },
           "__example__": [
-            { "id": "051001", "title": "Standard Bank (South Africa)" },
-            { "id": "632005", "title": "Absa Bank" }
+            {
+              "id": "051001",
+              "title": "Standard Bank (South Africa)"
+            },
+            {
+              "id": "632005",
+              "title": "Absa Bank"
+            }
           ]
         },
-        "error_message": { "type": "string", "__example__": "" },
-        "has_error": { "type": "boolean", "__example__": false }
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
       },
       "layout": {
         "type": "SingleColumnLayout",
@@ -541,7 +797,10 @@
             "type": "If",
             "condition": "${data.has_error}",
             "then": [
-              { "type": "TextCaption", "text": "${data.error_message}" }
+              {
+                "type": "TextCaption",
+                "text": "${data.error_message}"
+              }
             ]
           },
           {
@@ -554,8 +813,14 @@
                 "label": "Asset to Sell",
                 "required": true,
                 "data-source": [
-                  { "id": "USDT", "title": "Tether (USDT)" },
-                  { "id": "USDC", "title": "USD Coin (USDC)" }
+                  {
+                    "id": "USDT",
+                    "title": "Tether (USDT)"
+                  },
+                  {
+                    "id": "USDC",
+                    "title": "USD Coin (USDC)"
+                  }
                 ]
               },
               {
@@ -564,13 +829,34 @@
                 "label": "Select Network",
                 "required": true,
                 "data-source": [
-                  { "id": "BASE", "title": "Base Network" },
-                  { "id": "ERC20", "title": "Ethereum (ERC20)" },
-                  { "id": "POLYGON", "title": "Polygon" },
-                  { "id": "OPTIMISM", "title": "Optimism" },
-                  { "id": "ARBITRUM", "title": "Arbitrum" },
-                  { "id": "SOL", "title": "Solana (SOL)" },
-                  { "id": "AVALANCHE", "title": "Avalanche" }
+                  {
+                    "id": "BASE",
+                    "title": "Base Network"
+                  },
+                  {
+                    "id": "ERC20",
+                    "title": "Ethereum (ERC20)"
+                  },
+                  {
+                    "id": "POLYGON",
+                    "title": "Polygon"
+                  },
+                  {
+                    "id": "OPTIMISM",
+                    "title": "Optimism"
+                  },
+                  {
+                    "id": "ARBITRUM",
+                    "title": "Arbitrum"
+                  },
+                  {
+                    "id": "SOL",
+                    "title": "Solana (SOL)"
+                  },
+                  {
+                    "id": "AVALANCHE",
+                    "title": "Avalanche"
+                  }
                 ]
               },
               {
@@ -619,36 +905,96 @@
       "id": "ZAR_REVIEW",
       "title": "Review ZAR Withdrawal",
       "data": {
-        "crypto_asset": { "type": "string", "__example__": "USDC" },
-        "crypto_network": { "type": "string", "__example__": "BASE" },
-        "bank_code": { "type": "string", "__example__": "051001" },
-        "bank_name": { "type": "string", "__example__": "Standard Bank" },
-        "account_number": { "type": "string", "__example__": "1234567890" },
-        "account_name": { "type": "string", "__example__": "John Doe" },
-        "sell_amount": { "type": "string", "__example__": "1000" },
-        "crypto_cost": { "type": "string", "__example__": "61.88" },
-        "rate": { "type": "string", "__example__": "16.16" },
-        "error_message": { "type": "string", "__example__": "" },
-        "has_error": { "type": "boolean", "__example__": false }
+        "crypto_asset": {
+          "type": "string",
+          "__example__": "USDC"
+        },
+        "crypto_network": {
+          "type": "string",
+          "__example__": "BASE"
+        },
+        "bank_code": {
+          "type": "string",
+          "__example__": "051001"
+        },
+        "bank_name": {
+          "type": "string",
+          "__example__": "Standard Bank"
+        },
+        "account_number": {
+          "type": "string",
+          "__example__": "1234567890"
+        },
+        "account_name": {
+          "type": "string",
+          "__example__": "John Doe"
+        },
+        "sell_amount": {
+          "type": "string",
+          "__example__": "1000"
+        },
+        "crypto_cost": {
+          "type": "string",
+          "__example__": "61.88"
+        },
+        "rate": {
+          "type": "string",
+          "__example__": "16.16"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
       },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
-          { "type": "TextHeading", "text": "Review Details" },
+          {
+            "type": "TextHeading",
+            "text": "Review Details"
+          },
           {
             "type": "If",
             "condition": "${data.has_error}",
             "then": [
-              { "type": "TextCaption", "text": "${data.error_message}" }
+              {
+                "type": "TextCaption",
+                "text": "${data.error_message}"
+              }
             ]
           },
-          { "type": "TextBody", "text": "`'Bank: '${data.bank_name}''`" },
-          { "type": "TextBody", "text": "`'Account: '${data.account_number}''`" },
-          { "type": "TextBody", "text": "`'Name: '${data.account_name}''`" },
-          { "type": "TextBody", "text": "`'Amount: ZAR '${data.sell_amount}''`" },
-          { "type": "TextBody", "text": "`'You Pay: '${data.crypto_cost}' '${data.crypto_asset}''`" },
-          { "type": "TextBody", "text": "`'Rate: 1 '${data.crypto_asset}' = ZAR '${data.rate}''`" },
-          { "type": "TextBody", "text": "`'Network: '${data.crypto_network}''`" },
+          {
+            "type": "TextBody",
+            "text": "`'Bank: '${data.bank_name}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Account: '${data.account_number}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Name: '${data.account_name}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Amount: ZAR '${data.sell_amount}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'You Pay: '${data.crypto_cost}' '${data.crypto_asset}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Rate: 1 '${data.crypto_asset}' = ZAR '${data.rate}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Network: '${data.crypto_network}''`"
+          },
           {
             "type": "Footer",
             "label": "Proceed to Payment",
@@ -674,36 +1020,96 @@
       "id": "ZAR_AUTHORIZE",
       "title": "Authorize ZAR Payment",
       "data": {
-        "crypto_asset": { "type": "string", "__example__": "USDC" },
-        "crypto_network": { "type": "string", "__example__": "BASE" },
-        "bank_code": { "type": "string", "__example__": "051001" },
-        "bank_name": { "type": "string", "__example__": "Standard Bank" },
-        "account_number": { "type": "string", "__example__": "1234567890" },
-        "account_name": { "type": "string", "__example__": "John Doe" },
-        "sell_amount": { "type": "string", "__example__": "1000" },
-        "crypto_cost": { "type": "string", "__example__": "61.88" },
-        "total_crypto_usd": { "type": "string", "__example__": "62.63" },
-        "error_message": { "type": "string", "__example__": "" },
-        "has_error": { "type": "boolean", "__example__": false }
+        "crypto_asset": {
+          "type": "string",
+          "__example__": "USDC"
+        },
+        "crypto_network": {
+          "type": "string",
+          "__example__": "BASE"
+        },
+        "bank_code": {
+          "type": "string",
+          "__example__": "051001"
+        },
+        "bank_name": {
+          "type": "string",
+          "__example__": "Standard Bank"
+        },
+        "account_number": {
+          "type": "string",
+          "__example__": "1234567890"
+        },
+        "account_name": {
+          "type": "string",
+          "__example__": "John Doe"
+        },
+        "sell_amount": {
+          "type": "string",
+          "__example__": "1000"
+        },
+        "crypto_cost": {
+          "type": "string",
+          "__example__": "61.88"
+        },
+        "total_crypto_usd": {
+          "type": "string",
+          "__example__": "62.63"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
       },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
-          { "type": "TextHeading", "text": "Authorize" },
+          {
+            "type": "TextHeading",
+            "text": "Authorize"
+          },
           {
             "type": "If",
             "condition": "${data.has_error}",
             "then": [
-              { "type": "TextCaption", "text": "${data.error_message}" }
+              {
+                "type": "TextCaption",
+                "text": "${data.error_message}"
+              }
             ]
           },
-          { "type": "TextBody", "text": "`'Bank: '${data.bank_name}''`" },
-          { "type": "TextBody", "text": "`'Account: '${data.account_number}''`" },
-          { "type": "TextBody", "text": "`'You Receive: ZAR '${data.sell_amount}''`" },
-          { "type": "TextBody", "text": "`'Crypto Cost: '${data.crypto_cost}' '${data.crypto_asset}''`" },
-          { "type": "TextBody", "text": "`'Fee: $0.75 USD'`" },
-          { "type": "TextBody", "text": "`'Total Deducted: '${data.total_crypto_usd}' '${data.crypto_asset}''`" },
-          { "type": "TextBody", "text": "Enter PIN to Confirm" },
+          {
+            "type": "TextBody",
+            "text": "`'Bank: '${data.bank_name}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Account: '${data.account_number}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'You Receive: ZAR '${data.sell_amount}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Crypto Cost: '${data.crypto_cost}' '${data.crypto_asset}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Fee: $0.75 USD'`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Total Deducted: '${data.total_crypto_usd}' '${data.crypto_asset}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "Enter PIN to Confirm"
+          },
           {
             "type": "Form",
             "name": "zar_pin_form",
@@ -1026,21 +1432,47 @@
       "id": "SELECT_PAYMENT_METHOD",
       "title": "Payment Method",
       "data": {
-        "payout_country": { "type": "string", "__example__": "KES" },
-        "country_label": { "type": "string", "__example__": "Kenya 🇰🇪" },
-        "currency_code": { "type": "string", "__example__": "KES" },
-        "error_message": { "type": "string", "__example__": "" },
-        "has_error": { "type": "boolean", "__example__": false }
+        "payout_country": {
+          "type": "string",
+          "__example__": "KES"
+        },
+        "country_label": {
+          "type": "string",
+          "__example__": "Kenya 🇰🇪"
+        },
+        "currency_code": {
+          "type": "string",
+          "__example__": "KES"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
       },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
-          { "type": "TextHeading", "text": "`'Withdraw to '${data.country_label}''`" },
-          { "type": "TextBody", "text": "How would you like to receive your funds?" },
+          {
+            "type": "TextHeading",
+            "text": "`'Withdraw to '${data.country_label}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "How would you like to receive your funds?"
+          },
           {
             "type": "If",
             "condition": "${data.has_error}",
-            "then": [{ "type": "TextCaption", "text": "${data.error_message}" }]
+            "then": [
+              {
+                "type": "TextCaption",
+                "text": "${data.error_message}"
+              }
+            ]
           },
           {
             "type": "Form",
@@ -1052,8 +1484,14 @@
                 "label": "Payment Method",
                 "required": true,
                 "data-source": [
-                  { "id": "bank_transfer", "title": "🏦 Bank Transfer" },
-                  { "id": "mobile_money", "title": "📱 Mobile Money" }
+                  {
+                    "id": "bank_transfer",
+                    "title": "🏦 Bank Transfer"
+                  },
+                  {
+                    "id": "mobile_money",
+                    "title": "📱 Mobile Money"
+                  }
                 ]
               },
               {
@@ -1079,21 +1517,53 @@
       "data": {
         "banks": {
           "type": "array",
-          "items": { "type": "object", "properties": { "id": { "type": "string" }, "title": { "type": "string" } } },
-          "__example__": [{ "id": "410506", "title": "Access Bank" }]
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            }
+          },
+          "__example__": [
+            {
+              "id": "410506",
+              "title": "Access Bank"
+            }
+          ]
         },
-        "error_message": { "type": "string", "__example__": "" },
-        "has_error": { "type": "boolean", "__example__": false }
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
       },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
-          { "type": "TextHeading", "text": "Withdraw to Kenya 🇰🇪" },
-          { "type": "TextBody", "text": "Enter your bank account details to receive KES." },
+          {
+            "type": "TextHeading",
+            "text": "Withdraw to Kenya 🇰🇪"
+          },
+          {
+            "type": "TextBody",
+            "text": "Enter your bank account details to receive KES."
+          },
           {
             "type": "If",
             "condition": "${data.has_error}",
-            "then": [{ "type": "TextCaption", "text": "${data.error_message}" }]
+            "then": [
+              {
+                "type": "TextCaption",
+                "text": "${data.error_message}"
+              }
+            ]
           },
           {
             "type": "Form",
@@ -1105,8 +1575,14 @@
                 "label": "Asset to Sell",
                 "required": true,
                 "data-source": [
-                  { "id": "USDT", "title": "Tether (USDT)" },
-                  { "id": "USDC", "title": "USD Coin (USDC)" }
+                  {
+                    "id": "USDT",
+                    "title": "Tether (USDT)"
+                  },
+                  {
+                    "id": "USDC",
+                    "title": "USD Coin (USDC)"
+                  }
                 ]
               },
               {
@@ -1115,11 +1591,26 @@
                 "label": "Select Network",
                 "required": true,
                 "data-source": [
-                  { "id": "BASE", "title": "Base Network" },
-                  { "id": "ERC20", "title": "Ethereum (ERC20)" },
-                  { "id": "POLYGON", "title": "Polygon" },
-                  { "id": "SOL", "title": "Solana (SOL)" },
-                  { "id": "AVALANCHE", "title": "Avalanche" }
+                  {
+                    "id": "BASE",
+                    "title": "Base Network"
+                  },
+                  {
+                    "id": "ERC20",
+                    "title": "Ethereum (ERC20)"
+                  },
+                  {
+                    "id": "POLYGON",
+                    "title": "Polygon"
+                  },
+                  {
+                    "id": "SOL",
+                    "title": "Solana (SOL)"
+                  },
+                  {
+                    "id": "AVALANCHE",
+                    "title": "Avalanche"
+                  }
                 ]
               },
               {
@@ -1177,34 +1668,96 @@
       "id": "KES_BANK_REVIEW",
       "title": "Review KES Bank Withdrawal",
       "data": {
-        "crypto_asset": { "type": "string", "__example__": "USDC" },
-        "crypto_network": { "type": "string", "__example__": "BASE" },
-        "bank_code": { "type": "string", "__example__": "410506" },
-        "bank_name": { "type": "string", "__example__": "Access Bank" },
-        "account_number": { "type": "string", "__example__": "1234567890" },
-        "account_name": { "type": "string", "__example__": "John Doe" },
-        "sell_amount": { "type": "string", "__example__": "5000" },
-        "crypto_cost": { "type": "string", "__example__": "38.46" },
-        "rate": { "type": "string", "__example__": "130.00" },
-        "error_message": { "type": "string", "__example__": "" },
-        "has_error": { "type": "boolean", "__example__": false }
+        "crypto_asset": {
+          "type": "string",
+          "__example__": "USDC"
+        },
+        "crypto_network": {
+          "type": "string",
+          "__example__": "BASE"
+        },
+        "bank_code": {
+          "type": "string",
+          "__example__": "410506"
+        },
+        "bank_name": {
+          "type": "string",
+          "__example__": "Access Bank"
+        },
+        "account_number": {
+          "type": "string",
+          "__example__": "1234567890"
+        },
+        "account_name": {
+          "type": "string",
+          "__example__": "John Doe"
+        },
+        "sell_amount": {
+          "type": "string",
+          "__example__": "5000"
+        },
+        "crypto_cost": {
+          "type": "string",
+          "__example__": "38.46"
+        },
+        "rate": {
+          "type": "string",
+          "__example__": "130.00"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
       },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
-          { "type": "TextHeading", "text": "Review Details" },
+          {
+            "type": "TextHeading",
+            "text": "Review Details"
+          },
           {
             "type": "If",
             "condition": "${data.has_error}",
-            "then": [{ "type": "TextCaption", "text": "${data.error_message}" }]
+            "then": [
+              {
+                "type": "TextCaption",
+                "text": "${data.error_message}"
+              }
+            ]
           },
-          { "type": "TextBody", "text": "`'Bank: '${data.bank_name}''`" },
-          { "type": "TextBody", "text": "`'Account: '${data.account_number}''`" },
-          { "type": "TextBody", "text": "`'Name: '${data.account_name}''`" },
-          { "type": "TextBody", "text": "`'Amount: KES '${data.sell_amount}''`" },
-          { "type": "TextBody", "text": "`'You Pay: '${data.crypto_cost}' '${data.crypto_asset}''`" },
-          { "type": "TextBody", "text": "`'Rate: 1 '${data.crypto_asset}' = KES '${data.rate}''`" },
-          { "type": "TextBody", "text": "`'Network: '${data.crypto_network}''`" },
+          {
+            "type": "TextBody",
+            "text": "`'Bank: '${data.bank_name}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Account: '${data.account_number}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Name: '${data.account_name}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Amount: KES '${data.sell_amount}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'You Pay: '${data.crypto_cost}' '${data.crypto_asset}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Rate: 1 '${data.crypto_asset}' = KES '${data.rate}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Network: '${data.crypto_network}''`"
+          },
           {
             "type": "Footer",
             "label": "Proceed to Payment",
@@ -1230,34 +1783,96 @@
       "id": "KES_BANK_AUTHORIZE",
       "title": "Authorize KES Bank Payment",
       "data": {
-        "crypto_asset": { "type": "string", "__example__": "USDC" },
-        "crypto_network": { "type": "string", "__example__": "BASE" },
-        "bank_code": { "type": "string", "__example__": "410506" },
-        "bank_name": { "type": "string", "__example__": "Access Bank" },
-        "account_number": { "type": "string", "__example__": "1234567890" },
-        "account_name": { "type": "string", "__example__": "John Doe" },
-        "sell_amount": { "type": "string", "__example__": "5000" },
-        "crypto_cost": { "type": "string", "__example__": "38.46" },
-        "total_crypto_usd": { "type": "string", "__example__": "39.21" },
-        "error_message": { "type": "string", "__example__": "" },
-        "has_error": { "type": "boolean", "__example__": false }
+        "crypto_asset": {
+          "type": "string",
+          "__example__": "USDC"
+        },
+        "crypto_network": {
+          "type": "string",
+          "__example__": "BASE"
+        },
+        "bank_code": {
+          "type": "string",
+          "__example__": "410506"
+        },
+        "bank_name": {
+          "type": "string",
+          "__example__": "Access Bank"
+        },
+        "account_number": {
+          "type": "string",
+          "__example__": "1234567890"
+        },
+        "account_name": {
+          "type": "string",
+          "__example__": "John Doe"
+        },
+        "sell_amount": {
+          "type": "string",
+          "__example__": "5000"
+        },
+        "crypto_cost": {
+          "type": "string",
+          "__example__": "38.46"
+        },
+        "total_crypto_usd": {
+          "type": "string",
+          "__example__": "39.21"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
       },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
-          { "type": "TextHeading", "text": "Authorize" },
+          {
+            "type": "TextHeading",
+            "text": "Authorize"
+          },
           {
             "type": "If",
             "condition": "${data.has_error}",
-            "then": [{ "type": "TextCaption", "text": "${data.error_message}" }]
+            "then": [
+              {
+                "type": "TextCaption",
+                "text": "${data.error_message}"
+              }
+            ]
           },
-          { "type": "TextBody", "text": "`'Bank: '${data.bank_name}''`" },
-          { "type": "TextBody", "text": "`'Account: '${data.account_number}''`" },
-          { "type": "TextBody", "text": "`'You Receive: KES '${data.sell_amount}''`" },
-          { "type": "TextBody", "text": "`'Crypto Cost: '${data.crypto_cost}' '${data.crypto_asset}''`" },
-          { "type": "TextBody", "text": "`'Fee: $0.75 USD'`" },
-          { "type": "TextBody", "text": "`'Total Deducted: '${data.total_crypto_usd}' '${data.crypto_asset}''`" },
-          { "type": "TextBody", "text": "Enter PIN to Confirm" },
+          {
+            "type": "TextBody",
+            "text": "`'Bank: '${data.bank_name}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Account: '${data.account_number}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'You Receive: KES '${data.sell_amount}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Crypto Cost: '${data.crypto_cost}' '${data.crypto_asset}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Fee: $0.75 USD'`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Total Deducted: '${data.total_crypto_usd}' '${data.crypto_asset}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "Enter PIN to Confirm"
+          },
           {
             "type": "Form",
             "name": "kes_bank_pin_form",
@@ -1301,21 +1916,53 @@
       "data": {
         "networks": {
           "type": "array",
-          "items": { "type": "object", "properties": { "id": { "type": "string" }, "title": { "type": "string" } } },
-          "__example__": [{ "id": "M PESA", "title": "Mobile Wallet (M-PESA)" }]
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            }
+          },
+          "__example__": [
+            {
+              "id": "M PESA",
+              "title": "Mobile Wallet (M-PESA)"
+            }
+          ]
         },
-        "error_message": { "type": "string", "__example__": "" },
-        "has_error": { "type": "boolean", "__example__": false }
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
       },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
-          { "type": "TextHeading", "text": "Withdraw to Kenya 🇰🇪" },
-          { "type": "TextBody", "text": "Enter your mobile money details to receive KES." },
+          {
+            "type": "TextHeading",
+            "text": "Withdraw to Kenya 🇰🇪"
+          },
+          {
+            "type": "TextBody",
+            "text": "Enter your mobile money details to receive KES."
+          },
           {
             "type": "If",
             "condition": "${data.has_error}",
-            "then": [{ "type": "TextCaption", "text": "${data.error_message}" }]
+            "then": [
+              {
+                "type": "TextCaption",
+                "text": "${data.error_message}"
+              }
+            ]
           },
           {
             "type": "Form",
@@ -1327,8 +1974,14 @@
                 "label": "Asset to Sell",
                 "required": true,
                 "data-source": [
-                  { "id": "USDT", "title": "Tether (USDT)" },
-                  { "id": "USDC", "title": "USD Coin (USDC)" }
+                  {
+                    "id": "USDT",
+                    "title": "Tether (USDT)"
+                  },
+                  {
+                    "id": "USDC",
+                    "title": "USD Coin (USDC)"
+                  }
                 ]
               },
               {
@@ -1337,11 +1990,26 @@
                 "label": "Select Network",
                 "required": true,
                 "data-source": [
-                  { "id": "BASE", "title": "Base Network" },
-                  { "id": "ERC20", "title": "Ethereum (ERC20)" },
-                  { "id": "POLYGON", "title": "Polygon" },
-                  { "id": "SOL", "title": "Solana (SOL)" },
-                  { "id": "AVALANCHE", "title": "Avalanche" }
+                  {
+                    "id": "BASE",
+                    "title": "Base Network"
+                  },
+                  {
+                    "id": "ERC20",
+                    "title": "Ethereum (ERC20)"
+                  },
+                  {
+                    "id": "POLYGON",
+                    "title": "Polygon"
+                  },
+                  {
+                    "id": "SOL",
+                    "title": "Solana (SOL)"
+                  },
+                  {
+                    "id": "AVALANCHE",
+                    "title": "Avalanche"
+                  }
                 ]
               },
               {
@@ -1390,32 +2058,96 @@
       "id": "KES_MOMO_REVIEW",
       "title": "Review KES MoMo Withdrawal",
       "data": {
-        "crypto_asset": { "type": "string", "__example__": "USDC" },
-        "crypto_network": { "type": "string", "__example__": "BASE" },
-        "network_code": { "type": "string", "__example__": "M PESA" },
-        "network_name": { "type": "string", "__example__": "Mobile Wallet (M-PESA)" },
-        "phone_number": { "type": "string", "__example__": "0712345678" },
-        "sell_amount": { "type": "string", "__example__": "5000" },
-        "crypto_cost": { "type": "string", "__example__": "38.46" },
-        "rate": { "type": "string", "__example__": "130.00" },
-        "error_message": { "type": "string", "__example__": "" },
-        "has_error": { "type": "boolean", "__example__": false }
+        "crypto_asset": {
+          "type": "string",
+          "__example__": "USDC"
+        },
+        "crypto_network": {
+          "type": "string",
+          "__example__": "BASE"
+        },
+        "network_code": {
+          "type": "string",
+          "__example__": "M PESA"
+        },
+        "network_name": {
+          "type": "string",
+          "__example__": "Mobile Wallet (M-PESA)"
+        },
+        "phone_number": {
+          "type": "string",
+          "__example__": "0712345678"
+        },
+        "account_name": {
+          "type": "string",
+          "__example__": "John Doe"
+        },
+        "sell_amount": {
+          "type": "string",
+          "__example__": "5000"
+        },
+        "crypto_cost": {
+          "type": "string",
+          "__example__": "38.46"
+        },
+        "rate": {
+          "type": "string",
+          "__example__": "130.00"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
       },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
-          { "type": "TextHeading", "text": "Review Details" },
+          {
+            "type": "TextHeading",
+            "text": "Review Details"
+          },
           {
             "type": "If",
             "condition": "${data.has_error}",
-            "then": [{ "type": "TextCaption", "text": "${data.error_message}" }]
+            "then": [
+              {
+                "type": "TextCaption",
+                "text": "${data.error_message}"
+              }
+            ]
           },
-          { "type": "TextBody", "text": "`'Network: '${data.network_name}''`" },
-          { "type": "TextBody", "text": "`'Mobile Number: '${data.phone_number}''`" },
-          { "type": "TextBody", "text": "`'Amount: KES '${data.sell_amount}''`" },
-          { "type": "TextBody", "text": "`'You Pay: '${data.crypto_cost}' '${data.crypto_asset}''`" },
-          { "type": "TextBody", "text": "`'Rate: 1 '${data.crypto_asset}' = KES '${data.rate}''`" },
-          { "type": "TextBody", "text": "`'Network: '${data.crypto_network}''`" },
+          {
+            "type": "TextBody",
+            "text": "`'Network: '${data.network_name}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Mobile Number: '${data.phone_number}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Account Name: '${data.account_name}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Amount: KES '${data.sell_amount}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'You Pay: '${data.crypto_cost}' '${data.crypto_asset}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Rate: 1 '${data.crypto_asset}' = KES '${data.rate}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Network: '${data.crypto_network}''`"
+          },
           {
             "type": "Footer",
             "label": "Proceed to Payment",
@@ -1429,7 +2161,8 @@
                 "phone_number": "${data.phone_number}",
                 "sell_amount": "${data.sell_amount}",
                 "crypto_cost": "${data.crypto_cost}",
-                "rate": "${data.rate}"
+                "rate": "${data.rate}",
+                "account_name": "${data.account_name}"
               }
             }
           }
@@ -1440,33 +2173,100 @@
       "id": "KES_MOMO_AUTHORIZE",
       "title": "Authorize KES MoMo Payment",
       "data": {
-        "crypto_asset": { "type": "string", "__example__": "USDC" },
-        "crypto_network": { "type": "string", "__example__": "BASE" },
-        "network_code": { "type": "string", "__example__": "M PESA" },
-        "network_name": { "type": "string", "__example__": "Mobile Wallet (M-PESA)" },
-        "phone_number": { "type": "string", "__example__": "0712345678" },
-        "sell_amount": { "type": "string", "__example__": "5000" },
-        "crypto_cost": { "type": "string", "__example__": "38.46" },
-        "total_crypto_usd": { "type": "string", "__example__": "39.21" },
-        "error_message": { "type": "string", "__example__": "" },
-        "has_error": { "type": "boolean", "__example__": false }
+        "crypto_asset": {
+          "type": "string",
+          "__example__": "USDC"
+        },
+        "crypto_network": {
+          "type": "string",
+          "__example__": "BASE"
+        },
+        "network_code": {
+          "type": "string",
+          "__example__": "M PESA"
+        },
+        "network_name": {
+          "type": "string",
+          "__example__": "Mobile Wallet (M-PESA)"
+        },
+        "phone_number": {
+          "type": "string",
+          "__example__": "0712345678"
+        },
+        "account_name": {
+          "type": "string",
+          "__example__": "John Doe"
+        },
+        "sell_amount": {
+          "type": "string",
+          "__example__": "5000"
+        },
+        "crypto_cost": {
+          "type": "string",
+          "__example__": "38.46"
+        },
+        "total_crypto_usd": {
+          "type": "string",
+          "__example__": "39.21"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
       },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
-          { "type": "TextHeading", "text": "Authorize" },
+          {
+            "type": "TextHeading",
+            "text": "Authorize"
+          },
           {
             "type": "If",
             "condition": "${data.has_error}",
-            "then": [{ "type": "TextCaption", "text": "${data.error_message}" }]
+            "then": [
+              {
+                "type": "TextCaption",
+                "text": "${data.error_message}"
+              }
+            ]
           },
-          { "type": "TextBody", "text": "`'Network: '${data.network_name}''`" },
-          { "type": "TextBody", "text": "`'Mobile Number: '${data.phone_number}''`" },
-          { "type": "TextBody", "text": "`'You Receive: KES '${data.sell_amount}''`" },
-          { "type": "TextBody", "text": "`'Crypto Cost: '${data.crypto_cost}' '${data.crypto_asset}''`" },
-          { "type": "TextBody", "text": "`'Fee: $0.75 USD'`" },
-          { "type": "TextBody", "text": "`'Total Deducted: '${data.total_crypto_usd}' '${data.crypto_asset}''`" },
-          { "type": "TextBody", "text": "Enter PIN to Confirm" },
+          {
+            "type": "TextBody",
+            "text": "`'Network: '${data.network_name}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Mobile Number: '${data.phone_number}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Account Name: '${data.account_name}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'You Receive: KES '${data.sell_amount}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Crypto Cost: '${data.crypto_cost}' '${data.crypto_asset}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Fee: $0.75 USD'`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Total Deducted: '${data.total_crypto_usd}' '${data.crypto_asset}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "Enter PIN to Confirm"
+          },
           {
             "type": "Form",
             "name": "kes_momo_pin_form",
@@ -1494,7 +2294,8 @@
                     "phone_number": "${data.phone_number}",
                     "sell_amount": "${data.sell_amount}",
                     "crypto_cost": "${data.crypto_cost}",
-                    "total_crypto_usd": "${data.total_crypto_usd}"
+                    "total_crypto_usd": "${data.total_crypto_usd}",
+                    "account_name": "${data.account_name}"
                   }
                 }
               }
@@ -1509,21 +2310,53 @@
       "data": {
         "banks": {
           "type": "array",
-          "items": { "type": "object", "properties": { "id": { "type": "string" }, "title": { "type": "string" } } },
-          "__example__": [{ "id": "bank_code", "title": "CRDB Bank" }]
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            }
+          },
+          "__example__": [
+            {
+              "id": "bank_code",
+              "title": "CRDB Bank"
+            }
+          ]
         },
-        "error_message": { "type": "string", "__example__": "" },
-        "has_error": { "type": "boolean", "__example__": false }
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
       },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
-          { "type": "TextHeading", "text": "Withdraw to Tanzania 🇹🇿" },
-          { "type": "TextBody", "text": "Enter your bank account details to receive TZS." },
+          {
+            "type": "TextHeading",
+            "text": "Withdraw to Tanzania 🇹🇿"
+          },
+          {
+            "type": "TextBody",
+            "text": "Enter your bank account details to receive TZS."
+          },
           {
             "type": "If",
             "condition": "${data.has_error}",
-            "then": [{ "type": "TextCaption", "text": "${data.error_message}" }]
+            "then": [
+              {
+                "type": "TextCaption",
+                "text": "${data.error_message}"
+              }
+            ]
           },
           {
             "type": "Form",
@@ -1535,8 +2368,14 @@
                 "label": "Asset to Sell",
                 "required": true,
                 "data-source": [
-                  { "id": "USDT", "title": "Tether (USDT)" },
-                  { "id": "USDC", "title": "USD Coin (USDC)" }
+                  {
+                    "id": "USDT",
+                    "title": "Tether (USDT)"
+                  },
+                  {
+                    "id": "USDC",
+                    "title": "USD Coin (USDC)"
+                  }
                 ]
               },
               {
@@ -1545,11 +2384,26 @@
                 "label": "Select Network",
                 "required": true,
                 "data-source": [
-                  { "id": "BASE", "title": "Base Network" },
-                  { "id": "ERC20", "title": "Ethereum (ERC20)" },
-                  { "id": "POLYGON", "title": "Polygon" },
-                  { "id": "SOL", "title": "Solana (SOL)" },
-                  { "id": "AVALANCHE", "title": "Avalanche" }
+                  {
+                    "id": "BASE",
+                    "title": "Base Network"
+                  },
+                  {
+                    "id": "ERC20",
+                    "title": "Ethereum (ERC20)"
+                  },
+                  {
+                    "id": "POLYGON",
+                    "title": "Polygon"
+                  },
+                  {
+                    "id": "SOL",
+                    "title": "Solana (SOL)"
+                  },
+                  {
+                    "id": "AVALANCHE",
+                    "title": "Avalanche"
+                  }
                 ]
               },
               {
@@ -1607,34 +2461,96 @@
       "id": "TZS_BANK_REVIEW",
       "title": "Review TZS Bank Withdrawal",
       "data": {
-        "crypto_asset": { "type": "string", "__example__": "USDC" },
-        "crypto_network": { "type": "string", "__example__": "BASE" },
-        "bank_code": { "type": "string", "__example__": "bank_code" },
-        "bank_name": { "type": "string", "__example__": "CRDB Bank" },
-        "account_number": { "type": "string", "__example__": "1234567890" },
-        "account_name": { "type": "string", "__example__": "John Doe" },
-        "sell_amount": { "type": "string", "__example__": "50000" },
-        "crypto_cost": { "type": "string", "__example__": "19.23" },
-        "rate": { "type": "string", "__example__": "2600.00" },
-        "error_message": { "type": "string", "__example__": "" },
-        "has_error": { "type": "boolean", "__example__": false }
+        "crypto_asset": {
+          "type": "string",
+          "__example__": "USDC"
+        },
+        "crypto_network": {
+          "type": "string",
+          "__example__": "BASE"
+        },
+        "bank_code": {
+          "type": "string",
+          "__example__": "bank_code"
+        },
+        "bank_name": {
+          "type": "string",
+          "__example__": "CRDB Bank"
+        },
+        "account_number": {
+          "type": "string",
+          "__example__": "1234567890"
+        },
+        "account_name": {
+          "type": "string",
+          "__example__": "John Doe"
+        },
+        "sell_amount": {
+          "type": "string",
+          "__example__": "50000"
+        },
+        "crypto_cost": {
+          "type": "string",
+          "__example__": "19.23"
+        },
+        "rate": {
+          "type": "string",
+          "__example__": "2600.00"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
       },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
-          { "type": "TextHeading", "text": "Review Details" },
+          {
+            "type": "TextHeading",
+            "text": "Review Details"
+          },
           {
             "type": "If",
             "condition": "${data.has_error}",
-            "then": [{ "type": "TextCaption", "text": "${data.error_message}" }]
+            "then": [
+              {
+                "type": "TextCaption",
+                "text": "${data.error_message}"
+              }
+            ]
           },
-          { "type": "TextBody", "text": "`'Bank: '${data.bank_name}''`" },
-          { "type": "TextBody", "text": "`'Account: '${data.account_number}''`" },
-          { "type": "TextBody", "text": "`'Name: '${data.account_name}''`" },
-          { "type": "TextBody", "text": "`'Amount: TZS '${data.sell_amount}''`" },
-          { "type": "TextBody", "text": "`'You Pay: '${data.crypto_cost}' '${data.crypto_asset}''`" },
-          { "type": "TextBody", "text": "`'Rate: 1 '${data.crypto_asset}' = TZS '${data.rate}''`" },
-          { "type": "TextBody", "text": "`'Network: '${data.crypto_network}''`" },
+          {
+            "type": "TextBody",
+            "text": "`'Bank: '${data.bank_name}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Account: '${data.account_number}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Name: '${data.account_name}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Amount: TZS '${data.sell_amount}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'You Pay: '${data.crypto_cost}' '${data.crypto_asset}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Rate: 1 '${data.crypto_asset}' = TZS '${data.rate}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Network: '${data.crypto_network}''`"
+          },
           {
             "type": "Footer",
             "label": "Proceed to Payment",
@@ -1660,34 +2576,96 @@
       "id": "TZS_BANK_AUTHORIZE",
       "title": "Authorize TZS Bank Payment",
       "data": {
-        "crypto_asset": { "type": "string", "__example__": "USDC" },
-        "crypto_network": { "type": "string", "__example__": "BASE" },
-        "bank_code": { "type": "string", "__example__": "bank_code" },
-        "bank_name": { "type": "string", "__example__": "CRDB Bank" },
-        "account_number": { "type": "string", "__example__": "1234567890" },
-        "account_name": { "type": "string", "__example__": "John Doe" },
-        "sell_amount": { "type": "string", "__example__": "50000" },
-        "crypto_cost": { "type": "string", "__example__": "19.23" },
-        "total_crypto_usd": { "type": "string", "__example__": "19.98" },
-        "error_message": { "type": "string", "__example__": "" },
-        "has_error": { "type": "boolean", "__example__": false }
+        "crypto_asset": {
+          "type": "string",
+          "__example__": "USDC"
+        },
+        "crypto_network": {
+          "type": "string",
+          "__example__": "BASE"
+        },
+        "bank_code": {
+          "type": "string",
+          "__example__": "bank_code"
+        },
+        "bank_name": {
+          "type": "string",
+          "__example__": "CRDB Bank"
+        },
+        "account_number": {
+          "type": "string",
+          "__example__": "1234567890"
+        },
+        "account_name": {
+          "type": "string",
+          "__example__": "John Doe"
+        },
+        "sell_amount": {
+          "type": "string",
+          "__example__": "50000"
+        },
+        "crypto_cost": {
+          "type": "string",
+          "__example__": "19.23"
+        },
+        "total_crypto_usd": {
+          "type": "string",
+          "__example__": "19.98"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
       },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
-          { "type": "TextHeading", "text": "Authorize" },
+          {
+            "type": "TextHeading",
+            "text": "Authorize"
+          },
           {
             "type": "If",
             "condition": "${data.has_error}",
-            "then": [{ "type": "TextCaption", "text": "${data.error_message}" }]
+            "then": [
+              {
+                "type": "TextCaption",
+                "text": "${data.error_message}"
+              }
+            ]
           },
-          { "type": "TextBody", "text": "`'Bank: '${data.bank_name}''`" },
-          { "type": "TextBody", "text": "`'Account: '${data.account_number}''`" },
-          { "type": "TextBody", "text": "`'You Receive: TZS '${data.sell_amount}''`" },
-          { "type": "TextBody", "text": "`'Crypto Cost: '${data.crypto_cost}' '${data.crypto_asset}''`" },
-          { "type": "TextBody", "text": "`'Fee: $0.75 USD'`" },
-          { "type": "TextBody", "text": "`'Total Deducted: '${data.total_crypto_usd}' '${data.crypto_asset}''`" },
-          { "type": "TextBody", "text": "Enter PIN to Confirm" },
+          {
+            "type": "TextBody",
+            "text": "`'Bank: '${data.bank_name}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Account: '${data.account_number}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'You Receive: TZS '${data.sell_amount}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Crypto Cost: '${data.crypto_cost}' '${data.crypto_asset}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Fee: $0.75 USD'`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Total Deducted: '${data.total_crypto_usd}' '${data.crypto_asset}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "Enter PIN to Confirm"
+          },
           {
             "type": "Form",
             "name": "tzs_bank_pin_form",
@@ -1731,21 +2709,53 @@
       "data": {
         "networks": {
           "type": "array",
-          "items": { "type": "object", "properties": { "id": { "type": "string" }, "title": { "type": "string" } } },
-          "__example__": [{ "id": "MPESA", "title": "M-PESA Tanzania" }]
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            }
+          },
+          "__example__": [
+            {
+              "id": "MPESA",
+              "title": "M-PESA Tanzania"
+            }
+          ]
         },
-        "error_message": { "type": "string", "__example__": "" },
-        "has_error": { "type": "boolean", "__example__": false }
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
       },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
-          { "type": "TextHeading", "text": "Withdraw to Tanzania 🇹🇿" },
-          { "type": "TextBody", "text": "Enter your mobile money details to receive TZS." },
+          {
+            "type": "TextHeading",
+            "text": "Withdraw to Tanzania 🇹🇿"
+          },
+          {
+            "type": "TextBody",
+            "text": "Enter your mobile money details to receive TZS."
+          },
           {
             "type": "If",
             "condition": "${data.has_error}",
-            "then": [{ "type": "TextCaption", "text": "${data.error_message}" }]
+            "then": [
+              {
+                "type": "TextCaption",
+                "text": "${data.error_message}"
+              }
+            ]
           },
           {
             "type": "Form",
@@ -1757,8 +2767,14 @@
                 "label": "Asset to Sell",
                 "required": true,
                 "data-source": [
-                  { "id": "USDT", "title": "Tether (USDT)" },
-                  { "id": "USDC", "title": "USD Coin (USDC)" }
+                  {
+                    "id": "USDT",
+                    "title": "Tether (USDT)"
+                  },
+                  {
+                    "id": "USDC",
+                    "title": "USD Coin (USDC)"
+                  }
                 ]
               },
               {
@@ -1767,11 +2783,26 @@
                 "label": "Select Network",
                 "required": true,
                 "data-source": [
-                  { "id": "BASE", "title": "Base Network" },
-                  { "id": "ERC20", "title": "Ethereum (ERC20)" },
-                  { "id": "POLYGON", "title": "Polygon" },
-                  { "id": "SOL", "title": "Solana (SOL)" },
-                  { "id": "AVALANCHE", "title": "Avalanche" }
+                  {
+                    "id": "BASE",
+                    "title": "Base Network"
+                  },
+                  {
+                    "id": "ERC20",
+                    "title": "Ethereum (ERC20)"
+                  },
+                  {
+                    "id": "POLYGON",
+                    "title": "Polygon"
+                  },
+                  {
+                    "id": "SOL",
+                    "title": "Solana (SOL)"
+                  },
+                  {
+                    "id": "AVALANCHE",
+                    "title": "Avalanche"
+                  }
                 ]
               },
               {
@@ -1820,32 +2851,88 @@
       "id": "TZS_MOMO_REVIEW",
       "title": "Review TZS MoMo Withdrawal",
       "data": {
-        "crypto_asset": { "type": "string", "__example__": "USDC" },
-        "crypto_network": { "type": "string", "__example__": "BASE" },
-        "network_code": { "type": "string", "__example__": "MPESA" },
-        "network_name": { "type": "string", "__example__": "M-PESA Tanzania" },
-        "phone_number": { "type": "string", "__example__": "0712345678" },
-        "sell_amount": { "type": "string", "__example__": "50000" },
-        "crypto_cost": { "type": "string", "__example__": "19.23" },
-        "rate": { "type": "string", "__example__": "2600.00" },
-        "error_message": { "type": "string", "__example__": "" },
-        "has_error": { "type": "boolean", "__example__": false }
+        "crypto_asset": {
+          "type": "string",
+          "__example__": "USDC"
+        },
+        "crypto_network": {
+          "type": "string",
+          "__example__": "BASE"
+        },
+        "network_code": {
+          "type": "string",
+          "__example__": "MPESA"
+        },
+        "network_name": {
+          "type": "string",
+          "__example__": "M-PESA Tanzania"
+        },
+        "phone_number": {
+          "type": "string",
+          "__example__": "0712345678"
+        },
+        "sell_amount": {
+          "type": "string",
+          "__example__": "50000"
+        },
+        "crypto_cost": {
+          "type": "string",
+          "__example__": "19.23"
+        },
+        "rate": {
+          "type": "string",
+          "__example__": "2600.00"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
       },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
-          { "type": "TextHeading", "text": "Review Details" },
+          {
+            "type": "TextHeading",
+            "text": "Review Details"
+          },
           {
             "type": "If",
             "condition": "${data.has_error}",
-            "then": [{ "type": "TextCaption", "text": "${data.error_message}" }]
+            "then": [
+              {
+                "type": "TextCaption",
+                "text": "${data.error_message}"
+              }
+            ]
           },
-          { "type": "TextBody", "text": "`'Network: '${data.network_name}''`" },
-          { "type": "TextBody", "text": "`'Mobile Number: '${data.phone_number}''`" },
-          { "type": "TextBody", "text": "`'Amount: TZS '${data.sell_amount}''`" },
-          { "type": "TextBody", "text": "`'You Pay: '${data.crypto_cost}' '${data.crypto_asset}''`" },
-          { "type": "TextBody", "text": "`'Rate: 1 '${data.crypto_asset}' = TZS '${data.rate}''`" },
-          { "type": "TextBody", "text": "`'Network: '${data.crypto_network}''`" },
+          {
+            "type": "TextBody",
+            "text": "`'Network: '${data.network_name}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Mobile Number: '${data.phone_number}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Amount: TZS '${data.sell_amount}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'You Pay: '${data.crypto_cost}' '${data.crypto_asset}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Rate: 1 '${data.crypto_asset}' = TZS '${data.rate}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Network: '${data.crypto_network}''`"
+          },
           {
             "type": "Footer",
             "label": "Proceed to Payment",
@@ -1870,33 +2957,92 @@
       "id": "TZS_MOMO_AUTHORIZE",
       "title": "Authorize TZS MoMo Payment",
       "data": {
-        "crypto_asset": { "type": "string", "__example__": "USDC" },
-        "crypto_network": { "type": "string", "__example__": "BASE" },
-        "network_code": { "type": "string", "__example__": "MPESA" },
-        "network_name": { "type": "string", "__example__": "M-PESA Tanzania" },
-        "phone_number": { "type": "string", "__example__": "0712345678" },
-        "sell_amount": { "type": "string", "__example__": "50000" },
-        "crypto_cost": { "type": "string", "__example__": "19.23" },
-        "total_crypto_usd": { "type": "string", "__example__": "19.98" },
-        "error_message": { "type": "string", "__example__": "" },
-        "has_error": { "type": "boolean", "__example__": false }
+        "crypto_asset": {
+          "type": "string",
+          "__example__": "USDC"
+        },
+        "crypto_network": {
+          "type": "string",
+          "__example__": "BASE"
+        },
+        "network_code": {
+          "type": "string",
+          "__example__": "MPESA"
+        },
+        "network_name": {
+          "type": "string",
+          "__example__": "M-PESA Tanzania"
+        },
+        "phone_number": {
+          "type": "string",
+          "__example__": "0712345678"
+        },
+        "sell_amount": {
+          "type": "string",
+          "__example__": "50000"
+        },
+        "crypto_cost": {
+          "type": "string",
+          "__example__": "19.23"
+        },
+        "total_crypto_usd": {
+          "type": "string",
+          "__example__": "19.98"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
       },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
-          { "type": "TextHeading", "text": "Authorize" },
+          {
+            "type": "TextHeading",
+            "text": "Authorize"
+          },
           {
             "type": "If",
             "condition": "${data.has_error}",
-            "then": [{ "type": "TextCaption", "text": "${data.error_message}" }]
+            "then": [
+              {
+                "type": "TextCaption",
+                "text": "${data.error_message}"
+              }
+            ]
           },
-          { "type": "TextBody", "text": "`'Network: '${data.network_name}''`" },
-          { "type": "TextBody", "text": "`'Mobile Number: '${data.phone_number}''`" },
-          { "type": "TextBody", "text": "`'You Receive: TZS '${data.sell_amount}''`" },
-          { "type": "TextBody", "text": "`'Crypto Cost: '${data.crypto_cost}' '${data.crypto_asset}''`" },
-          { "type": "TextBody", "text": "`'Fee: $0.75 USD'`" },
-          { "type": "TextBody", "text": "`'Total Deducted: '${data.total_crypto_usd}' '${data.crypto_asset}''`" },
-          { "type": "TextBody", "text": "Enter PIN to Confirm" },
+          {
+            "type": "TextBody",
+            "text": "`'Network: '${data.network_name}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Mobile Number: '${data.phone_number}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'You Receive: TZS '${data.sell_amount}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Crypto Cost: '${data.crypto_cost}' '${data.crypto_asset}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Fee: $0.75 USD'`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Total Deducted: '${data.total_crypto_usd}' '${data.crypto_asset}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "Enter PIN to Confirm"
+          },
           {
             "type": "Form",
             "name": "tzs_momo_pin_form",
@@ -1939,21 +3085,53 @@
       "data": {
         "networks": {
           "type": "array",
-          "items": { "type": "object", "properties": { "id": { "type": "string" }, "title": { "type": "string" } } },
-          "__example__": [{ "id": "MTN_UG", "title": "MTN Uganda" }]
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            }
+          },
+          "__example__": [
+            {
+              "id": "MTN_UG",
+              "title": "MTN Uganda"
+            }
+          ]
         },
-        "error_message": { "type": "string", "__example__": "" },
-        "has_error": { "type": "boolean", "__example__": false }
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
       },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
-          { "type": "TextHeading", "text": "Withdraw to Uganda 🇺🇬" },
-          { "type": "TextBody", "text": "Enter your mobile money details to receive UGX." },
+          {
+            "type": "TextHeading",
+            "text": "Withdraw to Uganda 🇺🇬"
+          },
+          {
+            "type": "TextBody",
+            "text": "Enter your mobile money details to receive UGX."
+          },
           {
             "type": "If",
             "condition": "${data.has_error}",
-            "then": [{ "type": "TextCaption", "text": "${data.error_message}" }]
+            "then": [
+              {
+                "type": "TextCaption",
+                "text": "${data.error_message}"
+              }
+            ]
           },
           {
             "type": "Form",
@@ -1965,8 +3143,14 @@
                 "label": "Asset to Sell",
                 "required": true,
                 "data-source": [
-                  { "id": "USDT", "title": "Tether (USDT)" },
-                  { "id": "USDC", "title": "USD Coin (USDC)" }
+                  {
+                    "id": "USDT",
+                    "title": "Tether (USDT)"
+                  },
+                  {
+                    "id": "USDC",
+                    "title": "USD Coin (USDC)"
+                  }
                 ]
               },
               {
@@ -1975,11 +3159,26 @@
                 "label": "Select Network",
                 "required": true,
                 "data-source": [
-                  { "id": "BASE", "title": "Base Network" },
-                  { "id": "ERC20", "title": "Ethereum (ERC20)" },
-                  { "id": "POLYGON", "title": "Polygon" },
-                  { "id": "SOL", "title": "Solana (SOL)" },
-                  { "id": "AVALANCHE", "title": "Avalanche" }
+                  {
+                    "id": "BASE",
+                    "title": "Base Network"
+                  },
+                  {
+                    "id": "ERC20",
+                    "title": "Ethereum (ERC20)"
+                  },
+                  {
+                    "id": "POLYGON",
+                    "title": "Polygon"
+                  },
+                  {
+                    "id": "SOL",
+                    "title": "Solana (SOL)"
+                  },
+                  {
+                    "id": "AVALANCHE",
+                    "title": "Avalanche"
+                  }
                 ]
               },
               {
@@ -2028,32 +3227,88 @@
       "id": "UGX_REVIEW",
       "title": "Review UGX Withdrawal",
       "data": {
-        "crypto_asset": { "type": "string", "__example__": "USDC" },
-        "crypto_network": { "type": "string", "__example__": "BASE" },
-        "network_code": { "type": "string", "__example__": "MTN_UG" },
-        "network_name": { "type": "string", "__example__": "MTN Uganda" },
-        "phone_number": { "type": "string", "__example__": "0712345678" },
-        "sell_amount": { "type": "string", "__example__": "100000" },
-        "crypto_cost": { "type": "string", "__example__": "27.03" },
-        "rate": { "type": "string", "__example__": "3700.00" },
-        "error_message": { "type": "string", "__example__": "" },
-        "has_error": { "type": "boolean", "__example__": false }
+        "crypto_asset": {
+          "type": "string",
+          "__example__": "USDC"
+        },
+        "crypto_network": {
+          "type": "string",
+          "__example__": "BASE"
+        },
+        "network_code": {
+          "type": "string",
+          "__example__": "MTN_UG"
+        },
+        "network_name": {
+          "type": "string",
+          "__example__": "MTN Uganda"
+        },
+        "phone_number": {
+          "type": "string",
+          "__example__": "0712345678"
+        },
+        "sell_amount": {
+          "type": "string",
+          "__example__": "100000"
+        },
+        "crypto_cost": {
+          "type": "string",
+          "__example__": "27.03"
+        },
+        "rate": {
+          "type": "string",
+          "__example__": "3700.00"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
       },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
-          { "type": "TextHeading", "text": "Review Details" },
+          {
+            "type": "TextHeading",
+            "text": "Review Details"
+          },
           {
             "type": "If",
             "condition": "${data.has_error}",
-            "then": [{ "type": "TextCaption", "text": "${data.error_message}" }]
+            "then": [
+              {
+                "type": "TextCaption",
+                "text": "${data.error_message}"
+              }
+            ]
           },
-          { "type": "TextBody", "text": "`'Network: '${data.network_name}''`" },
-          { "type": "TextBody", "text": "`'Mobile Number: '${data.phone_number}''`" },
-          { "type": "TextBody", "text": "`'Amount: UGX '${data.sell_amount}''`" },
-          { "type": "TextBody", "text": "`'You Pay: '${data.crypto_cost}' '${data.crypto_asset}''`" },
-          { "type": "TextBody", "text": "`'Rate: 1 '${data.crypto_asset}' = UGX '${data.rate}''`" },
-          { "type": "TextBody", "text": "`'Network: '${data.crypto_network}''`" },
+          {
+            "type": "TextBody",
+            "text": "`'Network: '${data.network_name}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Mobile Number: '${data.phone_number}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Amount: UGX '${data.sell_amount}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'You Pay: '${data.crypto_cost}' '${data.crypto_asset}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Rate: 1 '${data.crypto_asset}' = UGX '${data.rate}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Network: '${data.crypto_network}''`"
+          },
           {
             "type": "Footer",
             "label": "Proceed to Payment",
@@ -2078,33 +3333,92 @@
       "id": "UGX_AUTHORIZE",
       "title": "Authorize UGX Payment",
       "data": {
-        "crypto_asset": { "type": "string", "__example__": "USDC" },
-        "crypto_network": { "type": "string", "__example__": "BASE" },
-        "network_code": { "type": "string", "__example__": "MTN_UG" },
-        "network_name": { "type": "string", "__example__": "MTN Uganda" },
-        "phone_number": { "type": "string", "__example__": "0712345678" },
-        "sell_amount": { "type": "string", "__example__": "100000" },
-        "crypto_cost": { "type": "string", "__example__": "27.03" },
-        "total_crypto_usd": { "type": "string", "__example__": "27.78" },
-        "error_message": { "type": "string", "__example__": "" },
-        "has_error": { "type": "boolean", "__example__": false }
+        "crypto_asset": {
+          "type": "string",
+          "__example__": "USDC"
+        },
+        "crypto_network": {
+          "type": "string",
+          "__example__": "BASE"
+        },
+        "network_code": {
+          "type": "string",
+          "__example__": "MTN_UG"
+        },
+        "network_name": {
+          "type": "string",
+          "__example__": "MTN Uganda"
+        },
+        "phone_number": {
+          "type": "string",
+          "__example__": "0712345678"
+        },
+        "sell_amount": {
+          "type": "string",
+          "__example__": "100000"
+        },
+        "crypto_cost": {
+          "type": "string",
+          "__example__": "27.03"
+        },
+        "total_crypto_usd": {
+          "type": "string",
+          "__example__": "27.78"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
       },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
-          { "type": "TextHeading", "text": "Authorize" },
+          {
+            "type": "TextHeading",
+            "text": "Authorize"
+          },
           {
             "type": "If",
             "condition": "${data.has_error}",
-            "then": [{ "type": "TextCaption", "text": "${data.error_message}" }]
+            "then": [
+              {
+                "type": "TextCaption",
+                "text": "${data.error_message}"
+              }
+            ]
           },
-          { "type": "TextBody", "text": "`'Network: '${data.network_name}''`" },
-          { "type": "TextBody", "text": "`'Mobile Number: '${data.phone_number}''`" },
-          { "type": "TextBody", "text": "`'You Receive: UGX '${data.sell_amount}''`" },
-          { "type": "TextBody", "text": "`'Crypto Cost: '${data.crypto_cost}' '${data.crypto_asset}''`" },
-          { "type": "TextBody", "text": "`'Fee: $0.75 USD'`" },
-          { "type": "TextBody", "text": "`'Total Deducted: '${data.total_crypto_usd}' '${data.crypto_asset}''`" },
-          { "type": "TextBody", "text": "Enter PIN to Confirm" },
+          {
+            "type": "TextBody",
+            "text": "`'Network: '${data.network_name}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Mobile Number: '${data.phone_number}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'You Receive: UGX '${data.sell_amount}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Crypto Cost: '${data.crypto_cost}' '${data.crypto_asset}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Fee: $0.75 USD'`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Total Deducted: '${data.total_crypto_usd}' '${data.crypto_asset}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "Enter PIN to Confirm"
+          },
           {
             "type": "Form",
             "name": "ugx_pin_form",
@@ -2142,419 +3456,380 @@
       }
     },
     {
-
       "id": "MWK_DETAILS",
-
       "title": "Withdraw to Malawi",
-
       "data": {
-
         "networks": {
-
           "type": "array",
-
-          "items": { "type": "object", "properties": { "id": { "type": "string" }, "title": { "type": "string" } } },
-
-          "__example__": [{ "id": "AIRTEL_MW", "title": "Airtel Malawi" }]
-
-        },
-
-        "error_message": { "type": "string", "__example__": "" },
-
-        "has_error": { "type": "boolean", "__example__": false }
-
-      },
-
-      "layout": {
-
-        "type": "SingleColumnLayout",
-
-        "children": [
-
-          { "type": "TextHeading", "text": "Withdraw to Malawi \uD83C\uDDF2\uD83C\uDDFC" },
-
-          { "type": "TextBody", "text": "Enter your mobile money details to receive MWK." },
-
-          {
-
-            "type": "If",
-
-            "condition": "${data.has_error}",
-
-            "then": [{ "type": "TextCaption", "text": "${data.error_message}" }]
-
-          },
-
-          {
-
-            "type": "Form",
-
-            "name": "mwk_form",
-
-            "children": [
-
-              {
-
-                "type": "Dropdown",
-
-                "name": "crypto_asset",
-
-                "label": "Asset to Sell",
-
-                "required": true,
-
-                "data-source": [
-
-                  { "id": "USDT", "title": "Tether (USDT)" },
-
-                  { "id": "USDC", "title": "USD Coin (USDC)" }
-
-                ]
-
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
               },
-
-              {
-
-                "type": "Dropdown",
-
-                "name": "crypto_network",
-
-                "label": "Select Network",
-
-                "required": true,
-
-                "data-source": [
-
-                  { "id": "BASE", "title": "Base Network" },
-
-                  { "id": "ERC20", "title": "Ethereum (ERC20)" },
-
-                  { "id": "POLYGON", "title": "Polygon" },
-
-                  { "id": "SOL", "title": "Solana (SOL)" },
-
-                  { "id": "AVALANCHE", "title": "Avalanche" }
-
-                ]
-
-              },
-
-              {
-
-                "type": "Dropdown",
-
-                "name": "network_code",
-
-                "label": "Mobile Money Network",
-
-                "required": true,
-
-                "data-source": "${data.networks}"
-
-              },
-
-              {
-
-                "type": "TextInput",
-
-                "name": "phone_number",
-
-                "label": "Mobile Money Number",
-
-                "required": true,
-
-                "input-type": "phone",
-
-                "helper-text": "Enter number registered with mobile money"
-
-              },
-
-              {
-
-                "type": "TextInput",
-
-                "name": "sell_amount",
-
-                "label": "Amount (MWK)",
-
-                "required": true,
-
-                "input-type": "number",
-
-                "helper-text": "Min: MWK 5,000"
-
-              },
-
-              {
-
-                "type": "Footer",
-
-                "label": "Preview Withdrawal",
-
-                "on-click-action": {
-
-                  "name": "data_exchange",
-
-                  "payload": {
-
-                    "crypto_asset": "${form.crypto_asset}",
-
-                    "crypto_network": "${form.crypto_network}",
-
-                    "network_code": "${form.network_code}",
-
-                    "phone_number": "${form.phone_number}",
-
-                    "sell_amount": "${form.sell_amount}"
-
-                  }
-
-                }
-
+              "title": {
+                "type": "string"
               }
-
-            ]
-
-          }
-
-        ]
-
-      }
-
-    },
-
-    {
-
-      "id": "MWK_REVIEW",
-
-      "title": "Review MWK Withdrawal",
-
-      "data": {
-
-        "crypto_asset": { "type": "string", "__example__": "USDC" },
-
-        "crypto_network": { "type": "string", "__example__": "BASE" },
-
-        "network_code": { "type": "string", "__example__": "AIRTEL_MW" },
-
-        "network_name": { "type": "string", "__example__": "Airtel Malawi" },
-
-        "phone_number": { "type": "string", "__example__": "0991234567" },
-
-        "sell_amount": { "type": "string", "__example__": "10000" },
-
-        "crypto_cost": { "type": "string", "__example__": "5.50" },
-
-        "rate": { "type": "string", "__example__": "1820.00" },
-
-        "error_message": { "type": "string", "__example__": "" },
-
-        "has_error": { "type": "boolean", "__example__": false }
-
-      },
-
-      "layout": {
-
-        "type": "SingleColumnLayout",
-
-        "children": [
-
-          { "type": "TextHeading", "text": "Review Details" },
-
-          {
-
-            "type": "If",
-
-            "condition": "${data.has_error}",
-
-            "then": [{ "type": "TextCaption", "text": "${data.error_message}" }]
-
-          },
-
-          { "type": "TextBody", "text": "`'Network: '${data.network_name}''`" },
-
-          { "type": "TextBody", "text": "`'Mobile Number: '${data.phone_number}''`" },
-
-          { "type": "TextBody", "text": "`'Amount: MWK '${data.sell_amount}''`" },
-
-          { "type": "TextBody", "text": "`'You Pay: '${data.crypto_cost}' '${data.crypto_asset}''`" },
-
-          { "type": "TextBody", "text": "`'Rate: 1 '${data.crypto_asset}' = MWK '${data.rate}''`" },
-
-          { "type": "TextBody", "text": "`'Network: '${data.crypto_network}''`" },
-
-          {
-
-            "type": "Footer",
-
-            "label": "Proceed to Payment",
-
-            "on-click-action": {
-
-              "name": "data_exchange",
-
-              "payload": {
-
-                "crypto_asset": "${data.crypto_asset}",
-
-                "crypto_network": "${data.crypto_network}",
-
-                "network_code": "${data.network_code}",
-
-                "network_name": "${data.network_name}",
-
-                "phone_number": "${data.phone_number}",
-
-                "sell_amount": "${data.sell_amount}",
-
-                "crypto_cost": "${data.crypto_cost}",
-
-                "rate": "${data.rate}"
-
-              }
-
             }
-
-          }
-
-        ]
-
-      }
-
-    },
-
-    {
-
-      "id": "MWK_AUTHORIZE",
-
-      "title": "Authorize MWK Payment",
-
-      "data": {
-
-        "crypto_asset": { "type": "string", "__example__": "USDC" },
-
-        "crypto_network": { "type": "string", "__example__": "BASE" },
-
-        "network_code": { "type": "string", "__example__": "AIRTEL_MW" },
-
-        "network_name": { "type": "string", "__example__": "Airtel Malawi" },
-
-        "phone_number": { "type": "string", "__example__": "0991234567" },
-
-        "sell_amount": { "type": "string", "__example__": "10000" },
-
-        "crypto_cost": { "type": "string", "__example__": "5.50" },
-
-        "total_crypto_usd": { "type": "string", "__example__": "6.25" },
-
-        "error_message": { "type": "string", "__example__": "" },
-
-        "has_error": { "type": "boolean", "__example__": false }
-
-      },
-
-      "layout": {
-
-        "type": "SingleColumnLayout",
-
-        "children": [
-
-          { "type": "TextHeading", "text": "Authorize" },
-
-          {
-
-            "type": "If",
-
-            "condition": "${data.has_error}",
-
-            "then": [{ "type": "TextCaption", "text": "${data.error_message}" }]
-
           },
-
-          { "type": "TextBody", "text": "`'Network: '${data.network_name}''`" },
-
-          { "type": "TextBody", "text": "`'Mobile Number: '${data.phone_number}''`" },
-
-          { "type": "TextBody", "text": "`'You Receive: MWK '${data.sell_amount}''`" },
-
-          { "type": "TextBody", "text": "`'Crypto Cost: '${data.crypto_cost}' '${data.crypto_asset}''`" },
-
-          { "type": "TextBody", "text": "`'Fee: $0.75 USD'`" },
-
-          { "type": "TextBody", "text": "`'Total Deducted: '${data.total_crypto_usd}' '${data.crypto_asset}''`" },
-
-          { "type": "TextBody", "text": "Enter PIN to Confirm" },
-
+          "__example__": [
+            {
+              "id": "AIRTEL_MW",
+              "title": "Airtel Malawi"
+            }
+          ]
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
           {
-
-            "type": "Form",
-
-            "name": "mwk_pin_form",
-
-            "children": [
-
+            "type": "TextHeading",
+            "text": "Withdraw to Malawi 🇲🇼"
+          },
+          {
+            "type": "TextBody",
+            "text": "Enter your mobile money details to receive MWK."
+          },
+          {
+            "type": "If",
+            "condition": "${data.has_error}",
+            "then": [
               {
-
-                "type": "TextInput",
-
-                "name": "pin",
-
-                "label": "4 Digit PIN",
-
-                "required": true,
-
-                "input-type": "password",
-
-                "min-chars": 4,
-
-                "max-chars": 6
-
-              },
-
-              {
-
-                "type": "Footer",
-
-                "label": "Sell & Send",
-
-                "on-click-action": {
-
-                  "name": "data_exchange",
-
-                  "payload": {
-
-                    "pin": "${form.pin}",
-
-                    "crypto_asset": "${data.crypto_asset}",
-
-                    "crypto_network": "${data.crypto_network}",
-
-                    "network_code": "${data.network_code}",
-
-                    "network_name": "${data.network_name}",
-
-                    "phone_number": "${data.phone_number}",
-
-                    "sell_amount": "${data.sell_amount}",
-
-                    "crypto_cost": "${data.crypto_cost}",
-
-                    "total_crypto_usd": "${data.total_crypto_usd}"
-
-                  }
-
-                }
-
+                "type": "TextCaption",
+                "text": "${data.error_message}"
               }
-
             ]
-
+          },
+          {
+            "type": "Form",
+            "name": "mwk_form",
+            "children": [
+              {
+                "type": "Dropdown",
+                "name": "crypto_asset",
+                "label": "Asset to Sell",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "USDT",
+                    "title": "Tether (USDT)"
+                  },
+                  {
+                    "id": "USDC",
+                    "title": "USD Coin (USDC)"
+                  }
+                ]
+              },
+              {
+                "type": "Dropdown",
+                "name": "crypto_network",
+                "label": "Select Network",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "BASE",
+                    "title": "Base Network"
+                  },
+                  {
+                    "id": "ERC20",
+                    "title": "Ethereum (ERC20)"
+                  },
+                  {
+                    "id": "POLYGON",
+                    "title": "Polygon"
+                  },
+                  {
+                    "id": "SOL",
+                    "title": "Solana (SOL)"
+                  },
+                  {
+                    "id": "AVALANCHE",
+                    "title": "Avalanche"
+                  }
+                ]
+              },
+              {
+                "type": "Dropdown",
+                "name": "network_code",
+                "label": "Mobile Money Network",
+                "required": true,
+                "data-source": "${data.networks}"
+              },
+              {
+                "type": "TextInput",
+                "name": "phone_number",
+                "label": "Mobile Money Number",
+                "required": true,
+                "input-type": "phone",
+                "helper-text": "Enter number registered with mobile money"
+              },
+              {
+                "type": "TextInput",
+                "name": "sell_amount",
+                "label": "Amount (MWK)",
+                "required": true,
+                "input-type": "number",
+                "helper-text": "Min: MWK 5,000"
+              },
+              {
+                "type": "Footer",
+                "label": "Preview Withdrawal",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "crypto_asset": "${form.crypto_asset}",
+                    "crypto_network": "${form.crypto_network}",
+                    "network_code": "${form.network_code}",
+                    "phone_number": "${form.phone_number}",
+                    "sell_amount": "${form.sell_amount}"
+                  }
+                }
+              }
+            ]
           }
-
         ]
-
       }
-
+    },
+    {
+      "id": "MWK_REVIEW",
+      "title": "Review MWK Withdrawal",
+      "data": {
+        "crypto_asset": {
+          "type": "string",
+          "__example__": "USDC"
+        },
+        "crypto_network": {
+          "type": "string",
+          "__example__": "BASE"
+        },
+        "network_code": {
+          "type": "string",
+          "__example__": "AIRTEL_MW"
+        },
+        "network_name": {
+          "type": "string",
+          "__example__": "Airtel Malawi"
+        },
+        "phone_number": {
+          "type": "string",
+          "__example__": "0991234567"
+        },
+        "sell_amount": {
+          "type": "string",
+          "__example__": "10000"
+        },
+        "crypto_cost": {
+          "type": "string",
+          "__example__": "5.50"
+        },
+        "rate": {
+          "type": "string",
+          "__example__": "1820.00"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Review Details"
+          },
+          {
+            "type": "If",
+            "condition": "${data.has_error}",
+            "then": [
+              {
+                "type": "TextCaption",
+                "text": "${data.error_message}"
+              }
+            ]
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Network: '${data.network_name}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Mobile Number: '${data.phone_number}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Amount: MWK '${data.sell_amount}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'You Pay: '${data.crypto_cost}' '${data.crypto_asset}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Rate: 1 '${data.crypto_asset}' = MWK '${data.rate}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Network: '${data.crypto_network}''`"
+          },
+          {
+            "type": "Footer",
+            "label": "Proceed to Payment",
+            "on-click-action": {
+              "name": "data_exchange",
+              "payload": {
+                "crypto_asset": "${data.crypto_asset}",
+                "crypto_network": "${data.crypto_network}",
+                "network_code": "${data.network_code}",
+                "network_name": "${data.network_name}",
+                "phone_number": "${data.phone_number}",
+                "sell_amount": "${data.sell_amount}",
+                "crypto_cost": "${data.crypto_cost}",
+                "rate": "${data.rate}"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "MWK_AUTHORIZE",
+      "title": "Authorize MWK Payment",
+      "data": {
+        "crypto_asset": {
+          "type": "string",
+          "__example__": "USDC"
+        },
+        "crypto_network": {
+          "type": "string",
+          "__example__": "BASE"
+        },
+        "network_code": {
+          "type": "string",
+          "__example__": "AIRTEL_MW"
+        },
+        "network_name": {
+          "type": "string",
+          "__example__": "Airtel Malawi"
+        },
+        "phone_number": {
+          "type": "string",
+          "__example__": "0991234567"
+        },
+        "sell_amount": {
+          "type": "string",
+          "__example__": "10000"
+        },
+        "crypto_cost": {
+          "type": "string",
+          "__example__": "5.50"
+        },
+        "total_crypto_usd": {
+          "type": "string",
+          "__example__": "6.25"
+        },
+        "error_message": {
+          "type": "string",
+          "__example__": ""
+        },
+        "has_error": {
+          "type": "boolean",
+          "__example__": false
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Authorize"
+          },
+          {
+            "type": "If",
+            "condition": "${data.has_error}",
+            "then": [
+              {
+                "type": "TextCaption",
+                "text": "${data.error_message}"
+              }
+            ]
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Network: '${data.network_name}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Mobile Number: '${data.phone_number}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'You Receive: MWK '${data.sell_amount}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Crypto Cost: '${data.crypto_cost}' '${data.crypto_asset}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Fee: $0.75 USD'`"
+          },
+          {
+            "type": "TextBody",
+            "text": "`'Total Deducted: '${data.total_crypto_usd}' '${data.crypto_asset}''`"
+          },
+          {
+            "type": "TextBody",
+            "text": "Enter PIN to Confirm"
+          },
+          {
+            "type": "Form",
+            "name": "mwk_pin_form",
+            "children": [
+              {
+                "type": "TextInput",
+                "name": "pin",
+                "label": "4 Digit PIN",
+                "required": true,
+                "input-type": "password",
+                "min-chars": 4,
+                "max-chars": 6
+              },
+              {
+                "type": "Footer",
+                "label": "Sell & Send",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "pin": "${form.pin}",
+                    "crypto_asset": "${data.crypto_asset}",
+                    "crypto_network": "${data.crypto_network}",
+                    "network_code": "${data.network_code}",
+                    "network_name": "${data.network_name}",
+                    "phone_number": "${data.phone_number}",
+                    "sell_amount": "${data.sell_amount}",
+                    "crypto_cost": "${data.crypto_cost}",
+                    "total_crypto_usd": "${data.total_crypto_usd}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
     },
     {
       "id": "OFFRAMP_SUCCESS",
@@ -2565,7 +3840,10 @@
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
-          { "type": "TextHeading", "text": "Transaction Processing ⏳" },
+          {
+            "type": "TextHeading",
+            "text": "Transaction Processing ⏳"
+          },
           {
             "type": "TextBody",
             "text": "Your crypto has been transferred. The fiat payout is underway and will complete within 120 seconds."
@@ -2579,7 +3857,10 @@
             "label": "Done",
             "on-click-action": {
               "name": "complete",
-              "payload": { "status": "offramp_initiated", "result": "success" }
+              "payload": {
+                "status": "offramp_initiated",
+                "result": "success"
+              }
             }
           }
         ]

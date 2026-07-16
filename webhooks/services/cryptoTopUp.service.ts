@@ -1999,12 +1999,22 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
         let kesMomoNetworkName = kesMC;
         try { const all = await fetchPcxPayNetworks("KE"); const f = all.find((n) => n.id === kesMC); if (f) kesMomoNetworkName = f.title; } catch { /* keep code */ }
 
+        // Resolve M-Pesa account name via Paystack
+        let kesMomoAccountName = "";
+        try {
+          const resolved = await resolvePaystackAccount(kesMPhone!, kesMC!);
+          kesMomoAccountName = resolved.accountName;
+          logger.info(`[OFFRAMP-KES-MOMO] Resolved: ${kesMPhone} -> ${kesMomoAccountName}`);
+        } catch (re: any) {
+          logger.warn(`[OFFRAMP-KES-MOMO] Could not resolve account name: ${re.message}`);
+        }
+
         const kesMomoCost = (kesMomoInput / kesRate).toFixed(6).replace(/\.?0+$/, "") || "0.00";
         return {
           screen: "KES_MOMO_REVIEW",
           data: {
             crypto_asset: kesMA.toUpperCase(), crypto_network: kesMN.toUpperCase(),
-            network_code: kesMC, network_name: kesMomoNetworkName,
+            network_code: kesMC, network_name: kesMomoNetworkName, account_name: kesMomoAccountName,
             phone_number: kesMPhone, sell_amount: kesMomoInput.toLocaleString("en-KE", { maximumFractionDigits: 0 }),
             crypto_cost: kesMomoCost, rate: kesRate.toFixed(2),
             org_rate_id: kesOrgRateId, has_error: false, error_message: "",
@@ -2014,14 +2024,14 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
 
       case "KES_MOMO_REVIEW": {
         const { crypto_asset: kmrA, crypto_network: kmrN, network_code: kmrC, network_name: kmrNN,
-          phone_number: kmrPhone, sell_amount: kmrSell, crypto_cost: kmrCost,
+          phone_number: kmrPhone, account_name: kmrAccountName, sell_amount: kmrSell, crypto_cost: kmrCost,
           org_rate_id: kmrOrgRateId, rate: kmrRate } = data as Record<string, string | undefined>;
         const flatFee = parseFloat(process.env.OFFRAMP_FLAT_FEE_USD || "0.75");
         const kmrTotal = (parseFloat(kmrCost || "0") + flatFee).toFixed(6).replace(/\.?0+$/, "") || "0.00";
         return {
           screen: "KES_MOMO_AUTHORIZE",
           data: { crypto_asset: kmrA || "USDC", crypto_network: kmrN || "", network_code: kmrC || "",
-            network_name: kmrNN || "", phone_number: kmrPhone || "", sell_amount: kmrSell || "0",
+            network_name: kmrNN || "", phone_number: kmrPhone || "", account_name: kmrAccountName || "", sell_amount: kmrSell || "0",
             crypto_cost: kmrCost || "0", rate: kmrRate || "0", org_rate_id: kmrOrgRateId || "",
             total_crypto_usd: kmrTotal, has_error: false, error_message: "" },
         };
@@ -2029,7 +2039,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
 
       case "KES_MOMO_AUTHORIZE": {
         const { pin: kmaPin, crypto_asset: kmaAsset, crypto_network: kmaNetwork, network_code: kmaCode,
-          network_name: kmaName, phone_number: kmaPhone, sell_amount: kmaSell,
+          network_name: kmaName, phone_number: kmaPhone, account_name: kmaAccountName, sell_amount: kmaSell,
           total_crypto_usd: kmaTotal, rate: kmaRate, org_rate_id: kmaOrgRateId } = data as Record<string, string | undefined>;
         if (!kmaPin || !kmaAsset || !kmaNetwork || !kmaCode || !kmaPhone || !kmaSell) {
           return { screen: "KES_MOMO_AUTHORIZE", data: { ...data, error_message: "Missing required transaction details.", has_error: true } };
@@ -2042,7 +2052,7 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
           fiatAmount: kmaSell, clientRate: kmaRate || "0",
           orgRateId: kmaOrgRateId || "", country: "KE",
           paymentMethod: "mobile_money",
-          beneficiaryName: kmaName || kmaPhone,
+          beneficiaryName: kmaAccountName || kmaName || kmaPhone,
           destination: { provider: kmaCode, phoneNumber: kmaPhone } as PCXMobileMoneyDestination,
           idempKeySuffix: `${kmaSell}:${kmaCode}:${kmaPhone}`,
           displayAmount: `KES ${kmaSell}`,
