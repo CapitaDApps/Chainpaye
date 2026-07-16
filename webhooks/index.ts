@@ -140,19 +140,7 @@ app.post("/webhook", verifyWebhookSignature, async (req, res) => {
     await readMessage(message.id);
     try {
       if (isStagingEnvironment()) {
-        const allowedNumbers = getStagingAllowedWhatsappNumbers();
-        const incomingNumber = normalizePhoneNumber(
-          contact?.wa_id || message.from || "",
-        );
-
-        if (!allowedNumbers.has(incomingNumber)) {
-          await replyingMessage(message.id);
-          await whatsappBusinessService.sendNormalMessage(
-            "Access restricted: this Chainpaye number is currently for approved staging testers only. Your number is not yet authorized.\n\nPlease contact support for access, or message our main Chainpaye number: +1 (318) 394-7303.",
-            message.from,
-          );
-          return res.sendStatus(200);
-        }
+        // Staging number restriction removed — all numbers allowed
       }
 
       // mark incoming message as read
