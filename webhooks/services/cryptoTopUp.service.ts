@@ -1977,11 +1977,11 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
 
       case "KES_MOMO_DETAILS": {
         const { crypto_asset: kesMA, crypto_network: kesMN, network_code: kesMC,
-          phone_number: kesMPhone, sell_amount: kesMSell } = data as Record<string, string | undefined>;
+          phone_number: kesMPhone, account_name: kesMAccountName, sell_amount: kesMSell } = data as Record<string, string | undefined>;
 
         const kesNetworksOnError = async () => { try { const raw = await fetchPcxPayNetworks("KE"); return raw.filter((n) => n.type === "momo").map((n) => ({ id: n.id, title: n.title })); } catch { return []; } };
 
-        if (!kesMA || !kesMN || !kesMC || !kesMPhone || !kesMSell) {
+        if (!kesMA || !kesMN || !kesMC || !kesMPhone || !kesMAccountName || !kesMSell) {
           return { screen: "KES_MOMO_DETAILS", data: { networks: await kesNetworksOnError(), has_error: true, error_message: "Please fill in all required fields." } };
         }
 
@@ -1999,15 +1999,8 @@ export const getCryptoTopUpScreen = async (decryptedBody: DecryptedBody) => {
         let kesMomoNetworkName = kesMC;
         try { const all = await fetchPcxPayNetworks("KE"); const f = all.find((n) => n.id === kesMC); if (f) kesMomoNetworkName = f.title; } catch { /* keep code */ }
 
-        // Resolve M-Pesa account name via Paystack
-        let kesMomoAccountName = "";
-        try {
-          const resolved = await resolvePaystackAccount(kesMPhone!, kesMC!);
-          kesMomoAccountName = resolved.accountName;
-          logger.info(`[OFFRAMP-KES-MOMO] Resolved: ${kesMPhone} -> ${kesMomoAccountName}`);
-        } catch (re: any) {
-          logger.warn(`[OFFRAMP-KES-MOMO] Could not resolve account name: ${re.message}`);
-        }
+        // Account name provided directly by user in the form
+        const kesMomoAccountName = (kesMAccountName || '').trim();
 
         const kesMomoCost = (kesMomoInput / kesRate).toFixed(6).replace(/\.?0+$/, "") || "0.00";
         return {

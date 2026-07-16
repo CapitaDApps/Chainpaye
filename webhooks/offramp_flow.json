@@ -2029,6 +2029,14 @@
               },
               {
                 "type": "TextInput",
+                "name": "account_name",
+                "label": "Account Holder Name",
+                "required": true,
+                "input-type": "text",
+                "helper-text": "Enter the name registered with your M-Pesa"
+              },
+              {
+                "type": "TextInput",
                 "name": "sell_amount",
                 "label": "Amount (KES)",
                 "required": true,
@@ -2045,7 +2053,8 @@
                     "crypto_network": "${form.crypto_network}",
                     "network_code": "${form.network_code}",
                     "phone_number": "${form.phone_number}",
-                    "sell_amount": "${form.sell_amount}"
+                    "sell_amount": "${form.sell_amount}",
+                    "account_name": "${form.account_name}"
                   }
                 }
               }
