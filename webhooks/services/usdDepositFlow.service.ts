@@ -104,10 +104,11 @@ export const getUsdDepositScreen = async (decryptedBody: {
         const bankDetailsMessage = `💰 *USD Deposit Details*
 
 *Bank Name:* Chase Bank
-*Account Name:* Connect Word Ink INC
+*Account Name:* ConnectWorld Inc
 *Account Number:* 839128227
 *Routing Number:* 021000021
-*Bank Address:* Chase Bank, N.A., 270 Park Avenue, New York, NY 10017
+*Bank Address:* Chase Bank, N.A., 270 Park Avenue, New York
+*ZIP CODE: 10017"
 
 *Amount to Transfer:* $${Number(data.amount).toFixed(2)} USD`;
 

@@ -22,6 +22,15 @@ export interface CrossmintWallet {
   chainType: string;
   type: string;
   owner: string;
+  /** Populated from the GET /wallets response — contains the admin signer config */
+  config?: {
+    adminSigner?: {
+      /** e.g. "external-wallet", "solana-keypair", "api-key" */
+      type: string;
+      address?: string;
+      locator?: string;
+    };
+  };
 }
 
 export interface CrossmintBalance {
@@ -82,6 +91,39 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
 
   private get adminSolanaPrivateKey(): string {
     return process.env.CROSSMINT_ADMIN_SOLANA_PRIVATE_KEY || "";
+  }
+
+  /**
+   * Resolve the correct signer string for a transfer request.
+   *
+   * Crossmint wallets are locked to the signer type used at creation time.
+   * Older wallets used "solana-keypair" while the current default is "external-wallet".
+   * Sending the wrong prefix causes a 400 "signer not found" error.
+   *
+   * This method reads the wallet's actual adminSigner config from Crossmint and
+   * returns the correctly prefixed signer string, e.g.:
+   *   "external-wallet:CGz55..."   (new wallets)
+   *   "solana-keypair:CGz55..."    (legacy Solana wallets)
+   *   "evm-keypair:0x..."          (legacy EVM wallets, if ever used)
+   *
+   * Falls back to "external-wallet:<address>" if the config is not available.
+   */
+  private resolveSignerForWallet(
+    wallet: CrossmintWallet,
+    adminAddress: string,
+  ): string {
+    const signerType = wallet.config?.adminSigner?.type;
+
+    // Use whatever signer type the wallet was actually created with
+    if (signerType && signerType !== "external-wallet") {
+      const resolved = `${signerType}:${adminAddress}`;
+      logger.info(
+        `[resolveSignerForWallet] Using legacy signer type "${signerType}" for wallet ${wallet.address}: ${resolved}`,
+      );
+      return resolved;
+    }
+
+    return `external-wallet:${adminAddress}`;
   }
 
   /**
@@ -1237,7 +1279,7 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
           recipient: toAddress,
           executionRoute: "direct",
           // Configure external wallet signer for transaction signing
-          signer: `external-wallet:${adminAddress}`,
+          signer: this.resolveSignerForWallet(wallet, adminAddress),
         },
         {
           headers: {
@@ -1528,7 +1570,7 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         // Stellar uses api-key signer — no external wallet signer needed
         // Other chains require the external wallet signer for approval
         if (!isStellarTransfer) {
-          transferPayload.signer = `external-wallet:${adminAddress}`;
+          transferPayload.signer = this.resolveSignerForWallet(wallet, adminAddress);
         }
 
         // NOTE: Memo commented out - switched to wallet that doesn't require memo ID
@@ -1626,7 +1668,8 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
               wallet.address,
               response.data.id,
               response.data.approvals?.pending?.[0]?.message,
-              adminAddress
+              adminAddress,
+              this.resolveSignerForWallet(wallet, adminAddress),
             );
             
             console.log("✅ TRANSACTION AUTO-APPROVED SUCCESSFULLY");
@@ -1757,12 +1800,16 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
   /**
    * Submit transaction approval for external wallet signers
    * Handles both EVM (using viem) and Solana (using @solana/web3.js + tweetnacl) chains
+   *
+   * @param resolvedSigner - The full signer string already resolved for the wallet,
+   *                         e.g. "solana-keypair:CGz..." or "external-wallet:CGz..."
    */
   private async submitTransactionApproval(
     walletAddress: string,
     transactionId: string,
     messageToSign: string,
-    signerAddress: string
+    signerAddress: string,
+    resolvedSigner?: string,
   ): Promise<any> {
     try {
       if (!messageToSign) {
@@ -1776,6 +1823,7 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         walletAddress,
         transactionId,
         signerAddress,
+        resolvedSigner: resolvedSigner || `external-wallet:${signerAddress}`,
         messageLength: messageToSign.length,
         chainType: isSolanaChain ? 'solana' : 'evm',
       });
@@ -1790,11 +1838,14 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         signature = await this.signEvmMessage(messageToSign, signerAddress);
       }
 
+      // Use the resolved signer string (preserves the original signer type, e.g. "solana-keypair")
+      const signerString = resolvedSigner || `external-wallet:${signerAddress}`;
+
       // Submit the approval
       const approvalPayload = {
         approvals: [
           {
-            signer: `external-wallet:${signerAddress}`,
+            signer: signerString,
             signature,
           },
         ],
@@ -2769,7 +2820,7 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         recipient: recipientAddress,
         transactionType: "direct",
         idempotencyKey,
-        signer: `external-wallet:${adminAddress}`,
+        signer: this.resolveSignerForWallet(wallet, adminAddress),
         metadata: {
           userId,
           token: TOKEN_IDENTIFIER,
@@ -2779,10 +2830,10 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
 
       logger.info(`[SolanaUSDT] Submitting transfer:`, {
         endpoint: transferEndpoint,
-        amount,
+        amount: sanitizedAmount,
         recipient: recipientAddress,
         idempotencyKey,
-        signer: `external-wallet:${adminAddress}`,
+        signer: this.resolveSignerForWallet(wallet, adminAddress),
       });
 
       const response = await axios.post(transferEndpoint, transferPayload, {
@@ -2818,6 +2869,7 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
             response.data.id,
             pendingApproval.message,
             adminAddress,
+            this.resolveSignerForWallet(wallet, adminAddress),
           );
 
           logger.info(`[SolanaUSDT] Approval submitted successfully`, {

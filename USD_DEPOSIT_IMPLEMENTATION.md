@@ -63,11 +63,13 @@ This implementation creates a new USD deposit system that allows users to deposi
 ## Bank Details (Hardcoded)
 
 ```
-Bank Name: Chase Bank
-Account Name: Connect Word Ink INC
-Account Number: 839128227
-Routing Number: 021000021
-Bank Address: Chase Bank, N.A., 270 Park Avenue, New York, NY 10017
+
+*Bank Name:* Chase Bank
+*Account Name:* ConnectWorld Inc
+*Account Number:* 839128227
+*Routing Number:* 021000021
+*Bank Address:* Chase Bank, N.A., 270 Park Avenue, New York
+*ZIP CODE: 10017"
 ```
 
 ## Data Storage
