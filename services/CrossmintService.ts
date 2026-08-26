@@ -1964,10 +1964,10 @@ export class CrossmintService implements ICrossmintService, IWalletManager {
         );
       }
 
-      // Sign the message (Solana messages are base64 format, NOT hex like EVM)
-      const messageBytes = Buffer.from(messageToSign, "base64");
+      // Sign the message (Solana messages are base58-encoded serialized transactions)
+      const messageBytes = bs58.default.decode(messageToSign);
       const sig = nacl.default.sign.detached(messageBytes, keypair.secretKey);
-      const signature = Buffer.from(sig).toString("base64");
+      const signature = bs58.default.encode(sig);
 
       logger.info(`Solana message signed successfully`, {
         signerAddress,
